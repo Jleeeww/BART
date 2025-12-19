@@ -23,7 +23,7 @@ export function StockHeader({ stock }: StockHeaderProps) {
               {stock.symbol}
             </h1>
             <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium uppercase tracking-wider ${bgColorClass} ${changeColorClass}`}>
-              NYSE
+              IDX
             </span>
           </div>
           <p className="text-lg text-muted-foreground font-medium mt-1">
@@ -35,7 +35,7 @@ export function StockHeader({ stock }: StockHeaderProps) {
       <div className="flex flex-col md:items-end">
         <div className="flex items-baseline gap-3">
           <span className="text-4xl md:text-5xl font-mono font-bold tracking-tighter tabular-nums">
-            ${parseFloat(stock.price).toFixed(2)}
+            IDR {parseInt(stock.price).toLocaleString('id-ID')}
           </span>
         </div>
         <div className={`flex items-center gap-2 mt-2 font-mono font-medium ${changeColorClass}`}>

@@ -10,21 +10,22 @@ export async function registerRoutes(
 
   // Seed data check (simple check on startup)
   try {
-    const existing = await storage.getStockBySymbol("GOGL");
+    const existing = await storage.getStockBySymbol("BBCA");
     if (!existing) {
       await storage.createStock({
-        symbol: "GOGL",
-        name: "Google (Alphabet Inc.)",
-        price: "175.45",
-        change: "2.35",
-        changePercent: "1.36",
-        summary: "GOGL shows strong momentum with recent AI advancements. Gemini 1.5 Pro launch has been well-received by the developer community. Cloud revenue continues to grow at a double-digit pace, offsetting minor ad revenue fluctuations. Analysts maintain a BUY rating with a target of $195.",
-        description: "Alphabet Inc. is a holding company that gives ambitious projects the resources, freedom, and focus to make their ideas happen. It is the parent company of Google.",
-        marketCap: "2.1T",
-        peRatio: "24.5",
-        dividendYield: "0.45",
+        symbol: "BBCA",
+        name: "Bank Central Asia Tbk",
+        price: "11250",
+        change: "50",
+        changePercent: "0.45",
+        summary: "BBCA shows stable fundamentals with consistent profitability and strong liquidity. Recent price movement appears driven by steady accumulation rather than speculative trading. Valuation remains relatively high compared to peers, reflecting its defensive profile. Main risk lies in slower growth versus smaller banks.",
+        description: "PT Bank Central Asia Tbk is one of the largest commercial banks in Indonesia with a strong retail and SME banking franchise. Known for conservative credit policies and efficient operations.",
+        marketCap: "600.2T IDR",
+        peRatio: "18.5",
+        dividendYield: "3.20",
+        aiConfidence: "High",
       });
-      console.log("Seeded GOGL stock data");
+      console.log("Seeded BBCA stock data");
     }
   } catch (e) {
     console.error("Error seeding data (might be because tables don't exist yet):", e);

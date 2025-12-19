@@ -14,6 +14,7 @@ export const stocks = pgTable("stocks", {
   marketCap: text("market_cap").notNull(),
   peRatio: numeric("pe_ratio").notNull(),
   dividendYield: numeric("dividend_yield").notNull(),
+  aiConfidence: text("ai_confidence").default("High").notNull(), // High, Medium, Low
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

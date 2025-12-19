@@ -18,7 +18,7 @@ import {
 import { motion } from "framer-motion";
 
 export default function StockDashboard() {
-  const symbol = "GOGL"; // Hardcoded for this demo
+  const symbol = "BBCA"; // Hardcoded for this demo
   const { data: stock, isLoading, error } = useStock(symbol);
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -188,49 +188,7 @@ export default function StockDashboard() {
 
             {/* Sidebar Section */}
             <motion.div variants={itemVariants} className="space-y-6">
-              <AIStockSummary summary={stock.summary} />
-              
-              <Card className="p-6 border-border/50 shadow-sm">
-                <h3 className="font-display font-bold text-lg mb-4">Analyst Rating</h3>
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="flex-1 h-3 bg-secondary rounded-full overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-[65%]" />
-                  </div>
-                  <span className="font-bold text-emerald-600">Buy</span>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Analyst Target</span>
-                    <span className="font-mono font-medium">$165.00</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Low Target</span>
-                    <span className="font-mono font-medium">$132.00</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">High Target</span>
-                    <span className="font-mono font-medium">$180.00</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6 border-border/50 shadow-sm bg-primary text-primary-foreground relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-10 transform translate-x-1/4 -translate-y-1/4">
-                  <TrendingUp className="w-40 h-40" />
-                </div>
-                <div className="relative z-10">
-                  <h3 className="font-display font-bold text-xl mb-2">Trade {stock.symbol}</h3>
-                  <p className="text-primary-foreground/80 text-sm mb-6">
-                    Commission-free trading available now.
-                  </p>
-                  <button className="w-full py-3 bg-background text-foreground font-bold rounded-xl hover:bg-background/90 transition-colors shadow-lg shadow-black/10">
-                    Buy Shares
-                  </button>
-                  <button className="w-full mt-3 py-3 bg-primary-foreground/10 text-primary-foreground font-bold rounded-xl hover:bg-primary-foreground/20 transition-colors border border-primary-foreground/20">
-                    Add to Watchlist
-                  </button>
-                </div>
-              </Card>
+              <AIStockSummary summary={stock.summary} confidence={stock.aiConfidence as "High" | "Medium" | "Low"} />
             </motion.div>
           </div>
         </motion.div>
