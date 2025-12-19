@@ -20,9 +20,15 @@ export async function registerRoutes(
         changePercent: "0.45",
         summary: "BBCA shows stable fundamentals with consistent profitability and strong liquidity. Recent price movement appears driven by steady accumulation rather than speculative trading. Valuation remains relatively high compared to peers, reflecting its defensive profile. Main risk lies in slower growth versus smaller banks.",
         description: "PT Bank Central Asia Tbk is one of the largest commercial banks in Indonesia with a strong retail and SME banking franchise. Known for conservative credit policies and efficient operations.",
+        sector: "Financials",
+        subsector: "Banking",
         marketCap: "600.2T IDR",
         peRatio: "18.5",
         dividendYield: "3.20",
+        roe: "15.8",
+        netMargin: "28.4",
+        growth: "5.2",
+        investorView: "BBCA is viewed by investors as a defensive, income-oriented holding. The stock appeals to those seeking stability through established market leadership and consistent dividend payments. Conservative lending practices and strong loan portfolios have supported investor confidence across market cycles. Institutional ownership remains high, reflecting its liquidity and creditworthiness.",
         aiConfidence: "High",
       });
       console.log("Seeded BBCA stock data");

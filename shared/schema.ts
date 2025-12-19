@@ -11,9 +11,15 @@ export const stocks = pgTable("stocks", {
   changePercent: numeric("change_percent").notNull(),
   summary: text("summary").notNull(),
   description: text("description").notNull(), // For Overview tab
+  sector: text("sector").notNull(),
+  subsector: text("subsector").notNull(),
   marketCap: text("market_cap").notNull(),
   peRatio: numeric("pe_ratio").notNull(),
   dividendYield: numeric("dividend_yield").notNull(),
+  roe: numeric("roe").notNull(), // Return on Equity
+  netMargin: numeric("net_margin").notNull(), // Net Profit Margin
+  growth: numeric("growth").notNull(), // Year-over-year growth rate
+  investorView: text("investor_view").notNull(), // How investors view this stock
   aiConfidence: text("ai_confidence").default("High").notNull(), // High, Medium, Low
   updatedAt: timestamp("updated_at").defaultNow(),
 });

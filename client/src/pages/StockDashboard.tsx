@@ -135,36 +135,56 @@ export default function StockDashboard() {
                 </TabsList>
                 
                 <div className="mt-6">
-                  <TabsContent value="overview" className="mt-0 focus-visible:outline-none">
+                  <TabsContent value="overview" className="mt-0 focus-visible:outline-none space-y-6">
                     <Card className="p-6 border-border/50 shadow-sm">
                       <h3 className="text-xl font-bold font-display mb-4">Company Profile</h3>
-                      <p className="text-muted-foreground leading-relaxed mb-8">
+                      <p className="text-muted-foreground leading-relaxed mb-6">
                         {stock.description}
                       </p>
                       
-                      <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Key Statistics</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <MetricCard 
-                          label="Market Cap" 
-                          value={stock.marketCap} 
-                          trend="neutral"
-                        />
-                        <MetricCard 
-                          label="P/E Ratio" 
-                          value={parseFloat(stock.peRatio).toFixed(2)} 
-                          trend="down"
-                        />
-                        <MetricCard 
-                          label="Div Yield" 
-                          value={`${parseFloat(stock.dividendYield).toFixed(2)}%`}
-                          trend="up"
-                        />
-                        <MetricCard 
-                          label="Beta (5Y)" 
-                          value="1.42" 
-                          trend="neutral"
-                        />
+                      <div className="grid grid-cols-2 gap-6 mb-8">
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Sector</p>
+                          <p className="text-lg font-semibold text-foreground">{stock.sector}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Subsector</p>
+                          <p className="text-lg font-semibold text-foreground">{stock.subsector}</p>
+                        </div>
                       </div>
+                      
+                      <div className="pt-6 border-t border-border/50">
+                        <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Key Metrics</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <MetricCard 
+                            label="P/E Ratio" 
+                            value={parseFloat(stock.peRatio).toFixed(2)} 
+                            trend="neutral"
+                          />
+                          <MetricCard 
+                            label="ROE" 
+                            value={`${parseFloat(stock.roe).toFixed(1)}%`}
+                            trend="up"
+                          />
+                          <MetricCard 
+                            label="Net Margin" 
+                            value={`${parseFloat(stock.netMargin).toFixed(1)}%`}
+                            trend="neutral"
+                          />
+                          <MetricCard 
+                            label="YoY Growth" 
+                            value={`${parseFloat(stock.growth).toFixed(1)}%`}
+                            trend="up"
+                          />
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">How investors typically view this stock</h3>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {stock.investorView}
+                      </p>
                     </Card>
                   </TabsContent>
                   
