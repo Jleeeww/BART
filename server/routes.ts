@@ -45,15 +45,26 @@ export async function registerRoutes(
         ocf2023: "28.5T IDR",
         ocf2024: "31.2T IDR",
         ocf2025: "34.7T IDR",
-        tradingActivitySummary: "Recent trading patterns indicate moderate accumulation by institutional investors, with particular strength from domestic funds. Trading volume has remained steady, suggesting sustained interest from a diversified participant base. The distribution of volume across brokers is relatively balanced, indicating no single entity dominates trading activity. This pattern reflects typical behavior for blue-chip banking stocks with strong liquidity and broad ownership.",
+        tradingActivitySummary: "Recent trading patterns show institutional accumulation with steady volume participation.",
+        flowOverviewSummary: "Trading flow analysis reveals a balanced institutional presence with moderate net accumulation. Domestic institutional investors have shown steady buying interest, while some profit-taking has occurred through selective sales by certain brokers. The overall flow pattern suggests cautious optimism among market participants, with typical positioning for a defensive banking stock.",
+        flowBias: "Accumulation",
         flowReliability: "High",
         brokerData: JSON.stringify([
-          { name: "PT Mandiri Sekuritas", netBuy: "125.5B IDR", netSell: null, volumePercent: "12.4%" },
-          { name: "PT BNI Securities", netBuy: "98.2B IDR", netSell: null, volumePercent: "9.8%" },
-          { name: "PT Maybank Kim Eng", netBuy: null, netSell: "45.3B IDR", volumePercent: "8.7%" },
-          { name: "PT CIMB Securities", netBuy: "72.3B IDR", netSell: null, volumePercent: "7.2%" },
-          { name: "PT Bahana Securities", netBuy: null, netSell: "28.4B IDR", volumePercent: "6.5%" }
+          { code: "BK", name: "PT Mandiri Sekuritas", netBuy: "125.5B IDR", netSell: null, volumePercent: "12.4%" },
+          { code: "BNI", name: "PT BNI Securities", netBuy: "98.2B IDR", netSell: null, volumePercent: "9.8%" },
+          { code: "CIMB", name: "PT CIMB Securities", netBuy: "72.3B IDR", netSell: null, volumePercent: "7.2%" },
+          { code: "MBK", name: "PT Maybank Kim Eng", netBuy: null, netSell: "45.3B IDR", volumePercent: "8.7%" },
+          { code: "BHS", name: "PT Bahana Securities", netBuy: null, netSell: "28.4B IDR", volumePercent: "6.5%" }
         ]),
+        foreignActivityData: JSON.stringify({
+          foreignBuy: "185.2B IDR",
+          foreignSell: "92.4B IDR",
+          netForeignFlow: "92.8B IDR",
+          domesticBuy: "450.7B IDR",
+          domesticSell: "320.3B IDR",
+          foreignPercent: 22,
+          domesticPercent: 78
+        }),
         aiConfidence: "High",
       });
       console.log("Seeded BBCA stock data");

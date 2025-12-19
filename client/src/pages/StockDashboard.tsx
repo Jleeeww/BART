@@ -284,29 +284,35 @@ export default function StockDashboard() {
 
                   {/* Flow Tab */}
                   <TabsContent value="flow" className="mt-0 focus-visible:outline-none space-y-6">
+                    {/* SECTION 1: AI Flow Overview */}
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Trading Activity Summary</h3>
-                      <p className="text-muted-foreground leading-relaxed mb-4">
-                        {stock.tradingActivitySummary}
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">AI Flow Overview</h3>
+                      <p className="text-muted-foreground leading-relaxed mb-6">
+                        {stock.flowOverviewSummary}
                       </p>
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">Flow Reliability:</span>
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
-                          {stock.flowReliability}
-                        </span>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Flow Bias</p>
+                          <p className="text-base font-semibold text-foreground">{stock.flowBias}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Flow Reliability</p>
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                            {stock.flowReliability}
+                          </span>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Flow Reliability indicates the quality and consistency of trading data. High reliability means the data reflects broad market participation. Medium suggests moderate data quality. Low indicates limited data coverage.
-                      </p>
                     </Card>
 
+                    {/* SECTION 2: Broker Summary */}
                     <Card className="p-6 border-border/50 shadow-sm">
                       <h4 className="text-base font-bold font-display mb-4 text-foreground">Broker Summary</h4>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border/50">
-                              <th className="text-left py-3 px-3 font-semibold text-foreground">Broker</th>
+                              <th className="text-left py-3 px-3 font-semibold text-foreground">Broker Code</th>
+                              <th className="text-left py-3 px-3 font-semibold text-foreground">Broker Name</th>
                               <th className="text-right py-3 px-3 font-semibold text-foreground">Net Buy (IDR)</th>
                               <th className="text-right py-3 px-3 font-semibold text-foreground">Net Sell (IDR)</th>
                               <th className="text-right py-3 px-3 font-semibold text-foreground">% of Volume</th>
@@ -316,8 +322,14 @@ export default function StockDashboard() {
                             {(() => {
                               try {
                                 const brokers = JSON.parse(stock.brokerData);
-                                return brokers.map((broker: any, index: number) => (
+                                const sorted = [...brokers].sort((a: any, b: any) => {
+                                  const aVal = parseFloat(a.netBuy?.replace(/[B IDR]/g, "") || a.netSell?.replace(/[B IDR]/g, "") || "0");
+                                  const bVal = parseFloat(b.netBuy?.replace(/[B IDR]/g, "") || b.netSell?.replace(/[B IDR]/g, "") || "0");
+                                  return bVal - aVal;
+                                });
+                                return sorted.map((broker: any, index: number) => (
                                   <tr key={index} className="border-b border-border/30 hover:bg-muted/30">
+                                    <td className="py-3 px-3 font-mono font-semibold text-foreground">{broker.code}</td>
                                     <td className="py-3 px-3 text-muted-foreground">{broker.name}</td>
                                     <td className="text-right py-3 px-3 font-mono">
                                       {broker.netBuy ? (
@@ -343,7 +355,7 @@ export default function StockDashboard() {
                               } catch (e) {
                                 return (
                                   <tr>
-                                    <td colSpan={4} className="py-3 px-3 text-muted-foreground text-center">
+                                    <td colSpan={5} className="py-3 px-3 text-muted-foreground text-center">
                                       No broker data available
                                     </td>
                                   </tr>
@@ -352,6 +364,90 @@ export default function StockDashboard() {
                             })()}
                           </tbody>
                         </table>
+                      </div>
+                    </Card>
+
+                    {/* SECTION 3: Foreign vs Domestic Activity */}
+                    <Card className="p-6 border-border/50 shadow-sm space-y-6">
+                      <div>
+                        <h4 className="text-base font-bold font-display mb-4 text-foreground">Foreign vs Domestic Activity</h4>
+                        {(() => {
+                          try {
+                            const data = JSON.parse(stock.foreignActivityData);
+                            return (
+                              <div className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  {/* Foreign Activity */}
+                                  <div className="space-y-3">
+                                    <h5 className="text-sm font-semibold text-foreground">Foreign Investors</h5>
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Buy:</span>
+                                        <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{data.foreignBuy}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Sell:</span>
+                                        <span className="font-mono font-semibold text-red-600 dark:text-red-400">{data.foreignSell}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center border-t border-border/30 pt-2">
+                                        <span className="text-muted-foreground font-semibold">Net Flow:</span>
+                                        <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{data.netForeignFlow}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Domestic Activity */}
+                                  <div className="space-y-3">
+                                    <h5 className="text-sm font-semibold text-foreground">Domestic Investors</h5>
+                                    <div className="space-y-2 text-sm">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Buy:</span>
+                                        <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{data.domesticBuy}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-muted-foreground">Sell:</span>
+                                        <span className="font-mono font-semibold text-red-600 dark:text-red-400">{data.domesticSell}</span>
+                                      </div>
+                                      <div className="h-1" />
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Bar Visual for Participation Split */}
+                                <div className="space-y-3">
+                                  <h5 className="text-sm font-semibold text-foreground">Participation Split</h5>
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex-1 h-6 rounded-md overflow-hidden border border-border/30 flex">
+                                      <div
+                                        className="bg-blue-500 dark:bg-blue-400 transition-all"
+                                        style={{ width: `${data.domesticPercent}%` }}
+                                      />
+                                      <div
+                                        className="bg-amber-500 dark:bg-amber-400 transition-all"
+                                        style={{ width: `${data.foreignPercent}%` }}
+                                      />
+                                    </div>
+                                    <div className="flex gap-4 text-xs font-semibold whitespace-nowrap">
+                                      <span>
+                                        <span className="inline-block w-3 h-3 rounded-sm bg-blue-500 dark:bg-blue-400 mr-1" />
+                                        {data.domesticPercent}%
+                                      </span>
+                                      <span>
+                                        <span className="inline-block w-3 h-3 rounded-sm bg-amber-500 dark:bg-amber-400 mr-1" />
+                                        {data.foreignPercent}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    The stock shows strong domestic investor interest, which is typical for established blue-chip banking stocks. Foreign participation remains meaningful but secondary, reflecting cautious international investor positioning in Indonesian equities.
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          } catch (e) {
+                            return <p className="text-muted-foreground text-sm">No foreign/domestic data available</p>;
+                          }
+                        })()}
                       </div>
                     </Card>
                   </TabsContent>
