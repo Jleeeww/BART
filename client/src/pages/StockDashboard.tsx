@@ -77,7 +77,7 @@ export default function StockDashboard() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <TrendingUp className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-xl tracking-tight">TradeDash</span>
+            <span className="font-display font-bold text-xl tracking-tight">BR Trade</span>
           </div>
           
           <div className="flex items-center gap-4">
@@ -188,8 +188,102 @@ export default function StockDashboard() {
                     </Card>
                   </TabsContent>
                   
+                  {/* Financials Tab */}
+                  <TabsContent value="financials" className="mt-0 focus-visible:outline-none space-y-6">
+                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Financial Performance Summary</h3>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {stock.financialSummary}
+                      </p>
+                    </Card>
+
+                    <Card className="p-6 border-border/50 shadow-sm">
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Income Statement</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/50">
+                              <th className="text-left py-3 px-3 font-semibold text-foreground">Metric</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">2023</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">2024</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">2025</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b border-border/30 hover:bg-muted/30">
+                              <td className="py-3 px-3 text-muted-foreground">Revenue</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.revenue2023}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.revenue2024}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.revenue2025}</td>
+                            </tr>
+                            <tr className="border-b border-border/30 hover:bg-muted/30">
+                              <td className="py-3 px-3 text-muted-foreground">Net Profit</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.netProfit2023}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.netProfit2024}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.netProfit2025}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+
+                    <Card className="p-6 border-border/50 shadow-sm">
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Balance Sheet</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/50">
+                              <th className="text-left py-3 px-3 font-semibold text-foreground">Metric</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">2023</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">2024</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">2025</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b border-border/30 hover:bg-muted/30">
+                              <td className="py-3 px-3 text-muted-foreground">Total Assets</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.assets2023}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.assets2024}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.assets2025}</td>
+                            </tr>
+                            <tr className="border-b border-border/30 hover:bg-muted/30">
+                              <td className="py-3 px-3 text-muted-foreground">Total Liabilities</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.liabilities2023}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.liabilities2024}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.liabilities2025}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+
+                    <Card className="p-6 border-border/50 shadow-sm">
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Cash Flow</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/50">
+                              <th className="text-left py-3 px-3 font-semibold text-foreground">Metric</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">2023</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">2024</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">2025</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="border-b border-border/30 hover:bg-muted/30">
+                              <td className="py-3 px-3 text-muted-foreground">Operating Cash Flow</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.ocf2023}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.ocf2024}</td>
+                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.ocf2025}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  </TabsContent>
+
                   {/* Placeholder for other tabs */}
-                  {["financials", "valuation", "flow", "news", "risk"].map((tab) => (
+                  {["valuation", "flow", "news", "risk"].map((tab) => (
                     <TabsContent key={tab} value={tab} className="mt-0 focus-visible:outline-none">
                       <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
                         <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
