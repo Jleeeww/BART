@@ -48,6 +48,7 @@ export async function registerRoutes(
         tradingActivitySummary: "Recent trading patterns show institutional accumulation with steady volume participation.",
         flowOverviewSummary: "Trading flow analysis reveals a balanced institutional presence with moderate net accumulation. Domestic institutional investors have shown steady buying interest, while some profit-taking has occurred through selective sales by certain brokers. The overall flow pattern suggests cautious optimism among market participants, with typical positioning for a defensive banking stock.",
         flowBias: "Accumulation",
+        flowIntensity: "Moderate Accumulation",
         flowReliability: "High",
         brokerData: JSON.stringify([
           { code: "BK", name: "PT Mandiri Sekuritas", netBuy: "125.5B IDR", netSell: null, volumePercent: "12.4%" },
@@ -65,6 +66,8 @@ export async function registerRoutes(
           foreignPercent: 22,
           domesticPercent: 78
         }),
+        avgBuyPrice: "9,542 IDR",
+        avgSellPrice: "9,538 IDR",
         aiConfidence: "High",
       });
       console.log("Seeded BBCA stock data");

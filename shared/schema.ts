@@ -42,8 +42,11 @@ export const stocks = pgTable("stocks", {
   flowOverviewSummary: text("flow_overview_summary").notNull(),
   flowBias: text("flow_bias").notNull(), // Accumulation, Distribution, Neutral
   flowReliability: text("flow_reliability").notNull(),
+  flowIntensity: text("flow_intensity").notNull(), // Big Distribution, Moderate Distribution, Neutral, Moderate Accumulation, Big Accumulation
   brokerData: text("broker_data").notNull(), // JSON stringified array of brokers
   foreignActivityData: text("foreign_activity_data").notNull(), // JSON stringified foreign/domestic data
+  avgBuyPrice: text("avg_buy_price").notNull(), // Average transaction price for buys
+  avgSellPrice: text("avg_sell_price").notNull(), // Average transaction price for sells
   aiConfidence: text("ai_confidence").default("High").notNull(), // High, Medium, Low
   updatedAt: timestamp("updated_at").defaultNow(),
 });

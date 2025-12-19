@@ -290,6 +290,38 @@ export default function StockDashboard() {
                       <p className="text-muted-foreground leading-relaxed mb-6">
                         {stock.flowOverviewSummary}
                       </p>
+                      
+                      {/* Flow Intensity Gradient Bar */}
+                      <div className="mb-6">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Flow Intensity</p>
+                        <div className="space-y-2">
+                          <div className="relative h-8 rounded-md border border-border/30 overflow-hidden flex items-center">
+                            <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-neutral-400 to-emerald-500 dark:from-red-600 dark:via-neutral-500 dark:to-emerald-600" />
+                            {(() => {
+                              const intensityValues: Record<string, number> = {
+                                "Big Distribution": 10,
+                                "Moderate Distribution": 30,
+                                "Neutral": 50,
+                                "Moderate Accumulation": 70,
+                                "Big Accumulation": 90,
+                              };
+                              const position = intensityValues[stock.flowIntensity] || 50;
+                              return (
+                                <div
+                                  className="absolute w-0.5 h-10 bg-foreground shadow-lg rounded-full -top-1 transition-all"
+                                  style={{ left: `${position}%` }}
+                                />
+                              );
+                            })()}
+                          </div>
+                          <div className="flex justify-between text-xs text-muted-foreground px-1">
+                            <span>Big Distribution</span>
+                            <span>Big Accumulation</span>
+                          </div>
+                        </div>
+                        <p className="text-sm font-semibold text-foreground mt-3">{stock.flowIntensity}</p>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-6">
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Flow Bias</p>
@@ -364,6 +396,24 @@ export default function StockDashboard() {
                             })()}
                           </tbody>
                         </table>
+                      </div>
+
+                      {/* Average Transaction Price Section */}
+                      <div className="mt-6 pt-6 border-t border-border/30">
+                        <h5 className="text-sm font-bold font-display mb-4 text-foreground">Average Transaction Price</h5>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Buy Average Price</p>
+                            <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400 font-mono">{stock.avgBuyPrice}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Sell Average Price</p>
+                            <p className="text-lg font-semibold text-red-600 dark:text-red-400 font-mono">{stock.avgSellPrice}</p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-3">
+                          The narrow spread between buy and sell prices indicates institutional participation with minimal price friction during execution.
+                        </p>
                       </div>
                     </Card>
 
