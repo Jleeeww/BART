@@ -282,8 +282,64 @@ export default function StockDashboard() {
                     </Card>
                   </TabsContent>
 
+                  {/* Flow Tab */}
+                  <TabsContent value="flow" className="mt-0 focus-visible:outline-none space-y-6">
+                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Trading Activity Summary</h3>
+                      <p className="text-muted-foreground leading-relaxed mb-4">
+                        {stock.tradingActivitySummary}
+                      </p>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Flow Reliability:</span>
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                          {stock.flowReliability}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Flow Reliability indicates the quality and consistency of trading data. High reliability means the data reflects broad market participation. Medium suggests moderate data quality. Low indicates limited data coverage.
+                      </p>
+                    </Card>
+
+                    <Card className="p-6 border-border/50 shadow-sm">
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Broker Summary</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border/50">
+                              <th className="text-left py-3 px-3 font-semibold text-foreground">Broker</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">Net Buy / Sell</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">% of Volume</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(() => {
+                              try {
+                                const brokers = JSON.parse(stock.brokerData);
+                                return brokers.map((broker: any, index: number) => (
+                                  <tr key={index} className="border-b border-border/30 hover:bg-muted/30">
+                                    <td className="py-3 px-3 text-muted-foreground">{broker.name}</td>
+                                    <td className="text-right py-3 px-3 font-mono text-foreground">{broker.netBuySell}</td>
+                                    <td className="text-right py-3 px-3 font-mono text-foreground">{broker.volumePercent}</td>
+                                  </tr>
+                                ));
+                              } catch (e) {
+                                return (
+                                  <tr>
+                                    <td colSpan={3} className="py-3 px-3 text-muted-foreground text-center">
+                                      No broker data available
+                                    </td>
+                                  </tr>
+                                );
+                              }
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    </Card>
+                  </TabsContent>
+
                   {/* Placeholder for other tabs */}
-                  {["valuation", "flow", "news", "risk"].map((tab) => (
+                  {["valuation", "news", "risk"].map((tab) => (
                     <TabsContent key={tab} value={tab} className="mt-0 focus-visible:outline-none">
                       <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
                         <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">

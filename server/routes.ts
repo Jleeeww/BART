@@ -45,6 +45,15 @@ export async function registerRoutes(
         ocf2023: "28.5T IDR",
         ocf2024: "31.2T IDR",
         ocf2025: "34.7T IDR",
+        tradingActivitySummary: "Recent trading patterns indicate moderate accumulation by institutional investors, with particular strength from domestic funds. Trading volume has remained steady, suggesting sustained interest from a diversified participant base. The distribution of volume across brokers is relatively balanced, indicating no single entity dominates trading activity. This pattern reflects typical behavior for blue-chip banking stocks with strong liquidity and broad ownership.",
+        flowReliability: "High",
+        brokerData: JSON.stringify([
+          { name: "PT Mandiri Sekuritas", netBuySell: "125.5B IDR", volumePercent: "12.4%" },
+          { name: "PT BNI Securities", netBuySell: "98.2B IDR", volumePercent: "9.8%" },
+          { name: "PT Maybank Kim Eng", netBuySell: "87.6B IDR", volumePercent: "8.7%" },
+          { name: "PT CIMB Securities", netBuySell: "72.3B IDR", volumePercent: "7.2%" },
+          { name: "PT Bahana Securities", netBuySell: "65.8B IDR", volumePercent: "6.5%" }
+        ]),
         aiConfidence: "High",
       });
       console.log("Seeded BBCA stock data");

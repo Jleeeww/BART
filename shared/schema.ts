@@ -37,6 +37,10 @@ export const stocks = pgTable("stocks", {
   ocf2023: text("ocf_2023").notNull(),
   ocf2024: text("ocf_2024").notNull(),
   ocf2025: text("ocf_2025").notNull(),
+  // Flow data
+  tradingActivitySummary: text("trading_activity_summary").notNull(),
+  flowReliability: text("flow_reliability").notNull(),
+  brokerData: text("broker_data").notNull(), // JSON stringified array of brokers
   aiConfidence: text("ai_confidence").default("High").notNull(), // High, Medium, Low
   updatedAt: timestamp("updated_at").defaultNow(),
 });
