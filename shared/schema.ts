@@ -47,6 +47,13 @@ export const stocks = pgTable("stocks", {
   foreignActivityData: text("foreign_activity_data").notNull(), // JSON stringified foreign/domestic data
   avgBuyPrice: text("avg_buy_price").notNull(), // Average transaction price for buys
   avgSellPrice: text("avg_sell_price").notNull(), // Average transaction price for sells
+  // News and Corporate Action data
+  newsOverviewSummary: text("news_overview_summary").notNull(),
+  newsImpact: text("news_impact").notNull(), // Low, Medium, High
+  newsRelevance: text("news_relevance").notNull(), // Short-term, Structural
+  newsFeed: text("news_feed").notNull(), // JSON stringified array of news items
+  corporateActions: text("corporate_actions").notNull(), // JSON stringified array of corporate actions
+  investorInterpretation: text("investor_interpretation").notNull(), // What This Means for Investors
   aiConfidence: text("ai_confidence").default("High").notNull(), // High, Medium, Low
   updatedAt: timestamp("updated_at").defaultNow(),
 });

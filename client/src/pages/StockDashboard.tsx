@@ -502,8 +502,110 @@ export default function StockDashboard() {
                     </Card>
                   </TabsContent>
 
+                  {/* News Tab */}
+                  <TabsContent value="news" className="mt-0 focus-visible:outline-none space-y-6">
+                    {/* SECTION 1: AI News Overview */}
+                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">AI News Overview</h3>
+                      <p className="text-muted-foreground leading-relaxed mb-6">
+                        {stock.newsOverviewSummary}
+                      </p>
+                      <div className="grid grid-cols-2 gap-6">
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">News Impact</p>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            stock.newsImpact === "High" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                            stock.newsImpact === "Medium" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                            "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
+                          }`}>
+                            {stock.newsImpact}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Relevance</p>
+                          <p className="text-base font-semibold text-foreground">{stock.newsRelevance}</p>
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* SECTION 2: Filtered News Feed */}
+                    <Card className="p-6 border-border/50 shadow-sm">
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Filtered News Feed</h4>
+                      <div className="space-y-4">
+                        {(() => {
+                          try {
+                            const news = JSON.parse(stock.newsFeed);
+                            return news.map((item: any, index: number) => (
+                              <div key={index} className="p-4 rounded-md border border-border/30 hover:bg-muted/30 transition-colors">
+                                <div className="flex justify-between items-start gap-4 mb-2">
+                                  <h5 className="font-semibold text-foreground leading-tight">{item.headline}</h5>
+                                  <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                    item.impact === "Structural" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                                    item.impact === "Temporary" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                                    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-500"
+                                  }`}>
+                                    {item.impact}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                  <span>{item.date}</span>
+                                  <span className="w-1 h-1 rounded-full bg-border" />
+                                  <span>{item.source}</span>
+                                </div>
+                              </div>
+                            ));
+                          } catch (e) {
+                            return <p className="text-muted-foreground text-sm">No news items available</p>;
+                          }
+                        })()}
+                      </div>
+                    </Card>
+
+                    {/* SECTION 3: Corporate Action Summary */}
+                    <Card className="p-6 border-border/50 shadow-sm">
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Corporate Action Summary</h4>
+                      <div className="space-y-6">
+                        {(() => {
+                          try {
+                            const actions = JSON.parse(stock.corporateActions);
+                            return actions.map((action: any, index: number) => (
+                              <div key={index} className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <h5 className="font-bold text-foreground">{action.type}</h5>
+                                    <p className="text-xs text-muted-foreground">{action.date} • {action.status}</p>
+                                  </div>
+                                </div>
+                                <div className="p-3 bg-secondary/30 rounded-md">
+                                  <p className="text-xs text-muted-foreground leading-relaxed">
+                                    <span className="font-semibold text-foreground block mb-1">Impact Analysis:</span>
+                                    {action.explanation}
+                                  </p>
+                                </div>
+                                {index < actions.length - 1 && <div className="border-b border-border/30" />}
+                              </div>
+                            ));
+                          } catch (e) {
+                            return <p className="text-muted-foreground text-sm">No corporate actions available</p>;
+                          }
+                        })()}
+                      </div>
+                    </Card>
+
+                    {/* SECTION 4: What This Means for Investors */}
+                    <Card className="p-6 border border-primary/20 bg-primary/5 shadow-sm">
+                      <h4 className="text-base font-bold font-display mb-3 text-foreground flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-primary" />
+                        What This Means for Investors
+                      </h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {stock.investorInterpretation}
+                      </p>
+                    </Card>
+                  </TabsContent>
+
                   {/* Placeholder for other tabs */}
-                  {["valuation", "news", "risk"].map((tab) => (
+                  {["valuation", "risk"].map((tab) => (
                     <TabsContent key={tab} value={tab} className="mt-0 focus-visible:outline-none">
                       <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
                         <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">

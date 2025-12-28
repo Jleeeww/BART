@@ -68,6 +68,20 @@ export async function registerRoutes(
         }),
         avgBuyPrice: "9,542 IDR",
         avgSellPrice: "9,538 IDR",
+        newsOverviewSummary: "Recent developments for BBCA are centered around strong quarterly performance and digital banking expansion. The news landscape is characterized by stable growth narratives and positive regulatory adjustments in the Indonesian banking sector, reinforcing the company's structural position as a market leader.",
+        newsImpact: "Medium",
+        newsRelevance: "Structural",
+        newsFeed: JSON.stringify([
+          { headline: "BBCA Reports 12% YoY Net Profit Growth in Q3 2025", date: "2025-10-25", source: "IDX News", impact: "Structural" },
+          { headline: "Bank Indonesia Maintains Policy Rate, Positive for Banking Margins", date: "2025-11-15", source: "Business Times", impact: "Structural" },
+          { headline: "BBCA Digital App Reaches 30 Million Active Users", date: "2025-12-05", source: "TechDaily", impact: "Temporary" },
+          { headline: "Global Market Volatility Slightly Affects Local Financial Sector", date: "2025-12-20", source: "MarketWatch", impact: "Noise" }
+        ]),
+        corporateActions: JSON.stringify([
+          { type: "Cash Dividend", date: "2025-04-10", status: "Completed", explanation: "Distributed IDR 205 per share, reflecting strong capital position and commitment to shareholder returns." },
+          { type: "Stock Split", date: "2024-10-15", status: "Completed", explanation: "1:5 split to increase liquidity and make shares more accessible to retail investors." }
+        ]),
+        investorInterpretation: "Investors should view the current news flow as supportive of long-term stability. The combination of consistent profit growth and successful digital transformation suggests that the company's core fundamentals remain intact despite broader market noise. The structural relevance of recent earnings reports outweighs short-term volatility concerns.",
         aiConfidence: "High",
       });
       console.log("Seeded BBCA stock data");
