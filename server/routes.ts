@@ -89,7 +89,9 @@ export async function registerRoutes(
             why: "Management attribute the growth to higher Net Interest Income (NII) and improved loan-to-deposit ratios, supported by Indonesia's steady consumer consumption and infrastructure financing demand.",
             immediate: "Positive market sentiment led to a 1.5% appreciation in share price immediately post-announcement. Capital adequacy remains robust, providing a strong cushion against macro shocks.",
             secondOrder: "Institutional investors are likely to rebalance toward banking as a defensive play. However, smaller retail banks may face liquidity competition as BBCA attracts more low-cost CASA deposits.",
-            thesis: "Positive. The earnings reinforce the structural growth thesis. The ability to grow margins in a stable rate environment demonstrates superior operational leverage and market dominance."
+            thesis: "Positive. The earnings reinforce the structural growth thesis. The ability to grow margins in a stable rate environment demonstrates superior operational leverage and market dominance.",
+            confidence: "High",
+            conditions: "Thesis assumes continued stability in domestic consumption and no significant contraction in Net Interest Margins (NIM). A sharp increase in credit costs or unexpected regulatory caps on lending rates would weaken this structural outlook."
           },
           {
             title: "Strategic Digital Acquisition",
@@ -97,7 +99,9 @@ export async function registerRoutes(
             why: "The move is designed to accelerate digital penetration into the underbanked SME segment, where traditional credit assessment has been a bottleneck for growth.",
             immediate: "Minimal impact on share price due to the relatively small transaction size. Integration costs are expected to marginally impact short-term operating expenses.",
             secondOrder: "Long-term data advantage over competitors. Successful integration could lower cost-of-risk through better predictive analytics, though cultural integration remains a key execution risk.",
-            thesis: "Conditional. Positive if digital synergy exceeds integration costs. The strategic value lies in defensive moats against emerging neo-banks by matching their technological agility."
+            thesis: "Conditional. Positive if digital synergy exceeds integration costs. The strategic value lies in defensive moats against emerging neo-banks by matching their technological agility.",
+            confidence: "Medium",
+            conditions: "Success depends on retaining key tech talent from the acquired entity and maintaining data integrity during platform migration. Aggressive competitive responses from existing digital banks could also diminish the expected first-mover advantage in SME digital scoring."
           }
         ]),
         financialsAnalystView: "While the headline growth is impressive, analysts should monitor the sustainability of loan yield improvements. The trade-off between aggressive digital expansion and maintaining high Net Interest Margins (NIM) is a critical balance. Structural efficiency gains are visible, but macro-driven deposit competition could pressure funding costs in future periods.",

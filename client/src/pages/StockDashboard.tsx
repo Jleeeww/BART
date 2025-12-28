@@ -648,7 +648,23 @@ export default function StockDashboard() {
                               </div>
                               <div className="pt-4 border-t border-border/30">
                                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Analyst Thesis</p>
-                                <p className="text-sm font-medium text-foreground leading-relaxed italic">{item.thesis}</p>
+                                <p className="text-sm font-medium text-foreground leading-relaxed italic mb-4">{item.thesis}</p>
+                                
+                                <div className="p-4 bg-secondary/20 rounded-md border border-border/30">
+                                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Confidence & Conditions</p>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                      item.confidence === "High" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                                      item.confidence === "Medium" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                                      "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                                    }`}>
+                                      Confidence: {item.confidence}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground leading-relaxed">
+                                    {item.conditions}
+                                  </p>
+                                </div>
                               </div>
                             </Card>
                           ));
