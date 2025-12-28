@@ -58,6 +58,7 @@ export const stocks = pgTable("stocks", {
   financialsAnalystView: text("financials_analyst_view").notNull(), // Analyst view for financials
   flowAnalystView: text("flow_analyst_view").notNull(), // Analyst view for flow
   riskAnalystView: text("risk_analyst_view").notNull(), // Analyst view for risk
+  riskData: text("risk_data").notNull(), // JSON stringified risk framework data
   aiConfidence: text("ai_confidence").default("High").notNull(), // High, Medium, Low
   updatedAt: timestamp("updated_at").defaultNow(),
 });

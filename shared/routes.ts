@@ -66,6 +66,7 @@ export const api = {
           financialsAnalystView: z.string(),
           flowAnalystView: z.string(),
           riskAnalystView: z.string(),
+          riskData: z.string(),
           aiConfidence: z.enum(["High", "Medium", "Low"]),
           updatedAt: z.string().nullable(),
         }),

@@ -107,6 +107,30 @@ export async function registerRoutes(
         financialsAnalystView: "While the headline growth is impressive, analysts should monitor the sustainability of loan yield improvements. The trade-off between aggressive digital expansion and maintaining high Net Interest Margins (NIM) is a critical balance. Structural efficiency gains are visible, but macro-driven deposit competition could pressure funding costs in future periods.",
         flowAnalystView: "The current accumulation phase is driven by high-quality institutional demand. However, the concentration of ownership among top domestic funds creates a liquidity risk during periods of macro stress. The reliability of flow is high, but the trade-off is a potential for volatility if institutional sentiment shifts rapidly.",
         riskAnalystView: "Primary risk remains macro-sensitivity to global interest rate cycles. While domestic buffers are strong, the bank's valuation premium leaves little room for earnings disappointments. Structural risks are low, but regulatory shifts regarding capital requirements or digital banking oversight remain key uncertainties.",
+        riskData: JSON.stringify({
+          overview: "BBCA maintains a conservative risk profile characterized by high capital adequacy and superior asset quality. However, its market-leading position makes it a primary proxy for Indonesian macro risk, meaning global sentiment shifts often manifest here first.",
+          level: "Moderate",
+          skew: "Balanced to Downside (Valuation-driven)",
+          primaryRisks: [
+            { title: "Net Interest Margin (NIM) Compression", why: "Rising cost of funds due to global rate pressure could squeeze the spread between lending rates and deposit costs.", likelihood: "Medium", impact: "High" },
+            { title: "Macroeconomic Slowdown", why: "As a credit engine for the economy, any deceleration in domestic consumption directly impacts loan growth and asset quality.", likelihood: "Low", impact: "Very High" },
+            { title: "Digital Disruption", why: "Neo-banks and fintechs are aggressively targeting low-cost deposits (CASA), potentially eroding BBCA's funding advantage.", likelihood: "Medium", impact: "Medium" }
+          ],
+          contrarianRisks: [
+            { title: "Institutional Over-Concentration", why: "BBCA is a 'must-own' for almost all domestic and many emerging market funds. This creates a hidden liquidity trap.", material: "If a global 'risk-off' event triggers simultaneous redemptions across multiple major funds.", affected: "Long-term institutional holders who may face significant slippage during forced exits." },
+            { title: "Regulatory Tech-Liability", why: "The bank's rapid digital scale-up increases systemic exposure to cybersecurity incidents that regulators may treat with unprecedented severity.", material: "A major data breach or system outage affecting millions of retail depositors simultaneously.", affected: "Retail trust and the bank's operational license/standing with Bank Indonesia." }
+          ],
+          tension: "The central tension for investors lies between paying a significant valuation premium for 'certainty' versus the risk that even slight growth decelerations could lead to massive multiple de-rating. You are essentially trading potential alpha for capital preservation and dividend reliability.",
+          invalidation: [
+            "A structural shift in BI policy that caps lending rates for major banks.",
+            "A sustained period of Net Interest Margin falling below 5.0%.",
+            "Significant erosion of CASA ratio (below 70%) indicating loss of funding dominance."
+          ],
+          investorFit: {
+            suitable: "Conservative, long-term institutional and retail investors seeking dividend stability and a proxy for Indonesian economic growth.",
+            unsuitable: "Aggressive growth-seekers or those unwilling to pay high valuation multiples for mature-stage companies."
+          }
+        }),
         aiConfidence: "High",
       });
       console.log("Seeded BBCA stock data");

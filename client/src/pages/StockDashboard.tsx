@@ -675,8 +675,132 @@ export default function StockDashboard() {
                     </div>
                   </TabsContent>
 
+                  {/* Risk Tab */}
+                  <TabsContent value="risk" className="mt-0 focus-visible:outline-none space-y-6">
+                    {(() => {
+                      try {
+                        const data = JSON.parse(stock.riskData);
+                        return (
+                          <>
+                            {/* SECTION 1: AI Risk Overview */}
+                            <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/20 dark:to-red-900/10">
+                              <h3 className="text-lg font-bold font-display mb-4 text-foreground">AI Risk Overview</h3>
+                              <p className="text-muted-foreground leading-relaxed mb-6">
+                                {data.overview}
+                              </p>
+                              <div className="grid grid-cols-2 gap-6">
+                                <div>
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Overall Risk Level</p>
+                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                    data.level === "High" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                                    data.level === "Moderate" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                                    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                  }`}>
+                                    {data.level}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Risk Skew</p>
+                                  <p className="text-base font-semibold text-foreground">{data.skew}</p>
+                                </div>
+                              </div>
+                            </Card>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* SECTION 2: Primary Risks */}
+                              <Card className="p-6 border-border/50 shadow-sm space-y-4">
+                                <h4 className="text-base font-bold font-display text-foreground">Primary Risks (Consensus)</h4>
+                                <div className="space-y-4">
+                                  {data.primaryRisks.map((risk: any, i: number) => (
+                                    <div key={i} className="space-y-2">
+                                      <div className="flex justify-between items-start">
+                                        <h5 className="text-sm font-bold text-foreground">{risk.title}</h5>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase">{risk.impact} Impact</span>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground leading-relaxed">{risk.why}</p>
+                                      <p className="text-[10px] text-muted-foreground">Likelihood: <span className="text-foreground font-semibold">{risk.likelihood}</span></p>
+                                      {i < data.primaryRisks.length - 1 && <div className="border-b border-border/30 pt-2" />}
+                                    </div>
+                                  ))}
+                                </div>
+                              </Card>
+
+                              {/* SECTION 3: Underappreciated Risks */}
+                              <Card className="p-6 border-border/50 shadow-sm space-y-4 bg-secondary/10">
+                                <h4 className="text-base font-bold font-display text-foreground flex items-center gap-2">
+                                  <Activity className="w-4 h-4 text-amber-500" />
+                                  Contrarian Risks
+                                </h4>
+                                <div className="space-y-4">
+                                  {data.contrarianRisks.map((risk: any, i: number) => (
+                                    <div key={i} className="space-y-2">
+                                      <h5 className="text-sm font-bold text-foreground">{risk.title}</h5>
+                                      <div className="p-3 bg-background/50 rounded border border-border/20 space-y-2">
+                                        <p className="text-xs text-muted-foreground">
+                                          <span className="font-semibold text-foreground">Why underappreciated:</span> {risk.why}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          <span className="font-semibold text-foreground">Materiality:</span> {risk.material}
+                                        </p>
+                                      </div>
+                                      {i < data.contrarianRisks.length - 1 && <div className="border-b border-border/30 pt-2" />}
+                                    </div>
+                                  ))}
+                                </div>
+                              </Card>
+                            </div>
+
+                            {/* SECTION 4: Risk-Reward Tension */}
+                            <Card className="p-6 border-border/50 shadow-sm">
+                              <h4 className="text-base font-bold font-display mb-3 text-foreground">Risk–Reward Tension</h4>
+                              <p className="text-sm text-muted-foreground leading-relaxed italic">
+                                {data.tension}
+                              </p>
+                            </Card>
+
+                            {/* SECTION 5: Thesis Invalidation & Investor Fit */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <Card className="p-6 border border-red-200/50 bg-red-50/10 dark:bg-red-950/5 shadow-sm">
+                                <h4 className="text-base font-bold font-display mb-4 text-foreground">Thesis Invalidation</h4>
+                                <ul className="space-y-3">
+                                  {data.invalidation.map((item: string, i: number) => (
+                                    <li key={i} className="text-xs text-muted-foreground flex gap-2">
+                                      <span className="text-red-500 shrink-0">•</span>
+                                      {item}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </Card>
+
+                              <Card className="p-6 border-border/50 shadow-sm">
+                                <h4 className="text-base font-bold font-display mb-4 text-foreground">Investor Fit</h4>
+                                <div className="space-y-4">
+                                  <div>
+                                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase mb-1">Suitable For</p>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">{data.investorFit.suitable}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase mb-1">Unsuitable For</p>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">{data.investorFit.unsuitable}</p>
+                                  </div>
+                                </div>
+                              </Card>
+                            </div>
+                          </>
+                        );
+                      } catch (e) {
+                        return (
+                          <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
+                            <h3 className="text-lg font-bold mb-2">Error Loading Risk Data</h3>
+                            <p className="text-muted-foreground">Unable to parse analyst risk framework.</p>
+                          </Card>
+                        );
+                      }
+                    })()}
+                  </TabsContent>
+
                   {/* Placeholder for other tabs */}
-                  {["valuation", "risk"].map((tab) => (
+                  {["valuation"].map((tab) => (
                     <TabsContent key={tab} value={tab} className="mt-0 focus-visible:outline-none">
                       <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
                         <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
