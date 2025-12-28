@@ -15,38 +15,38 @@ export async function registerRoutes(
       await storage.createStock({
         symbol: "BBCA",
         name: "Bank Central Asia Tbk",
-        price: "11250",
+        price: "11,250",
         change: "50",
         changePercent: "0.45",
-        summary: "BBCA shows stable fundamentals with consistent profitability and strong liquidity. Recent price movement appears driven by steady accumulation rather than speculative trading. Valuation remains relatively high compared to peers, reflecting its defensive profile. Main risk lies in slower growth versus smaller banks.",
-        description: "PT Bank Central Asia Tbk is one of the largest commercial banks in Indonesia with a strong retail and SME banking franchise. Known for conservative credit policies and efficient operations.",
+        summary: "Bank Central Asia (BBCA) continues to demonstrate structural resilience with a 12% YoY net profit growth in Q3 2025. This performance is underpinned by robust Net Interest Income (NII) expansion and maintained cost discipline, further solidified by a strong capital adequacy ratio.",
+        description: "Bank Central Asia (BBCA) is the largest private bank in Indonesia, serving as a primary pillar of the nation's financial infrastructure. Its business model focuses on transactional banking and a dominant position in low-cost funding (CASA), providing it with a unique competitive advantage in the Indonesian banking sector.",
         sector: "Financials",
-        subsector: "Banking",
-        marketCap: "600.2T IDR",
-        peRatio: "18.5",
-        dividendYield: "3.20",
+        subsector: "Banks",
+        marketCap: "1,385.4T IDR",
+        peRatio: "24.2",
+        dividendYield: "2.1%",
         roe: "15.8",
         netMargin: "28.4",
-        growth: "5.2",
-        investorView: "BBCA is viewed by investors as a defensive, income-oriented holding. The stock appeals to those seeking stability through established market leadership and consistent dividend payments. Conservative lending practices and strong loan portfolios have supported investor confidence across market cycles. Institutional ownership remains high, reflecting its liquidity and creditworthiness.",
-        financialSummary: "BBCA demonstrates steady revenue growth supported by expanding loan portfolios and stable fee-based income. Net profit has remained consistent, reflecting efficient cost management and low loan loss provisions. Operating cash flow has grown steadily, indicating strong cash generation from banking operations. The balance sheet is characterized by substantial asset growth supported by carefully managed liabilities, maintaining appropriate capital ratios. These metrics reflect the bank's operational stability and prudent financial management.",
-        revenue2023: "80.2T IDR",
-        revenue2024: "85.5T IDR",
-        revenue2025: "91.3T IDR",
-        netProfit2023: "22.8T IDR",
-        netProfit2024: "24.3T IDR",
-        netProfit2025: "25.9T IDR",
-        assets2023: "890.5T IDR",
-        assets2024: "945.2T IDR",
-        assets2025: "1,005.8T IDR",
+        growth: "12.0",
+        investorView: "Investors prioritize BBCA for its exceptional asset quality and dominance in transactional banking. Its ability to maintain high margins and consistent growth even during macro shifts makes it a core defensive asset in Indonesian equity portfolios.",
+        financialSummary: "The Q3 2025 results show a consistent upward trajectory in revenue and net profit, driven by operational efficiency and favorable credit conditions. The bank's strong balance sheet and capital position allow for sustained dividend distributions while supporting credit expansion.",
+        revenue2023: "94.5T IDR",
+        revenue2024: "105.2T IDR",
+        revenue2025: "117.8T IDR",
+        netProfit2023: "48.6T IDR",
+        netProfit2024: "54.4T IDR",
+        netProfit2025: "60.9T IDR",
+        assets2023: "1,350.2T IDR",
+        assets2024: "1,425.4T IDR",
+        assets2025: "1,505.8T IDR",
         liabilities2023: "780.3T IDR",
         liabilities2024: "825.4T IDR",
         liabilities2025: "878.6T IDR",
         ocf2023: "28.5T IDR",
         ocf2024: "31.2T IDR",
         ocf2025: "34.7T IDR",
-        tradingActivitySummary: "Recent trading patterns show institutional accumulation with steady volume participation.",
-        flowOverviewSummary: "Trading flow analysis reveals a balanced institutional presence with moderate net accumulation. Domestic institutional investors have shown steady buying interest, while some profit-taking has occurred through selective sales by certain brokers. The overall flow pattern suggests cautious optimism among market participants, with typical positioning for a defensive banking stock.",
+        tradingActivitySummary: "Trading activity on Dec 22, 2025, showed a volume increase to 1.2x average, with synchronized accumulation from both domestic (130.4B IDR) and foreign (92.8B IDR) institutional participants.",
+        flowOverviewSummary: "Market participants exhibited synchronized accumulation on Dec 22, 2025, following the quarterly earnings release. The net inflow of 223.2B IDR was supported by both foreign and domestic institutional sources, with the top 3 brokers accounting for 41.2% of total volume, indicating concentrated institutional interest.",
         flowBias: "Accumulation",
         flowIntensity: "Moderate Accumulation",
         flowReliability: "High",
@@ -68,67 +68,54 @@ export async function registerRoutes(
         }),
         avgBuyPrice: "9,542 IDR",
         avgSellPrice: "9,538 IDR",
-        newsOverviewSummary: "Recent developments for BBCA are centered around strong quarterly performance and digital banking expansion. The news landscape is characterized by stable growth narratives and positive regulatory adjustments in the Indonesian banking sector, reinforcing the company's structural position as a market leader.",
+        newsOverviewSummary: "The Q3 2025 earnings release is the primary driver of current sentiment, confirming the bank's operational resilience. Headline net profit growth of 12% YoY aligns with long-term structural trends, while maintained asset quality mitigates immediate credit risk concerns.",
         newsImpact: "Medium",
         newsRelevance: "Structural",
         newsFeed: JSON.stringify([
-          { headline: "BBCA Reports 12% YoY Net Profit Growth in Q3 2025", date: "2025-10-25", source: "IDX News", impact: "Structural" },
+          { headline: "BBCA Reports 12% YoY Net Profit Growth in Q3 2025", date: "2025-12-22", source: "IDX News", impact: "Structural" },
           { headline: "Bank Indonesia Maintains Policy Rate, Positive for Banking Margins", date: "2025-11-15", source: "Business Times", impact: "Structural" },
-          { headline: "BBCA Digital App Reaches 30 Million Active Users", date: "2025-12-05", source: "TechDaily", impact: "Temporary" },
-          { headline: "Global Market Volatility Slightly Affects Local Financial Sector", date: "2025-12-20", source: "MarketWatch", impact: "Noise" }
+          { headline: "BBCA Digital App Reaches 30 Million Active Users", date: "2025-12-05", source: "TechDaily", impact: "Temporary" }
         ]),
         corporateActions: JSON.stringify([
-          { type: "Cash Dividend", date: "2025-04-10", status: "Completed", explanation: "Distributed IDR 205 per share, reflecting strong capital position and commitment to shareholder returns." },
-          { type: "Stock Split", date: "2024-10-15", status: "Completed", explanation: "1:5 split to increase liquidity and make shares more accessible to retail investors." }
+          { type: "Earnings Release", date: "2025-12-22", status: "Completed", explanation: "Official reporting of Q3 2025 results showing 12% profit expansion." },
+          { type: "Cash Dividend", date: "2025-04-10", status: "Completed", explanation: "Distributed IDR 205 per share, reflecting strong capital position." }
         ]),
-        investorInterpretation: "Investors should view the current news flow as supportive of long-term stability. The combination of consistent profit growth and successful digital transformation suggests that the company's core fundamentals remain intact despite broader market noise. The structural relevance of recent earnings reports outweighs short-term volatility concerns.",
+        investorInterpretation: "The Q3 results validate the thesis of superior operational leverage. Investors should note the synchronization of foreign and domestic flows (net total 223.2B IDR) as a signal of broad-based institutional support post-earnings.",
         eventAnalysis: JSON.stringify([
           {
             title: "Q3 2025 Earnings Report",
-            event: "Bank Central Asia (BBCA) reported a 12% year-over-year increase in net profit for the third quarter of 2025, reaching a milestone in operational efficiency.",
-            why: "Management attribute the growth to higher Net Interest Income (NII) and improved loan-to-deposit ratios, supported by Indonesia's steady consumer consumption and infrastructure financing demand.",
-            immediate: "Positive market sentiment led to a 1.5% appreciation in share price immediately post-announcement. Capital adequacy remains robust, providing a strong cushion against macro shocks.",
-            secondOrder: "Institutional investors are likely to rebalance toward banking as a defensive play. However, smaller retail banks may face liquidity competition as BBCA attracts more low-cost CASA deposits.",
-            thesis: "Positive. The earnings reinforce the structural growth thesis. The ability to grow margins in a stable rate environment demonstrates superior operational leverage and market dominance.",
+            event: "Bank Central Asia (BBCA) reported a 12% year-over-year increase in net profit for the third quarter of 2025.",
+            why: "Drivers include NII expansion, sustained cost discipline, and stable asset quality metrics despite global macro headwinds.",
+            immediate: "0.45% price appreciation on 1.2x average volume, indicating a firm positive absorption of results by the market.",
+            secondOrder: "Reinforcement of the 'flight-to-quality' trade in Indonesian financials. BBCA's funding dominance (CASA) likely to strengthen as smaller peers face higher liquidity costs.",
+            thesis: "Positive. Confirms structural growth and operational efficiency milestones.",
             confidence: "High",
-            conditions: "Thesis assumes continued stability in domestic consumption and no significant contraction in Net Interest Margins (NIM). A sharp increase in credit costs or unexpected regulatory caps on lending rates would weaken this structural outlook."
-          },
-          {
-            title: "Strategic Digital Acquisition",
-            event: "BBCA announced the acquisition of a boutique fintech platform specializing in SME credit scoring and digital lending.",
-            why: "The move is designed to accelerate digital penetration into the underbanked SME segment, where traditional credit assessment has been a bottleneck for growth.",
-            immediate: "Minimal impact on share price due to the relatively small transaction size. Integration costs are expected to marginally impact short-term operating expenses.",
-            secondOrder: "Long-term data advantage over competitors. Successful integration could lower cost-of-risk through better predictive analytics, though cultural integration remains a key execution risk.",
-            thesis: "Conditional. Positive if digital synergy exceeds integration costs. The strategic value lies in defensive moats against emerging neo-banks by matching their technological agility.",
-            confidence: "Medium",
-            conditions: "Success depends on retaining key tech talent from the acquired entity and maintaining data integrity during platform migration. Aggressive competitive responses from existing digital banks could also diminish the expected first-mover advantage in SME digital scoring."
+            conditions: "Thesis assumes continued stability in domestic credit demand. Invalidation would involve a sharp uptick in NPLs or unexpected regulatory caps on Net Interest Margins."
           }
         ]),
-        financialsAnalystView: "While the headline growth is impressive, analysts should monitor the sustainability of loan yield improvements. The trade-off between aggressive digital expansion and maintaining high Net Interest Margins (NIM) is a critical balance. Structural efficiency gains are visible, but macro-driven deposit competition could pressure funding costs in future periods.",
-        flowAnalystView: "The current accumulation phase is driven by high-quality institutional demand. However, the concentration of ownership among top domestic funds creates a liquidity risk during periods of macro stress. The reliability of flow is high, but the trade-off is a potential for volatility if institutional sentiment shifts rapidly.",
-        riskAnalystView: "Primary risk remains macro-sensitivity to global interest rate cycles. While domestic buffers are strong, the bank's valuation premium leaves little room for earnings disappointments. Structural risks are low, but regulatory shifts regarding capital requirements or digital banking oversight remain key uncertainties.",
+        financialsAnalystView: "ROE of 15.8% and Net Margin of 28.4% reflect a high level of profitability and efficiency. The structural advantage lies in the bank's ability to maintain these metrics while growing the loan book by 12% YoY, supported by a Strong capital adequacy position.",
+        flowAnalystView: "Dec 22 flow was characterized by a healthy 1.2x volume spike and net accumulation of 223.2B IDR. The High reliability of this flow is supported by the tight 4 IDR spread between buy (9542) and sell (9538) average prices, suggesting efficient institutional execution.",
+        riskAnalystView: "While capital adequacy is 'Strong', the primary risk remains valuation-driven de-rating if profit growth falls below the 10-12% range. Macro-sensitivity to BI rate decisions remains the most significant external uncertainty.",
         riskData: JSON.stringify({
-          overview: "BBCA maintains a conservative risk profile characterized by high capital adequacy and superior asset quality. However, its market-leading position makes it a primary proxy for Indonesian macro risk, meaning global sentiment shifts often manifest here first.",
+          overview: "BBCA maintains a conservative risk profile characterized by high capital adequacy and superior asset quality.",
           level: "Moderate",
-          skew: "Balanced to Downside (Valuation-driven)",
+          skew: "Balanced",
           primaryRisks: [
-            { title: "Net Interest Margin (NIM) Compression", why: "Rising cost of funds due to global rate pressure could squeeze the spread between lending rates and deposit costs.", likelihood: "Medium", impact: "High" },
-            { title: "Macroeconomic Slowdown", why: "As a credit engine for the economy, any deceleration in domestic consumption directly impacts loan growth and asset quality.", likelihood: "Low", impact: "Very High" },
-            { title: "Digital Disruption", why: "Neo-banks and fintechs are aggressively targeting low-cost deposits (CASA), potentially eroding BBCA's funding advantage.", likelihood: "Medium", impact: "Medium" }
+            { title: "NIM Compression", why: "Potential for funding cost increases if deposit competition intensifies.", likelihood: "Medium", impact: "High" },
+            { title: "Macro Slowdown", why: "Deceleration in Indonesian GDP would directly impact credit demand.", likelihood: "Low", impact: "Very High" }
           ],
           contrarianRisks: [
-            { title: "Institutional Over-Concentration", why: "BBCA is a 'must-own' for almost all domestic and many emerging market funds. This creates a hidden liquidity trap.", material: "If a global 'risk-off' event triggers simultaneous redemptions across multiple major funds.", affected: "Long-term institutional holders who may face significant slippage during forced exits." },
-            { title: "Regulatory Tech-Liability", why: "The bank's rapid digital scale-up increases systemic exposure to cybersecurity incidents that regulators may treat with unprecedented severity.", material: "A major data breach or system outage affecting millions of retail depositors simultaneously.", affected: "Retail trust and the bank's operational license/standing with Bank Indonesia." }
+            { title: "Institutional Concentration", why: "High institutional ownership makes the stock a proxy for EM sentiment shifts.", material: "Simultaneous EM fund redemptions.", affected: "Long-term institutional holders." }
           ],
-          tension: "The central tension for investors lies between paying a significant valuation premium for 'certainty' versus the risk that even slight growth decelerations could lead to massive multiple de-rating. You are essentially trading potential alpha for capital preservation and dividend reliability.",
+          tension: "Trading at a premium for operational certainty; investors trade potential capital gains for high reliability and defensive characteristics.",
           invalidation: [
-            "A structural shift in BI policy that caps lending rates for major banks.",
-            "A sustained period of Net Interest Margin falling below 5.0%.",
-            "Significant erosion of CASA ratio (below 70%) indicating loss of funding dominance."
+            "Net Interest Margin contraction below 5.0%.",
+            "Sustained NPL spike above 3.0%.",
+            "Loss of CASA dominance (CASA ratio < 70%)."
           ],
           investorFit: {
-            suitable: "Conservative, long-term institutional and retail investors seeking dividend stability and a proxy for Indonesian economic growth.",
-            unsuitable: "Aggressive growth-seekers or those unwilling to pay high valuation multiples for mature-stage companies."
+            suitable: "Conservative institutional and retail investors seeking proxies for Indonesia's economy with lower volatility.",
+            unsuitable: "Investors seeking high-beta growth or undervalued assets with significant turnaround potential."
           }
         }),
         aiConfidence: "High",
