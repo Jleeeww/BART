@@ -192,9 +192,18 @@ export default function StockDashboard() {
                   <TabsContent value="financials" className="mt-0 focus-visible:outline-none space-y-6">
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">Financial Performance Summary</h3>
-                      <p className="text-muted-foreground leading-relaxed">
+                      <p className="text-muted-foreground leading-relaxed mb-4">
                         {stock.financialSummary}
                       </p>
+                      <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-md">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-2">
+                          <Activity className="w-3 h-3" />
+                          Analyst Financial Perspective
+                        </p>
+                        <p className="text-sm text-muted-foreground leading-relaxed italic">
+                          {stock.financialsAnalystView}
+                        </p>
+                      </div>
                     </Card>
 
                     <Card className="p-6 border-border/50 shadow-sm">
@@ -426,8 +435,8 @@ export default function StockDashboard() {
                             const data = JSON.parse(stock.foreignActivityData);
                             return (
                               <div className="space-y-6">
+                                {/* ... existing visual elements ... */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  {/* Foreign Activity */}
                                   <div className="space-y-3">
                                     <h5 className="text-sm font-semibold text-foreground">Foreign Investors</h5>
                                     <div className="space-y-2 text-sm">
@@ -446,7 +455,6 @@ export default function StockDashboard() {
                                     </div>
                                   </div>
 
-                                  {/* Domestic Activity */}
                                   <div className="space-y-3">
                                     <h5 className="text-sm font-semibold text-foreground">Domestic Investors</h5>
                                     <div className="space-y-2 text-sm">
@@ -458,44 +466,39 @@ export default function StockDashboard() {
                                         <span className="text-muted-foreground">Sell:</span>
                                         <span className="font-mono font-semibold text-red-600 dark:text-red-400">{data.domesticSell}</span>
                                       </div>
-                                      <div className="h-1" />
                                     </div>
                                   </div>
                                 </div>
 
-                                {/* Bar Visual for Participation Split */}
+                                {/* Participation Split ... */}
                                 <div className="space-y-3">
                                   <h5 className="text-sm font-semibold text-foreground">Participation Split</h5>
                                   <div className="flex items-center gap-3">
                                     <div className="flex-1 h-6 rounded-md overflow-hidden border border-border/30 flex">
-                                      <div
-                                        className="bg-blue-500 dark:bg-blue-400 transition-all"
-                                        style={{ width: `${data.domesticPercent}%` }}
-                                      />
-                                      <div
-                                        className="bg-amber-500 dark:bg-amber-400 transition-all"
-                                        style={{ width: `${data.foreignPercent}%` }}
-                                      />
+                                      <div className="bg-blue-500 dark:bg-blue-400 transition-all" style={{ width: `${data.domesticPercent}%` }} />
+                                      <div className="bg-amber-500 dark:bg-amber-400 transition-all" style={{ width: `${data.foreignPercent}%` }} />
                                     </div>
                                     <div className="flex gap-4 text-xs font-semibold whitespace-nowrap">
-                                      <span>
-                                        <span className="inline-block w-3 h-3 rounded-sm bg-blue-500 dark:bg-blue-400 mr-1" />
-                                        {data.domesticPercent}%
-                                      </span>
-                                      <span>
-                                        <span className="inline-block w-3 h-3 rounded-sm bg-amber-500 dark:bg-amber-400 mr-1" />
-                                        {data.foreignPercent}%
-                                      </span>
+                                      <span><span className="inline-block w-3 h-3 rounded-sm bg-blue-500 dark:bg-blue-400 mr-1" />{data.domesticPercent}%</span>
+                                      <span><span className="inline-block w-3 h-3 rounded-sm bg-amber-500 dark:bg-amber-400 mr-1" />{data.foreignPercent}%</span>
                                     </div>
                                   </div>
-                                  <p className="text-xs text-muted-foreground">
-                                    The stock shows strong domestic investor interest, which is typical for established blue-chip banking stocks. Foreign participation remains meaningful but secondary, reflecting cautious international investor positioning in Indonesian equities.
+                                </div>
+
+                                {/* Analyst View Section for Flow */}
+                                <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-md">
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <Activity className="w-3 h-3" />
+                                    Analyst Flow Perspective
+                                  </p>
+                                  <p className="text-sm text-muted-foreground leading-relaxed italic">
+                                    {stock.flowAnalystView}
                                   </p>
                                 </div>
                               </div>
                             );
                           } catch (e) {
-                            return <p className="text-muted-foreground text-sm">No foreign/domestic data available</p>;
+                            return null;
                           }
                         })()}
                       </div>
@@ -602,6 +605,58 @@ export default function StockDashboard() {
                         {stock.investorInterpretation}
                       </p>
                     </Card>
+
+                    {/* Analyst Framework: Event Analysis Section */}
+                    <div className="space-y-6 pt-6">
+                      <h4 className="text-lg font-bold font-display text-foreground">Detailed Event Analysis</h4>
+                      {(() => {
+                        try {
+                          const events = JSON.parse(stock.eventAnalysis);
+                          return events.map((item: any, index: number) => (
+                            <Card key={index} className="p-6 border-border/50 shadow-sm space-y-4">
+                              <div className="flex justify-between items-center border-b border-border/30 pb-4">
+                                <h5 className="text-base font-bold text-foreground">{item.title}</h5>
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                                  item.thesis.startsWith("Positive") ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                                  item.thesis.startsWith("Negative") ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                                  "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                }`}>
+                                  {item.thesis.split(".")[0]}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                                <div className="space-y-4">
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">The Event</p>
+                                    <p className="text-foreground leading-relaxed">{item.event}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Drivers</p>
+                                    <p className="text-muted-foreground leading-relaxed">{item.why}</p>
+                                  </div>
+                                </div>
+                                <div className="space-y-4">
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Immediate Effects</p>
+                                    <p className="text-muted-foreground leading-relaxed">{item.immediate}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Second-Order Effects</p>
+                                    <p className="text-muted-foreground leading-relaxed">{item.secondOrder}</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="pt-4 border-t border-border/30">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Analyst Thesis</p>
+                                <p className="text-sm font-medium text-foreground leading-relaxed italic">{item.thesis}</p>
+                              </div>
+                            </Card>
+                          ));
+                        } catch (e) {
+                          return null;
+                        }
+                      })()}
+                    </div>
                   </TabsContent>
 
                   {/* Placeholder for other tabs */}

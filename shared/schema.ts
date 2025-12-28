@@ -54,6 +54,10 @@ export const stocks = pgTable("stocks", {
   newsFeed: text("news_feed").notNull(), // JSON stringified array of news items
   corporateActions: text("corporate_actions").notNull(), // JSON stringified array of corporate actions
   investorInterpretation: text("investor_interpretation").notNull(), // What This Means for Investors
+  eventAnalysis: text("event_analysis").notNull(), // JSON stringified array of analyst-level event analysis
+  financialsAnalystView: text("financials_analyst_view").notNull(), // Analyst view for financials
+  flowAnalystView: text("flow_analyst_view").notNull(), // Analyst view for flow
+  riskAnalystView: text("risk_analyst_view").notNull(), // Analyst view for risk
   aiConfidence: text("ai_confidence").default("High").notNull(), // High, Medium, Low
   updatedAt: timestamp("updated_at").defaultNow(),
 });

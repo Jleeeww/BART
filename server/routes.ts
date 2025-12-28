@@ -82,6 +82,27 @@ export async function registerRoutes(
           { type: "Stock Split", date: "2024-10-15", status: "Completed", explanation: "1:5 split to increase liquidity and make shares more accessible to retail investors." }
         ]),
         investorInterpretation: "Investors should view the current news flow as supportive of long-term stability. The combination of consistent profit growth and successful digital transformation suggests that the company's core fundamentals remain intact despite broader market noise. The structural relevance of recent earnings reports outweighs short-term volatility concerns.",
+        eventAnalysis: JSON.stringify([
+          {
+            title: "Q3 2025 Earnings Report",
+            event: "Bank Central Asia (BBCA) reported a 12% year-over-year increase in net profit for the third quarter of 2025, reaching a milestone in operational efficiency.",
+            why: "Management attribute the growth to higher Net Interest Income (NII) and improved loan-to-deposit ratios, supported by Indonesia's steady consumer consumption and infrastructure financing demand.",
+            immediate: "Positive market sentiment led to a 1.5% appreciation in share price immediately post-announcement. Capital adequacy remains robust, providing a strong cushion against macro shocks.",
+            secondOrder: "Institutional investors are likely to rebalance toward banking as a defensive play. However, smaller retail banks may face liquidity competition as BBCA attracts more low-cost CASA deposits.",
+            thesis: "Positive. The earnings reinforce the structural growth thesis. The ability to grow margins in a stable rate environment demonstrates superior operational leverage and market dominance."
+          },
+          {
+            title: "Strategic Digital Acquisition",
+            event: "BBCA announced the acquisition of a boutique fintech platform specializing in SME credit scoring and digital lending.",
+            why: "The move is designed to accelerate digital penetration into the underbanked SME segment, where traditional credit assessment has been a bottleneck for growth.",
+            immediate: "Minimal impact on share price due to the relatively small transaction size. Integration costs are expected to marginally impact short-term operating expenses.",
+            secondOrder: "Long-term data advantage over competitors. Successful integration could lower cost-of-risk through better predictive analytics, though cultural integration remains a key execution risk.",
+            thesis: "Conditional. Positive if digital synergy exceeds integration costs. The strategic value lies in defensive moats against emerging neo-banks by matching their technological agility."
+          }
+        ]),
+        financialsAnalystView: "While the headline growth is impressive, analysts should monitor the sustainability of loan yield improvements. The trade-off between aggressive digital expansion and maintaining high Net Interest Margins (NIM) is a critical balance. Structural efficiency gains are visible, but macro-driven deposit competition could pressure funding costs in future periods.",
+        flowAnalystView: "The current accumulation phase is driven by high-quality institutional demand. However, the concentration of ownership among top domestic funds creates a liquidity risk during periods of macro stress. The reliability of flow is high, but the trade-off is a potential for volatility if institutional sentiment shifts rapidly.",
+        riskAnalystView: "Primary risk remains macro-sensitivity to global interest rate cycles. While domestic buffers are strong, the bank's valuation premium leaves little room for earnings disappointments. Structural risks are low, but regulatory shifts regarding capital requirements or digital banking oversight remain key uncertainties.",
         aiConfidence: "High",
       });
       console.log("Seeded BBCA stock data");
