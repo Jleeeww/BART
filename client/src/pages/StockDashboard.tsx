@@ -1,5 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
 import { useStock } from "@/hooks/use-stocks";
+async function fetchAIAnalysis(payload: any) {
+  const res = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    throw new Error("AI analysis failed");
+  }
+
+  return res.json();
+}
 import { StockHeader } from "@/components/StockHeader";
 import { AIStockSummary } from "@/components/AIStockSummary";
 import { PriceChart } from "@/components/PriceChart";
@@ -18,9 +32,50 @@ import {
 import { motion } from "framer-motion";
 
 export default function StockDashboard() {
-  const symbol = "BBCA"; // Hardcoded for this demo
-  const { data: stock, isLoading, error } = useStock(symbol);
+  const { symbol } = useParams<{ symbol: string }>();
   const [activeTab, setActiveTab] = useState("overview");
+  const { data: stock, isLoading, error } = useStock(symbol || "BBCA");
+  const [aiData, setAIData] = useState<any>(null);
+
+  useEffect(() => {
+      const payload = {
+        stock: "BBCA",
+        date: "2025-12-22",
+        context: "Quarterly earnings release",
+
+        price_context: {
+          last_price: 11250,
+          d1_change_pct: 0.45,
+          volume_vs_avg: 1.2,
+        },
+
+        flow_signals: {
+          net_foreign_buy_idr: 92800000000,
+          net_domestic_buy_idr: 130400000000,
+          flow_bias: "Accumulation",
+          flow_intensity: "Moderate",
+          flow_reliability: "High",
+          buy_avg_price: 9542,
+          sell_avg_price: 9538,
+        },
+
+        fundamentals: {
+          roe: 15.8,
+          net_margin: 28.4,
+          yoy_profit_growth_pct: 12.0,
+          capital_adequacy: "Strong",
+        },
+
+        event_specifics: {
+          event_type: "Earnings",
+          headline: "BBCA reports 12% YoY net profit growth",
+        },
+      };
+
+      fetchAIAnalysis(payload)
+        .then(setAIData)
+        .catch(console.error);
+    }, []);
 
   if (isLoading) {
     return (
@@ -299,7 +354,6 @@ export default function StockDashboard() {
                       <p className="text-muted-foreground leading-relaxed mb-6">
                         {stock.flowOverviewSummary}
                       </p>
-                      
                       {/* Flow Intensity Gradient Bar */}
                       <div className="mb-6">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Flow Intensity</p>
