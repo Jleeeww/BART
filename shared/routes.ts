@@ -67,7 +67,7 @@ export const api = {
           flowAnalystView: z.string(),
           riskAnalystView: z.string(),
           riskData: z.string(),
-          aiConfidence: z.enum(["High", "Medium", "Low"]),
+          aiConfidence: z.string(),
           updatedAt: z.string().nullable(),
         }),
         404: errorSchemas.notFound,

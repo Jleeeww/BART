@@ -135,5 +135,21 @@ export async function registerRoutes(
     res.json(stock);
   });
 
+  app.post("/api/ai", (req, res) => {
+    const payload = req.body;
+    // Structured analyst-style response without buy/sell signals
+    res.json({
+      flow_analysis: `Institutional flow for ${payload.stock} shows ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} with ${payload.flow_signals.flow_reliability} reliability. The synchronized participation of domestic and foreign institutions suggests broad-based positioning.`,
+      event_analysis: {
+        impact: "Medium",
+        relevance: "Structural",
+        thesis: `The ${payload.event_specifics.event_type} (${payload.event_specifics.headline}) aligns with the long-term operational trajectory. Structural efficiency gains are visible, though macro-sensitivity remains a primary external factor.`,
+        confidence: "High",
+        conditions: "Assumes continued stability in domestic consumption and no significant contraction in Net Interest Margins (NIM)."
+      },
+      risk_analysis: `Primary risks for ${payload.stock} are centered on macro-driven de-rating and potential NIM compression if deposit competition intensifies. Asset quality remains stable, providing a robust defensive cushion.`
+    });
+  });
+
   return httpServer;
 }

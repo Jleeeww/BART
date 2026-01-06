@@ -352,7 +352,7 @@ export default function StockDashboard() {
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">AI Flow Overview</h3>
                       <p className="text-muted-foreground leading-relaxed mb-6">
-                        {stock.flowOverviewSummary}
+                        {aiLoading ? "Analyzing market flow..." : (aiData?.flow_analysis || stock.flowOverviewSummary)}
                       </p>
                       {/* Flow Intensity Gradient Bar */}
                       <div className="mb-6">
@@ -565,7 +565,7 @@ export default function StockDashboard() {
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">AI News Overview</h3>
                       <p className="text-muted-foreground leading-relaxed mb-6">
-                        {stock.newsOverviewSummary}
+                        {aiLoading ? "Processing event data..." : (aiData?.event_analysis.thesis || stock.newsOverviewSummary)}
                       </p>
                       <div className="grid grid-cols-2 gap-6">
                         <div>
@@ -718,7 +718,7 @@ export default function StockDashboard() {
                             <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
                               <h3 className="text-lg font-bold font-display mb-4 text-foreground uppercase tracking-tight">AI Risk Analysis</h3>
                               <p className="text-muted-foreground leading-relaxed mb-6">
-                                {stock.riskAnalystView}
+                                {aiLoading ? "Evaluating risk factors..." : (aiData?.risk_analysis || stock.riskAnalystView)}
                               </p>
                               <div className="grid grid-cols-2 gap-6">
                                 <div>
