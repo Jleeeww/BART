@@ -137,9 +137,46 @@ export async function registerRoutes(
 
   app.post("/api/ai", (req, res) => {
     const payload = req.body;
+    
+    // Calculate Flow Quality Score based on payload
+    // broker concentration, buy avg vs close, foreign vs domestic alignment
+    let score = 50; // Base score
+    
+    // Logic for Foreign/Domestic alignment
+    if (payload.flow_signals.net_foreign_buy_idr > 0 && payload.flow_signals.net_domestic_buy_idr > 0) {
+      score += 15; // Synchronized accumulation
+    } else if (payload.flow_signals.net_foreign_buy_idr < 0 && payload.flow_signals.net_domestic_buy_idr < 0) {
+      score -= 15; // Synchronized distribution
+    }
+    
+    // Logic for Buy Average vs Close
+    const priceContext = payload.price_context;
+    const buyAvg = payload.flow_signals.buy_avg_price;
+    if (buyAvg && priceContext.last_price > buyAvg) {
+      score += 10; // Positive price response
+    } else if (buyAvg && priceContext.last_price < buyAvg) {
+      score -= 10; // Negative price response
+    }
+    
+    // Logic for Flow Intensity
+    if (payload.flow_signals.flow_intensity === "Big Accumulation") score += 15;
+    if (payload.flow_signals.flow_intensity === "Big Distribution") score -= 15;
+    
+    // Clamp score 0-100
+    score = Math.max(0, Math.min(100, score));
+    
+    let interpretation = "";
+    if (score > 80) interpretation = "Exceptional institutional conviction with high synchronization.";
+    else if (score > 60) interpretation = "Solid accumulation pattern with moderate reliability.";
+    else if (score > 40) interpretation = "Neutral flow characterized by lack of clear institutional consensus.";
+    else if (score > 20) interpretation = "Distribution bias with emerging signs of institutional exit.";
+    else interpretation = "Significant distribution across multiple participant types.";
+
     // Structured analyst-style response without buy/sell signals
     res.json({
       flow_analysis: `Institutional flow for ${payload.stock} shows ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} with ${payload.flow_signals.flow_reliability} reliability. The synchronized participation of domestic and foreign institutions suggests broad-based positioning.`,
+      flowQualityScore: score,
+      flowQualityInterpretation: interpretation,
       event_analysis: {
         impact: "Medium",
         relevance: "Structural",

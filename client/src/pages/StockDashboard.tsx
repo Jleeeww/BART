@@ -244,6 +244,8 @@ export default function StockDashboard() {
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">How investors typically view this stock</h3>
                       <p className="text-muted-foreground leading-relaxed">
                         {stock.investorView}
+                        {aiData?.flowQualityScore < 50 && " Caution is advised as current accumulation patterns show signs of low institutional consensus."}
+                        {aiData?.flowQualityScore > 75 && " Market participants should note potential crowding risk as institutional conviction reaches high levels."}
                       </p>
                     </Card>
                   </TabsContent>
@@ -254,6 +256,8 @@ export default function StockDashboard() {
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">Financial Performance Summary</h3>
                       <p className="text-muted-foreground leading-relaxed mb-4">
                         {stock.financialSummary}
+                        {aiData?.flowQualityScore < 50 && " The current financial trajectory should be weighed against emerging institutional distribution risks."}
+                        {aiData?.flowQualityScore > 75 && " Strong financial milestones are increasingly reflected in concentrated institutional positioning."}
                       </p>
                       <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-md">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -355,10 +359,25 @@ export default function StockDashboard() {
                   <TabsContent value="flow" className="mt-0 focus-visible:outline-none space-y-6">
                     {/* SECTION 1: AI Flow Overview */}
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">AI Flow Overview</h3>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-bold font-display text-foreground">AI Flow Overview</h3>
+                        {!aiLoading && aiData && (
+                          <div className="text-right">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Flow Quality</p>
+                            <p className="text-2xl font-bold text-primary">{aiData.flowQualityScore}/100</p>
+                          </div>
+                        )}
+                      </div>
                       <p className="text-muted-foreground leading-relaxed mb-6">
                         {aiLoading ? "Analyzing market flow..." : (aiData?.flow_analysis || stock.flowOverviewSummary)}
                       </p>
+                      
+                      {!aiLoading && aiData?.flowQualityInterpretation && (
+                        <div className="mb-6 p-4 bg-background/50 rounded-lg border border-border/30">
+                          <p className="text-sm font-medium text-foreground">{aiData.flowQualityInterpretation}</p>
+                        </div>
+                      )}
+
                       {/* Flow Intensity Gradient Bar */}
                       <div className="mb-6">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Flow Intensity</p>
