@@ -375,6 +375,15 @@ export default function StockDashboard() {
                       {!aiLoading && aiData?.flowQualityInterpretation && (
                         <div className="mb-6 p-4 bg-background/50 rounded-lg border border-border/30">
                           <p className="text-sm font-medium text-foreground">{aiData.flowQualityInterpretation}</p>
+                          {aiData.earlyDistributionFlag && (
+                            <div className="mt-3 pt-3 border-t border-border/20">
+                              <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                                <AlertTriangle className="w-3 h-3" />
+                                Early Distribution Risk Detected
+                              </p>
+                              <p className="text-sm text-muted-foreground italic">{aiData.earlyDistributionExplanation}</p>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -730,6 +739,7 @@ export default function StockDashboard() {
                         {stock.investorInterpretation}
                         {aiData?.flowQualityScore < 50 && " The current accumulation signals carry a significant risk of being 'noise' or false positives due to low quality scores."}
                         {aiData?.flowQualityScore > 75 && " While institutional support is high quality, the concentrated positioning may limit immediate upside without further structural catalysts."}
+                        {aiData?.earlyDistributionFlag && " Analysts observe signs of liquidity rotation. Chasing current price strength is discouraged as alpha-seeking attractiveness diminishes."}
                       </p>
                     </Card>
                   </TabsContent>
@@ -748,6 +758,7 @@ export default function StockDashboard() {
                                 {aiLoading ? "Evaluating risk factors..." : (aiData?.risk_analysis || stock.riskAnalystView)}
                                 {aiData?.flowQualityScore < 50 && " The low flow quality score suggests that apparent accumulation may not be sustained, introducing a risk of sudden price reversals."}
                                 {aiData?.flowQualityScore > 75 && " Crowding risk is elevated; the high consensus among institutional participants may lead to sharp drawdowns if the narrative shifts."}
+                                {aiData?.earlyDistributionFlag && " EARLY DISTRIBUTION ALERT: Internal signals suggest institutional rotation is underway despite positive headline flows."}
                               </p>
                               <div className="grid grid-cols-2 gap-6">
                                 <div>

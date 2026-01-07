@@ -162,6 +162,30 @@ export async function registerRoutes(
     if (payload.flow_signals.flow_intensity === "Big Accumulation") score += 15;
     if (payload.flow_signals.flow_intensity === "Big Distribution") score -= 15;
     
+    // Early Distribution Detection Logic
+    const signals = [];
+    // 1. Positive flow but weakening price (buy avg < last price but close to it)
+    if (payload.flow_signals.net_foreign_buy_idr > 0 && priceContext.last_price <= buyAvg * 1.01) {
+      signals.push("Price structure weakening relative to net inflow.");
+    }
+    // 2. High concentration but low flow reliability/bias
+    if (payload.flow_signals.flow_intensity.includes("Moderate") && payload.flow_signals.flow_reliability !== "High") {
+      signals.push("Institutional concentration rising with inconsistent execution quality.");
+    }
+    // 3. Sell average gaining pricing power (sell avg close to buy avg)
+    if (buyAvg && payload.flow_signals.sell_avg_price >= buyAvg * 0.995) {
+      signals.push("Distribution average gaining pricing power over accumulation.");
+    }
+    // 4. Late session strength without follow-through (implied by narrative timing)
+    if (payload.event_specifics.event_type === "Market Update") {
+      signals.push("Narrative exhaustion detected; lack of new structural catalysts.");
+    }
+
+    const earlyDistributionFlag = signals.length >= 3;
+    const earlyDistributionExplanation = earlyDistributionFlag 
+      ? `Analysis indicates ${signals.length} distribution signals emerging. Despite positive headline flows, internal price friction and sell-side pricing power suggest an early distribution phase. Market participants are likely rotating out of strength.`
+      : "Internal flow structure remains supportive with no significant distribution signals detected.";
+
     // Clamp score 0-100
     score = Math.max(0, Math.min(100, score));
     
@@ -177,6 +201,8 @@ export async function registerRoutes(
       flow_analysis: `Institutional flow for ${payload.stock} shows ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} with ${payload.flow_signals.flow_reliability} reliability. The synchronized participation of domestic and foreign institutions suggests broad-based positioning.`,
       flowQualityScore: score,
       flowQualityInterpretation: interpretation,
+      earlyDistributionFlag,
+      earlyDistributionExplanation,
       event_analysis: {
         impact: "Medium",
         relevance: "Structural",
