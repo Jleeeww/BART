@@ -414,6 +414,7 @@ export default function StockDashboard() {
                           <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
                           <div className="p-4 bg-background/50 rounded-lg border border-border/30">
                             <p className="text-sm font-medium text-foreground">{aiData.flowQualityInterpretation}</p>
+                          </div>
                           {aiData.earlyDistributionFlag && (
                             <div className="mt-3 pt-3 border-t border-border/20">
                               <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
