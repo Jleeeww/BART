@@ -432,6 +432,8 @@ export default function StockDashboard() {
                             <tr className="border-b border-border/50">
                               <th className="text-left py-3 px-3 font-semibold text-foreground">Broker Code</th>
                               <th className="text-left py-3 px-3 font-semibold text-foreground">Broker Name</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">Avg Buy</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">Avg Sell</th>
                               <th className="text-right py-3 px-3 font-semibold text-foreground">Net Buy (IDR)</th>
                               <th className="text-right py-3 px-3 font-semibold text-foreground">Net Sell (IDR)</th>
                               <th className="text-right py-3 px-3 font-semibold text-foreground">% of Volume</th>
@@ -450,6 +452,8 @@ export default function StockDashboard() {
                                   <tr key={index} className="border-b border-border/30 hover:bg-muted/30">
                                     <td className="py-3 px-3 font-mono font-semibold text-foreground">{broker.code}</td>
                                     <td className="py-3 px-3 text-muted-foreground">{broker.name}</td>
+                                    <td className="text-right py-3 px-3 font-mono text-emerald-600 dark:text-emerald-400">{broker.avgBuy || "—"}</td>
+                                    <td className="text-right py-3 px-3 font-mono text-red-600 dark:text-red-400">{broker.avgSell || "—"}</td>
                                     <td className="text-right py-3 px-3 font-mono">
                                       {broker.netBuy ? (
                                         <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
@@ -474,7 +478,7 @@ export default function StockDashboard() {
                               } catch (e) {
                                 return (
                                   <tr>
-                                    <td colSpan={5} className="py-3 px-3 text-muted-foreground text-center">
+                                    <td colSpan={7} className="py-3 px-3 text-muted-foreground text-center">
                                       No broker data available
                                     </td>
                                   </tr>
