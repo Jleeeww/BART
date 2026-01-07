@@ -720,13 +720,12 @@ export default function StockDashboard() {
                     </Card>
 
                     {/* Corporate Action Summary */}
-                    <Card className="p-6 border border-primary/20 bg-primary/5 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-3 text-foreground flex items-center gap-2">
-                        <Activity className="w-4 h-4 text-primary" />
-                        What This Means for Investors
-                      </h4>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
+                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">What This Means for Investors</h3>
+                      <p className="text-muted-foreground leading-relaxed">
                         {stock.investorInterpretation}
+                        {aiData?.flowQualityScore < 50 && " The current accumulation signals carry a significant risk of being 'noise' or false positives due to low quality scores."}
+                        {aiData?.flowQualityScore > 75 && " While institutional support is high quality, the concentrated positioning may limit immediate upside without further structural catalysts."}
                       </p>
                     </Card>
                   </TabsContent>
@@ -743,6 +742,8 @@ export default function StockDashboard() {
                               <h3 className="text-lg font-bold font-display mb-4 text-foreground uppercase tracking-tight">AI Risk Analysis</h3>
                               <p className="text-muted-foreground leading-relaxed mb-6">
                                 {aiLoading ? "Evaluating risk factors..." : (aiData?.risk_analysis || stock.riskAnalystView)}
+                                {aiData?.flowQualityScore < 50 && " The low flow quality score suggests that apparent accumulation may not be sustained, introducing a risk of sudden price reversals."}
+                                {aiData?.flowQualityScore > 75 && " Crowding risk is elevated; the high consensus among institutional participants may lead to sharp drawdowns if the narrative shifts."}
                               </p>
                               <div className="grid grid-cols-2 gap-6">
                                 <div>
