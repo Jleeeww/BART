@@ -186,6 +186,27 @@ export async function registerRoutes(
       ? `Analysis indicates ${signals.length} distribution signals emerging. Despite positive headline flows, internal price friction and sell-side pricing power suggest an early distribution phase. Market participants are likely rotating out of strength.`
       : "Internal flow structure remains supportive with no significant distribution signals detected.";
 
+    // Conviction Timeline Inference
+    let convictionPhase = "Positioning";
+    if (earlyDistributionFlag) {
+      convictionPhase = "Distribution";
+    } else if (score > 80) {
+      convictionPhase = "Crowding";
+    } else if (score > 60) {
+      convictionPhase = "Confirmation";
+    } else if (score < 30) {
+      convictionPhase = "Reset";
+    }
+
+    let convictionExplanation = "";
+    switch(convictionPhase) {
+      case "Positioning": convictionExplanation = "Institutional participants are quietly establishing core positions; flow quality is nascent but improving."; break;
+      case "Confirmation": convictionExplanation = "The narrative is being validated by synchronized flow and positive price response. Confidence is increasing."; break;
+      case "Crowding": convictionExplanation = "High institutional consensus. While flow quality is exceptional, the trade is becoming crowded with limited new entry points."; break;
+      case "Distribution": convictionExplanation = "Institutional exit is being masked by headline price strength. Flow quality is deteriorating as smart money rotates out."; break;
+      case "Reset": convictionExplanation = "Previous cycle has concluded. Market is searching for a new structural narrative and institutional base."; break;
+    }
+
     // Clamp score 0-100
     score = Math.max(0, Math.min(100, score));
     
@@ -203,6 +224,8 @@ export async function registerRoutes(
       flowQualityInterpretation: interpretation,
       earlyDistributionFlag,
       earlyDistributionExplanation,
+      convictionPhase,
+      convictionExplanation,
       event_analysis: {
         impact: "Medium",
         relevance: "Structural",

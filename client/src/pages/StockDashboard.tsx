@@ -31,6 +31,38 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+function ConvictionTimeline({ phase, explanation }: { phase: string; explanation: string }) {
+  const phases = ["Positioning", "Confirmation", "Crowding", "Distribution", "Reset"];
+  const currentIndex = phases.indexOf(phase);
+
+  return (
+    <Card className="p-4 border-border/50 shadow-sm bg-muted/20">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Conviction Lifecycle</p>
+        <span className="text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">{phase}</span>
+      </div>
+      <div className="relative h-2 bg-muted rounded-full overflow-hidden flex mb-3">
+        {phases.map((p, idx) => (
+          <div 
+            key={p} 
+            className={`flex-1 h-full transition-all border-r border-background/20 last:border-0 ${
+              idx === currentIndex ? "bg-primary" : idx < currentIndex ? "bg-primary/40" : "bg-transparent"
+            }`}
+          />
+        ))}
+      </div>
+      <div className="flex justify-between text-[10px] text-muted-foreground uppercase font-bold px-0.5 mb-3">
+        {phases.map((p, idx) => (
+          <span key={p} className={idx === currentIndex ? "text-primary" : ""}>{p}</span>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground leading-relaxed italic border-t border-border/20 pt-3">
+        {explanation}
+      </p>
+    </Card>
+  );
+}
+
 export default function StockDashboard() {
   const { symbol = "BBCA" } = useParams<{ symbol: string }>();
   const [activeTab, setActiveTab] = useState("overview");
@@ -198,6 +230,11 @@ export default function StockDashboard() {
                   <TabsContent value="overview" className="mt-0 focus-visible:outline-none space-y-6">
                     <Card className="p-6 border-border/50 shadow-sm">
                       <h3 className="text-xl font-bold font-display mb-4">Company Profile</h3>
+                      {!aiLoading && aiData && (
+                        <div className="mb-6">
+                          <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
+                        </div>
+                      )}
                       <p className="text-muted-foreground leading-relaxed mb-6">
                         {stock.description}
                       </p>
@@ -373,8 +410,10 @@ export default function StockDashboard() {
                       </p>
                       
                       {!aiLoading && aiData?.flowQualityInterpretation && (
-                        <div className="mb-6 p-4 bg-background/50 rounded-lg border border-border/30">
-                          <p className="text-sm font-medium text-foreground">{aiData.flowQualityInterpretation}</p>
+                        <div className="mb-6 space-y-4">
+                          <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
+                          <div className="p-4 bg-background/50 rounded-lg border border-border/30">
+                            <p className="text-sm font-medium text-foreground">{aiData.flowQualityInterpretation}</p>
                           {aiData.earlyDistributionFlag && (
                             <div className="mt-3 pt-3 border-t border-border/20">
                               <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
@@ -740,6 +779,7 @@ export default function StockDashboard() {
                         {aiData?.flowQualityScore < 50 && " The current accumulation signals carry a significant risk of being 'noise' or false positives due to low quality scores."}
                         {aiData?.flowQualityScore > 75 && " While institutional support is high quality, the concentrated positioning may limit immediate upside without further structural catalysts."}
                         {aiData?.earlyDistributionFlag && " Analysts observe signs of liquidity rotation. Chasing current price strength is discouraged as alpha-seeking attractiveness diminishes."}
+                        {(aiData?.convictionPhase === "Crowding" || aiData?.convictionPhase === "Distribution") && " High consensus levels suggest narrative saturation. Investors are advised to monitor for liquidity traps rather than chasing volatility."}
                       </p>
                     </Card>
                   </TabsContent>
@@ -753,7 +793,19 @@ export default function StockDashboard() {
                           <div className="space-y-6">
                             {/* SECTION 1: AI Risk Overview */}
                             <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                              <h3 className="text-lg font-bold font-display mb-4 text-foreground uppercase tracking-tight">AI Risk Analysis</h3>
+                              <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-bold font-display text-foreground uppercase tracking-tight">AI Risk Analysis</h3>
+                                {!aiLoading && aiData && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">
+                                    Cycle: {aiData.convictionPhase}
+                                  </span>
+                                )}
+                              </div>
+                              {aiData && (
+                                <div className="mb-6">
+                                  <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
+                                </div>
+                              )}
                               <p className="text-muted-foreground leading-relaxed mb-6">
                                 {aiLoading ? "Evaluating risk factors..." : (aiData?.risk_analysis || stock.riskAnalystView)}
                                 {aiData?.flowQualityScore < 50 && " The low flow quality score suggests that apparent accumulation may not be sustained, introducing a risk of sudden price reversals."}
