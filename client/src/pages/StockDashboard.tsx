@@ -32,50 +32,55 @@ import {
 import { motion } from "framer-motion";
 
 export default function StockDashboard() {
-  const { symbol } = useParams<{ symbol: string }>();
+  const { symbol = "BBCA" } = useParams<{ symbol: string }>();
   const [activeTab, setActiveTab] = useState("overview");
-  const { data: stock, isLoading, error } = useStock(symbol || "BBCA");
+  const { data: stock, isLoading, error } = useStock(symbol);
   const [aiData, setAIData] = useState<any>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => {
-      const payload = {
-        stock: "BBCA",
-        date: "2025-12-22",
-        context: "Quarterly earnings release",
+    if (!stock) return;
 
-        price_context: {
-          last_price: 11250,
-          d1_change_pct: 0.45,
-          volume_vs_avg: 1.2,
-        },
+    setAiLoading(true);
+    const payload = {
+      stock: stock.symbol,
+      date: new Date().toISOString().split('T')[0],
+      context: stock.summary,
 
-        flow_signals: {
-          net_foreign_buy_idr: 92800000000,
-          net_domestic_buy_idr: 130400000000,
-          flow_bias: "Accumulation",
-          flow_intensity: "Moderate",
-          flow_reliability: "High",
-          buy_avg_price: 9542,
-          sell_avg_price: 9538,
-        },
+      price_context: {
+        last_price: parseFloat(stock.price.replace(/,/g, "")),
+        d1_change_pct: parseFloat(stock.changePercent),
+        volume_vs_avg: 1.2,
+      },
 
-        fundamentals: {
-          roe: 15.8,
-          net_margin: 28.4,
-          yoy_profit_growth_pct: 12.0,
-          capital_adequacy: "Strong",
-        },
+      flow_signals: {
+        net_foreign_buy_idr: 92800000000,
+        net_domestic_buy_idr: 130400000000,
+        flow_bias: stock.flowBias,
+        flow_intensity: stock.flowIntensity,
+        flow_reliability: stock.flowReliability,
+        buy_avg_price: parseFloat(stock.avgBuyPrice.replace(/[^0-9.]/g, "")),
+        sell_avg_price: parseFloat(stock.avgSellPrice.replace(/[^0-9.]/g, "")),
+      },
 
-        event_specifics: {
-          event_type: "Earnings",
-          headline: "BBCA reports 12% YoY net profit growth",
-        },
-      };
+      fundamentals: {
+        roe: parseFloat(stock.roe),
+        net_margin: parseFloat(stock.netMargin),
+        yoy_profit_growth_pct: parseFloat(stock.growth),
+        capital_adequacy: "Strong",
+      },
 
-      fetchAIAnalysis(payload)
-        .then(setAIData)
-        .catch(console.error);
-    }, []);
+      event_specifics: {
+        event_type: "Market Update",
+        headline: `${stock.symbol} market activity analysis`,
+      },
+    };
+
+    fetchAIAnalysis(payload)
+      .then(setAIData)
+      .catch(console.error)
+      .finally(() => setAiLoading(false));
+  }, [stock]);
 
   if (isLoading) {
     return (
