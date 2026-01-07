@@ -183,8 +183,8 @@ export async function registerRoutes(
 
     const earlyDistributionFlag = signals.length >= 3;
     const earlyDistributionExplanation = earlyDistributionFlag 
-      ? `Analysis indicates ${signals.length} distribution signals emerging. Despite positive headline flows, internal price friction and sell-side pricing power suggest an early distribution phase. Market participants are likely rotating out of strength.`
-      : "Internal flow structure remains supportive with no significant distribution signals detected.";
+      ? `Analysis indicates ${signals.length} distribution signals emerging. While headline net flow remains positive, internal price friction and sell-side pricing power suggest an early distribution phase. Market participants should monitor for potential liquidity traps as smarter money appears to be rotating out during periods of apparent strength.`
+      : "Current flow structures appear structurally sound with institutional participation remaining synchronized and execution friction appearing minimal.";
 
     // Conviction Timeline Inference
     let convictionPhase = "Positioning";
@@ -200,26 +200,26 @@ export async function registerRoutes(
 
     let convictionExplanation = "";
     switch(convictionPhase) {
-      case "Positioning": convictionExplanation = "Institutional participants are quietly establishing core positions; flow quality is nascent but improving."; break;
-      case "Confirmation": convictionExplanation = "The narrative is being validated by synchronized flow and positive price response. Confidence is increasing."; break;
-      case "Crowding": convictionExplanation = "High institutional consensus. While flow quality is exceptional, the trade is becoming crowded with limited new entry points."; break;
-      case "Distribution": convictionExplanation = "Institutional exit is being masked by headline price strength. Flow quality is deteriorating as smart money rotates out."; break;
-      case "Reset": convictionExplanation = "Previous cycle has concluded. Market is searching for a new structural narrative and institutional base."; break;
+      case "Positioning": convictionExplanation = "Initial institutional positioning is detected. Flow quality is nascent; the thesis remains speculative until synchronized participation is confirmed across domestic and foreign desks."; break;
+      case "Confirmation": convictionExplanation = "The prevailing narrative is gaining structural validation. Synchronized accumulation and positive price response suggest increasing institutional conviction in the mid-term trajectory."; break;
+      case "Crowding": convictionExplanation = "Institutional consensus has reached elevated levels. While technical flows remain high-quality, the asymmetry of the trade is shifting as positioning becomes increasingly concentrated."; break;
+      case "Distribution": convictionExplanation = "Internal flow quality is deteriorating. Observed accumulation appears increasingly driven by late-cycle participation, while institutional leads show signs of structural rotation."; break;
+      case "Reset": convictionExplanation = "The previous lifecycle has concluded. Market participants are currently searching for new structural catalysts and a fresh institutional floor."; break;
     }
 
     // Clamp score 0-100
     score = Math.max(0, Math.min(100, score));
     
     let interpretation = "";
-    if (score > 80) interpretation = "Exceptional institutional conviction with high synchronization.";
-    else if (score > 60) interpretation = "Solid accumulation pattern with moderate reliability.";
-    else if (score > 40) interpretation = "Neutral flow characterized by lack of clear institutional consensus.";
-    else if (score > 20) interpretation = "Distribution bias with emerging signs of institutional exit.";
-    else interpretation = "Significant distribution across multiple participant types.";
+    if (score > 80) interpretation = "Exceptional institutional conviction characterized by high synchronization across participant types.";
+    else if (score > 60) interpretation = "Solid accumulation pattern with moderate reliability; requires continued structural catalyst validation.";
+    else if (score > 40) interpretation = "Neutral flow dynamics suggesting a lack of clear institutional consensus at current valuation levels.";
+    else if (score > 20) interpretation = "Distribution bias emerging; institutional participants appear to be reducing exposure during volatility.";
+    else interpretation = "Significant distribution across multiple desks, suggesting a broad-based reduction in institutional conviction.";
 
     // Structured analyst-style response without buy/sell signals
     res.json({
-      flow_analysis: `Institutional flow for ${payload.stock} shows ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} with ${payload.flow_signals.flow_reliability} reliability. The synchronized participation of domestic and foreign institutions suggests broad-based positioning.`,
+      flow_analysis: `Institutional activity for ${payload.stock} indicates ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} with ${payload.flow_signals.flow_reliability} reliability. Broad-based positioning is supported by synchronized participation from both domestic and foreign institutional sources.`,
       flowQualityScore: score,
       flowQualityInterpretation: interpretation,
       earlyDistributionFlag,
@@ -229,11 +229,11 @@ export async function registerRoutes(
       event_analysis: {
         impact: "Medium",
         relevance: "Structural",
-        thesis: `The ${payload.event_specifics.event_type} (${payload.event_specifics.headline}) aligns with the long-term operational trajectory. Structural efficiency gains are visible, though macro-sensitivity remains a primary external factor.`,
+        thesis: `The ${payload.event_specifics.event_type} (${payload.event_specifics.headline}) is consistent with observed operational trends. While structural efficiency gains are evident, macro-sensitivity remains the primary variable for valuation persistence.`,
         confidence: "High",
-        conditions: "Assumes continued stability in domestic consumption and no significant contraction in Net Interest Margins (NIM)."
+        conditions: "Thesis persistence assumes stability in domestic credit demand and no significant contraction in prevailing Net Interest Margins (NIM)."
       },
-      risk_analysis: `Primary risks for ${payload.stock} are centered on macro-driven de-rating and potential NIM compression if deposit competition intensifies. Asset quality remains stable, providing a robust defensive cushion.`
+      risk_analysis: `Primary risks for ${payload.stock} center on macro-driven de-rating and potential NIM compression should deposit competition intensify. Existing asset quality provides a defensive cushion, though valuation premium remains sensitive to growth decelerations.`
     });
   });
 

@@ -281,8 +281,8 @@ export default function StockDashboard() {
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">How investors typically view this stock</h3>
                       <p className="text-muted-foreground leading-relaxed">
                         {stock.investorView}
-                        {aiData?.flowQualityScore < 50 && " Caution is advised as current accumulation patterns show signs of low institutional consensus."}
-                        {aiData?.flowQualityScore > 75 && " Market participants should note potential crowding risk as institutional conviction reaches high levels."}
+                        {aiData?.flowQualityScore < 50 && " Institutional consensus appears fragmented at current levels; market participants should monitor for potential divergence between price and flow quality."}
+                        {aiData?.flowQualityScore > 75 && " While institutional conviction remains high, the risk-reward profile is shifting as positioning becomes increasingly crowded."}
                       </p>
                     </Card>
                   </TabsContent>
@@ -293,8 +293,8 @@ export default function StockDashboard() {
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">Financial Performance Summary</h3>
                       <p className="text-muted-foreground leading-relaxed mb-4">
                         {stock.financialSummary}
-                        {aiData?.flowQualityScore < 50 && " The current financial trajectory should be weighed against emerging institutional distribution risks."}
-                        {aiData?.flowQualityScore > 75 && " Strong financial milestones are increasingly reflected in concentrated institutional positioning."}
+                        {aiData?.flowQualityScore < 50 && " The structural financial narrative faces potential headwinds from emerging institutional distribution risks."}
+                        {aiData?.flowQualityScore > 75 && " Sustained financial outperformance is being met with concentrated institutional accumulation, increasing macro-sensitivity."}
                       </p>
                       <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-md">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -551,9 +551,9 @@ export default function StockDashboard() {
                             <p className="text-lg font-semibold text-red-600 dark:text-red-400 font-mono">{stock.avgSellPrice}</p>
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-3">
-                          The narrow spread between buy and sell prices indicates institutional participation with minimal price friction during execution.
-                        </p>
+                      <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
+                        The convergence of buy and sell average prices suggests institutional participation with minimal execution friction, indicating a high-quality liquidity environment.
+                      </p>
                       </div>
                     </Card>
 
@@ -777,10 +777,10 @@ export default function StockDashboard() {
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">What This Means for Investors</h3>
                       <p className="text-muted-foreground leading-relaxed">
                         {stock.investorInterpretation}
-                        {aiData?.flowQualityScore < 50 && " The current accumulation signals carry a significant risk of being 'noise' or false positives due to low quality scores."}
-                        {aiData?.flowQualityScore > 75 && " While institutional support is high quality, the concentrated positioning may limit immediate upside without further structural catalysts."}
-                        {aiData?.earlyDistributionFlag && " Analysts observe signs of liquidity rotation. Chasing current price strength is discouraged as alpha-seeking attractiveness diminishes."}
-                        {(aiData?.convictionPhase === "Crowding" || aiData?.convictionPhase === "Distribution") && " High consensus levels suggest narrative saturation. Investors are advised to monitor for liquidity traps rather than chasing volatility."}
+                        {aiData?.flowQualityScore < 50 && " Current accumulation signals exhibit low conviction characteristics, suggesting potential narrative fatigue or false positioning."}
+                        {aiData?.flowQualityScore > 75 && " Institutional participation is high-quality, though the resulting consensus may limit immediate alpha capture without new fundamental surprises."}
+                        {aiData?.earlyDistributionFlag && " Signs of liquidity rotation are emerging. Investors are encouraged to prioritize downside protection as alpha-seeking attractiveness potentially diminishes."}
+                        {(aiData?.convictionPhase === "Crowding" || aiData?.convictionPhase === "Distribution") && " Elevated consensus suggests the current cycle may be entering a period of narrative saturation and increased rotation risk."}
                       </p>
                     </Card>
                   </TabsContent>
@@ -809,9 +809,9 @@ export default function StockDashboard() {
                               )}
                               <p className="text-muted-foreground leading-relaxed mb-6">
                                 {aiLoading ? "Evaluating risk factors..." : (aiData?.risk_analysis || stock.riskAnalystView)}
-                                {aiData?.flowQualityScore < 50 && " The low flow quality score suggests that apparent accumulation may not be sustained, introducing a risk of sudden price reversals."}
-                                {aiData?.flowQualityScore > 75 && " Crowding risk is elevated; the high consensus among institutional participants may lead to sharp drawdowns if the narrative shifts."}
-                                {aiData?.earlyDistributionFlag && " EARLY DISTRIBUTION ALERT: Internal signals suggest institutional rotation is underway despite positive headline flows."}
+                                {aiData?.flowQualityScore < 50 && " Fragmented flow quality increases the probability of structural de-rating if market consensus shifts."}
+                                {aiData?.flowQualityScore > 75 && " High consensus creates inherent crowding risks; any failure to meet elevated expectations could lead to disproportionate price responses."}
+                                {aiData?.earlyDistributionFlag && " DISTRIBUTION RISK: Internal dynamics suggest institutional participants are reducing exposure despite headline volume resilience."}
                               </p>
                               <div className="grid grid-cols-2 gap-6">
                                 <div>
