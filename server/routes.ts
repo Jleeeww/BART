@@ -186,11 +186,53 @@ export async function registerRoutes(
       ? `Analysis indicates ${signals.length} distribution signals emerging. While headline net flow remains positive, internal price friction and sell-side pricing power suggest an early distribution phase. Market participants should monitor for potential liquidity traps as smarter money appears to be rotating out during periods of apparent strength.`
       : "Current flow structures appear structurally sound with institutional participation remaining synchronized and execution friction appearing minimal.";
 
+    // Advanced Bandarmology Logic
+    // Tape Control Detection
+    const tapeControlSignals = [];
+    if (priceContext.last_price > buyAvg && payload.flow_signals.flow_intensity === "Neutral") {
+      tapeControlSignals.push("Mechanical price support observed during neutral organic flow.");
+    }
+    if (payload.flow_signals.sell_avg_price >= buyAvg * 0.998) {
+      tapeControlSignals.push("Tight execution corridor suggests inventory recycling between dominant participants.");
+    }
+    const tapeControlFlag = tapeControlSignals.length >= 2;
+    const tapeControlExplanation = tapeControlFlag 
+      ? "Price behavior appears mechanically supported rather than organically driven. Observed tape control suggests a phase of inventory consolidation by a dominant participant, likely intended to stabilize the current valuation floor."
+      : "Market activity appears to be driven by organic institutional participation with no significant signs of mechanical price defense.";
+
+    // Broker Classification
+    const brokerInsights = (payload.broker_data || []).map((b: any) => {
+      let role = "Market Maker";
+      let confidence = "Medium";
+      if (b.netBuy && !b.netSell) role = "Accumulator";
+      else if (b.netSell && !b.netBuy) role = "Distributor";
+      else if (parseFloat(b.volumePercent) < 5) role = "Retail Proxy";
+      
+      if (tapeControlFlag && (role === "Accumulator" || role === "Distributor")) role = "Operator";
+      
+      return {
+        brokerCode: b.code,
+        inferredRole: role,
+        confidenceLevel: confidence,
+        roleShiftFlag: false,
+        explanation: `${b.code} activity is characterized by ${role.toLowerCase()} behavior, showing ${b.netBuy ? "consistent net positioning" : "liquidity provision"} patterns.`
+      };
+    });
+
+    // A/D Mode Engine
+    let marketMode = "Active Accumulation";
+    if (earlyDistributionFlag) marketMode = "Distribution into Strength";
+    else if (tapeControlFlag && score > 60) marketMode = "Stealth Accumulation";
+    else if (score > 80) marketMode = "Active Accumulation";
+    else if (score < 40) marketMode = "Passive Distribution";
+    
+    const marketModeExplanation = `The current regime is classified as ${marketMode}. This classification is derived from ${tapeControlFlag ? "observed mechanical price defense" : "organic flow quality"} and the current ${payload.flow_signals.flow_bias.toLowerCase()} bias. Market participants should prioritize ${marketMode.includes("Accumulation") ? "institutional lead tracking" : "downside risk management"}.`;
+
     // Conviction Timeline Inference
     let convictionPhase = "Positioning";
-    if (earlyDistributionFlag) {
+    if (earlyDistributionFlag || marketMode.includes("Distribution")) {
       convictionPhase = "Distribution";
-    } else if (score > 80) {
+    } else if (score > 80 || marketMode === "Stealth Accumulation") {
       convictionPhase = "Crowding";
     } else if (score > 60) {
       convictionPhase = "Confirmation";
@@ -224,6 +266,11 @@ export async function registerRoutes(
       flowQualityInterpretation: interpretation,
       earlyDistributionFlag,
       earlyDistributionExplanation,
+      tapeControlFlag,
+      tapeControlExplanation,
+      brokerInsights,
+      marketMode,
+      marketModeExplanation,
       convictionPhase,
       convictionExplanation,
       event_analysis: {

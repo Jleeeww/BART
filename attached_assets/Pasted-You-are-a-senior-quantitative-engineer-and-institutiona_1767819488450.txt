@@ -1,0 +1,134 @@
+You are a senior quantitative engineer and institutional market-structure analyst specializing in Indonesian equities (IDX).
+
+GOAL:
+Implement advanced bandarmology intelligence across the app by adding:
+(A) Broker Behavior Classification
+(B) Operator / Tape-Control Detection
+(C) Accumulation–Distribution Mode Engine
+
+This must integrate cleanly with existing AI logic:
+- Flow Quality Score
+- False Accumulation Detection
+- Early Distribution Detection
+- Conviction Timeline
+- Investor Interpretation blocks (present in every tab)
+
+DO NOT remove or refactor existing features.
+DO NOT add buy/sell recommendations or price targets.
+
+--------------------------------
+A) BROKER BEHAVIOR CLASSIFICATION
+--------------------------------
+
+1. Extend backend AI logic (/api/ai) to classify top brokers dynamically into:
+   - Accumulator
+   - Distributor
+   - Market Maker
+   - Retail Proxy
+   - Operator / Tape Manager
+
+2. Classification must be inferred from rolling behavior, including:
+   - Buy avg vs sell avg persistence
+   - Holding duration vs churn
+   - Net consistency across sessions
+   - Time-of-day activity (especially near close)
+   - Correlation between broker activity and price changes
+
+3. For each relevant broker, return:
+   - brokerCode
+   - inferredRole
+   - confidenceLevel (low / medium / high)
+   - roleShiftFlag (true if behavior recently changed)
+
+4. Provide a short analyst-style explanation describing broker intent.
+   Use neutral, professional language.
+
+--------------------------------
+B) OPERATOR / TAPE-CONTROL DETECTION
+--------------------------------
+
+1. Add a Tape-Control Detection module in backend AI logic.
+   Detect price control behavior using combined signals:
+   - Repeated end-of-day price defense
+   - Flat intraday action with late-session lift
+   - Broker inventory recycling (high volume, low net)
+   - Level-based defense (round numbers, key MAs)
+   - Weak next-day follow-through
+
+2. Trigger tape-control warning only when multiple signals align.
+
+3. Return:
+   - tapeControlFlag (boolean)
+   - tapeControlExplanation (analyst-style, no accusatory language)
+
+IMPORTANT LANGUAGE RULE:
+- NEVER use words like "manipulation" or "illegal".
+- Use phrasing such as:
+  “Price behavior appears mechanically supported rather than organically driven.”
+
+--------------------------------
+C) ACCUMULATION–DISTRIBUTION MODE ENGINE
+--------------------------------
+
+1. Implement a regime engine that classifies the stock into ONE current mode:
+   - Stealth Accumulation
+   - Active Accumulation
+   - Distribution into Strength
+   - Passive Distribution
+   - Post-Distribution Vacuum
+
+2. Mode inference must synthesize:
+   - Flow Quality Score trend
+   - Broker behavior mix and role shifts
+   - Early Distribution flags
+   - Tape-control signals
+   - Conviction Timeline phase
+
+3. Prevent rapid flipping:
+   - Mode should only change when multiple conditions align.
+
+4. Return:
+   - marketMode (string)
+   - marketModeExplanation (clear, educational, analyst-grade)
+
+--------------------------------
+FRONTEND INTEGRATION
+--------------------------------
+
+1. Display Broker Behavior insights in the Flow tab:
+   - Show inferred role + explanation for top brokers
+   - Highlight role shifts subtly
+
+2. Display Tape-Control warnings:
+   - Flow tab: subtle caution note
+   - Risk tab: under Contrarian Risks
+   - Conviction Timeline: accelerate toward Distribution when applicable
+
+3. Display Accumulation–Distribution Mode:
+   - Prominently in Flow and Overview
+   - As contextual input in Risk and Timeline explanations
+
+4. Investor Interpretation (EVERY TAB):
+   - Adjust language based on marketMode
+   - If mode is Distribution-related:
+     • Reduce alpha-seeking asymmetry
+     • Warn against chasing strength
+   - No hard labels or recommendations
+
+--------------------------------
+RULES (NON-NEGOTIABLE)
+--------------------------------
+
+- No buy/sell calls
+- No target prices
+- No sensational language
+- No refactoring unrelated components
+- Keep TypeScript strict and error-free
+- Prefer explanation over signals
+
+EXPECTED RESULT:
+- App compiles cleanly
+- Users can understand WHO is acting, HOW price is managed, and WHAT phase the stock is in
+- Bandarmology insights are institutional-grade, calm, and educational
+
+Proceed and apply changes directly.

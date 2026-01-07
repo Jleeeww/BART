@@ -78,6 +78,7 @@ export default function StockDashboard() {
       stock: stock.symbol,
       date: new Date().toISOString().split('T')[0],
       context: stock.summary,
+      broker_data: JSON.parse(stock.brokerData),
 
       price_context: {
         last_price: parseFloat(stock.price.replace(/,/g, "")),
@@ -229,10 +230,21 @@ export default function StockDashboard() {
                 <div className="mt-6">
                   <TabsContent value="overview" className="mt-0 focus-visible:outline-none space-y-6">
                     <Card className="p-6 border-border/50 shadow-sm">
-                      <h3 className="text-xl font-bold font-display mb-4">Company Profile</h3>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-bold font-display">Company Profile</h3>
+                        {!aiLoading && aiData?.marketMode && (
+                          <span className="text-xs font-bold px-2 py-1 rounded bg-secondary text-foreground uppercase">
+                            Mode: {aiData.marketMode}
+                          </span>
+                        )}
+                      </div>
                       {!aiLoading && aiData && (
-                        <div className="mb-6">
+                        <div className="mb-6 space-y-4">
                           <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
+                          <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
+                            <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Market Regime</p>
+                            <p className="text-sm text-muted-foreground leading-relaxed">{aiData.marketModeExplanation}</p>
+                          </div>
                         </div>
                       )}
                       <p className="text-muted-foreground leading-relaxed mb-6">
@@ -424,6 +436,15 @@ export default function StockDashboard() {
                               <p className="text-sm text-muted-foreground italic">{aiData.earlyDistributionExplanation}</p>
                             </div>
                           )}
+                          {aiData.tapeControlFlag && (
+                            <div className="mt-3 pt-3 border-t border-border/20">
+                              <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                                <Activity className="w-3 h-3" />
+                                Tape Control Behavior Detected
+                              </p>
+                              <p className="text-sm text-muted-foreground italic">{aiData.tapeControlExplanation}</p>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -486,6 +507,7 @@ export default function StockDashboard() {
                               <th className="text-right py-3 px-3 font-semibold text-foreground">Net Buy (IDR)</th>
                               <th className="text-right py-3 px-3 font-semibold text-foreground">Net Sell (IDR)</th>
                               <th className="text-right py-3 px-3 font-semibold text-foreground">% of Volume</th>
+                              <th className="text-right py-3 px-3 font-semibold text-foreground">AI Role</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -522,6 +544,21 @@ export default function StockDashboard() {
                                       )}
                                     </td>
                                     <td className="text-right py-3 px-3 font-mono text-foreground">{broker.volumePercent}</td>
+                                    <td className="py-3 px-3 text-right">
+                                      {(() => {
+                                        const insight = aiData?.brokerInsights?.find((i: any) => i.brokerCode === broker.code);
+                                        return insight ? (
+                                          <div className="inline-flex flex-col items-end">
+                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-secondary text-foreground uppercase">
+                                              {insight.inferredRole}
+                                            </span>
+                                            <span className="text-[9px] text-muted-foreground mt-0.5 whitespace-nowrap">
+                                              Conf: {insight.confidenceLevel}
+                                            </span>
+                                          </div>
+                                        ) : <span className="text-muted-foreground">—</span>;
+                                      })()}
+                                    </td>
                                   </tr>
                                 ));
                               } catch (e) {
