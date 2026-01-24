@@ -557,6 +557,43 @@ export default function StockDashboard() {
                       </Card>
                     )}
 
+                    {/* Broker Stability Score Card */}
+                    {!aiLoading && aiData?.brokerStabilityScore && (
+                      <Card className="p-6 border-border/50 shadow-sm" data-testid="card-broker-stability-score">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <h4 className="text-base font-bold font-display text-foreground">Broker Stability</h4>
+                            <p className="text-xs text-muted-foreground">Measures whether the same institutions are consistently controlling accumulation</p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-2xl font-bold ${
+                              aiData.brokerStabilityScore.level === "High" 
+                                ? 'text-emerald-600 dark:text-emerald-400' 
+                                : aiData.brokerStabilityScore.level === "Moderate" 
+                                  ? 'text-amber-600 dark:text-amber-400' 
+                                  : 'text-muted-foreground'
+                            }`} data-testid="text-broker-stability-score-value">
+                              {aiData.brokerStabilityScore.score}%
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mb-4">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            aiData.brokerStabilityScore.level === "High" 
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                              : aiData.brokerStabilityScore.level === "Moderate" 
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' 
+                                : 'bg-muted text-muted-foreground'
+                          }`} data-testid="badge-broker-stability-level">
+                            {aiData.brokerStabilityScore.level} Stability
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-broker-stability-interpretation">
+                          {aiData.brokerStabilityScore.interpretation}
+                        </p>
+                      </Card>
+                    )}
+
                     {/* SECTION 2: Broker Summary */}
                     <Card className="p-6 border-border/50 shadow-sm">
                       <div className="flex items-center justify-between mb-4">

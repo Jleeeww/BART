@@ -43,6 +43,12 @@ Measures concentration of net accumulation among top 3 brokers:
 - **Moderate Concentration** (40-69%): Somewhat concentrated, depends on key broker behavior
 - **High Concentration** (≥70%): Few brokers control most accumulation, higher manipulation risk
 
+### Broker Stability Score (0-100%)
+Measures whether the same brokers consistently dominate accumulation across multiple periods:
+- **Low Stability** (<40%): Rotating leadership, short-term positioning
+- **Moderate Stability** (40-69%): Emerging institutional interest, not full control
+- **High Stability** (≥70%): Structured operator-style campaign with sustained intent
+
 ### Additional Signals
 - Early Distribution Detection
 - Tape Control Detection

@@ -1,0 +1,111 @@
+TASK: Add a new advanced bandarmology feature called Broker Stability Score that measures whether the same brokers consistently dominate accumulation across multiple periods. This helps detect true operator campaigns vs temporary positioning.
+
+BACKEND CHANGES (server/routes.ts)
+
+Create a new function:
+
+Function name: calculateBrokerStabilityScore
+
+Purpose:
+Track broker dominance persistence across time and return a stability score from 0–100.
+
+Logic:
+
+• Input: Historical broker flow data (array of daily broker summaries)
+Each day contains:
+
+{
+  date: string,
+  brokers: [
+    { code: string, netBuy: number, netSell: number }
+  ]
+}
+
+
+• Step 1 — For each day:
+
+Compute net flow per broker = netBuy − netSell
+
+Identify Top 3 brokers with highest positive net flow
+
+• Step 2 — Track frequency:
+
+Count how many times each broker appears in Top 3 across all days
+
+• Step 3 — Compute Stability Score:
+
+stabilityScore = (total appearances of top recurring brokers) / (total top-3 slots across all days) * 100
+
+
+• Step 4 — Classify:
+
+Score	Stability Level	Meaning
+<40	Low Stability	Flow leadership changes frequently
+40–69	Moderate Stability	Some recurring accumulation
+≥70	High Stability	Strong operator-style persistent accumulation
+
+• Step 5 — Return:
+
+{
+  score: number,
+  level: "Low" | "Moderate" | "High",
+  interpretation: string
+}
+
+
+Interpretation Text Rules:
+
+Low: "Accumulation leadership is rotating. This suggests short-term positioning rather than a coordinated institutional campaign."
+
+Moderate: "Some brokers are repeatedly active, indicating emerging institutional interest but not full control."
+
+High: "The same brokers consistently dominate accumulation, signaling a structured operator-style campaign with sustained intent."
+
+API RESPONSE UPDATE
+
+Inside the existing AI analysis response, add:
+
+brokerStability: calculateBrokerStabilityScore(historicalBrokerData)
+
+FRONTEND CHANGES (Flow Tab)
+
+Add a new card below Broker Control Score called:
+
+🧩 Broker Stability Score
+
+Display:
+
+Large percentage score (like Flow Quality Score)
+
+Color rules:
+
+Green = High Stability
+
+Amber = Moderate
+
+Gray = Low
+
+Show:
+
+Stability Level badge
+
+Interpretation text returned from backend
+
+UI TEXT
+
+Title: Broker Stability
+Subtitle: Measures whether the same institutions are consistently controlling accumulation.
+
+PURPOSE OF FEATURE (FOR COMMENTS IN CODE)
+
+This metric helps distinguish:
+
+• Random daily accumulation
+vs
+• Coordinated institutional campaigns (operator behavior)
+
+High stability = strong conviction accumulation
+Low stability = temporary or speculative flow
+
+IMPORTANT:
+Do not break existing features. Integrate cleanly with the current bandarmology system and reuse styling from Flow Quality and Broker Control cards.
