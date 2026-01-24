@@ -297,6 +297,36 @@ export default function StockDashboard() {
                         {aiData?.flowQualityScore > 75 && " While institutional conviction remains high, the risk-reward profile is shifting as positioning becomes increasingly crowded."}
                       </p>
                     </Card>
+
+                    {aiData?.smartMoneyIntent && (
+                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2">
+                            <Activity className="w-5 h-5 text-indigo-500" />
+                            Smart Money Intent
+                          </h3>
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${
+                            aiData.smartMoneyIntent.confidence === "High" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                            aiData.smartMoneyIntent.confidence === "Medium" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
+                            "bg-slate-100 text-slate-600 dark:bg-slate-800/30 dark:text-slate-400"
+                          }`}>
+                            {aiData.smartMoneyIntent.confidence} Confidence
+                          </span>
+                        </div>
+                        <div className="mb-4">
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Primary Objective</p>
+                          <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{aiData.smartMoneyIntent.primaryIntent}</p>
+                          {aiData.smartMoneyIntent.secondaryIntent && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Secondary: <span className="font-semibold">{aiData.smartMoneyIntent.secondaryIntent}</span>
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {aiData.smartMoneyIntent.explanation}
+                        </p>
+                      </Card>
+                    )}
                   </TabsContent>
                   
                   {/* Financials Tab */}
@@ -495,7 +525,15 @@ export default function StockDashboard() {
 
                     {/* SECTION 2: Broker Summary */}
                     <Card className="p-6 border-border/50 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Broker Summary</h4>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-base font-bold font-display text-foreground">Broker Summary</h4>
+                        {aiData?.smartMoneyIntent && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">Dominant Institutional Objective:</span>
+                            <span className="font-bold text-indigo-600 dark:text-indigo-400">{aiData.smartMoneyIntent.primaryIntent}</span>
+                          </div>
+                        )}
+                      </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -941,6 +979,22 @@ export default function StockDashboard() {
                                     </h5>
                                     <p className="text-sm text-muted-foreground leading-relaxed italic">
                                       "{aiData.tapeControlExplanation}"
+                                    </p>
+                                  </div>
+                                )}
+                                {(aiData?.smartMoneyIntent?.primaryIntent === "Inventory Exit" || aiData?.smartMoneyIntent?.primaryIntent === "Liquidity Harvesting") && (
+                                  <div className="p-5 border border-red-500/20 bg-red-500/5 rounded-xl space-y-3">
+                                    <h5 className="font-bold text-red-700 dark:text-red-400 flex items-center gap-2 text-sm">
+                                      <AlertTriangle className="w-4 h-4" />
+                                      Smart Money Intent Warning
+                                    </h5>
+                                    <p className="text-sm text-muted-foreground leading-relaxed italic">
+                                      Current institutional behavior patterns suggest "{aiData.smartMoneyIntent.primaryIntent}". 
+                                      {aiData.smartMoneyIntent.primaryIntent === "Inventory Exit" && " Dominant participants appear to be reducing exposure through orderly liquidation. Price resilience may mask underlying rotation."}
+                                      {aiData.smartMoneyIntent.primaryIntent === "Liquidity Harvesting" && " Elevated tactical activity around key levels may indicate stop-run behavior or false breakout patterns. Net directional progress may be limited despite visible volume."}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground/70 mt-2">
+                                      Confidence: {aiData.smartMoneyIntent.confidence}
                                     </p>
                                   </div>
                                 )}

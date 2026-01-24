@@ -277,6 +277,7 @@ export async function registerRoutes(
       convictionPhase = "Reset";
     }
 
+    // Base conviction explanation (will be modified by intent later)
     let convictionExplanation = "";
     switch(convictionPhase) {
       case "Positioning": convictionExplanation = "Initial institutional positioning is detected. Flow quality is nascent; the thesis remains speculative until synchronized participation is confirmed across domestic and foreign desks."; break;
@@ -296,6 +297,76 @@ export async function registerRoutes(
     else if (score > 20) interpretation = "Distribution bias emerging; institutional participants appear to be reducing exposure during volatility.";
     else interpretation = "Significant distribution across multiple desks, suggesting a broad-based reduction in institutional conviction.";
 
+    // Smart Money Intent Engine
+    const accumulatorCount = brokerInsights.filter((b: any) => b.inferredRole === "Accumulator").length;
+    const distributorCount = brokerInsights.filter((b: any) => b.inferredRole === "Distributor").length;
+    const operatorCount = brokerInsights.filter((b: any) => b.inferredRole === "Operator").length;
+    const brokerRoleMix = accumulatorCount > distributorCount ? "Accumulator-Dominant" : 
+                          distributorCount > accumulatorCount ? "Distributor-Dominant" : "Balanced";
+    
+    // Flow quality trend inference (simplified - based on current score position)
+    const flowQualityTrend = score > 70 ? "improving" : score > 50 ? "flat" : "deteriorating";
+    
+    // Intent inference using multi-signal confluence
+    let primaryIntent = "Inventory Building";
+    let secondaryIntent: string | undefined = undefined;
+    let intentConfidence: "Low" | "Medium" | "High" = "Medium";
+    let intentExplanation = "";
+    
+    // Multi-signal confluence logic (incorporating flowQualityTrend)
+    if (earlyDistributionFlag || marketMode === "Distribution into Strength") {
+      primaryIntent = "Inventory Exit";
+      intentConfidence = earlyDistributionFlag ? "High" : "Medium";
+      if (flowQualityTrend === "deteriorating") intentConfidence = "High";
+      intentExplanation = "Flow characteristics suggest dominant participants are reducing exposure while maintaining orderly price behavior. The combination of deteriorating internal flow quality and resilient headline price action is consistent with institutional rotation patterns.";
+    } else if (tapeControlFlag && score < 50 && brokerRoleMix === "Balanced") {
+      primaryIntent = "Liquidity Harvesting";
+      intentConfidence = flowQualityTrend === "flat" ? "Medium" : "Low";
+      intentExplanation = "Market microstructure suggests elevated churn with limited net directional progress. High broker activity without corresponding accumulation or distribution bias may indicate tactical positioning around key technical levels.";
+    } else if (tapeControlFlag && score > 50) {
+      primaryIntent = "Price Support Operation";
+      intentConfidence = operatorCount > 0 ? "High" : "Medium";
+      secondaryIntent = "Inventory Building";
+      intentExplanation = "Flow characteristics suggest dominant participants are actively managing price stability near perceived support zones. Mechanical tape behavior combined with moderate flow quality indicates defensive positioning rather than aggressive accumulation.";
+    } else if (marketMode === "Stealth Accumulation" && convictionPhase === "Positioning") {
+      primaryIntent = "Inventory Building";
+      intentConfidence = flowQualityTrend === "improving" ? "High" : "Medium";
+      intentExplanation = "Flow characteristics suggest dominant participants are quietly building positions with minimal price displacement. Low volatility accumulation patterns and contained execution are consistent with early-stage institutional positioning.";
+    } else if (marketMode === "Active Accumulation" && (convictionPhase === "Confirmation" || convictionPhase === "Crowding")) {
+      primaryIntent = "Mark-Up Preparation";
+      intentConfidence = (score > 70 && flowQualityTrend === "improving") ? "High" : "Medium";
+      secondaryIntent = "Inventory Building";
+      intentExplanation = "Flow characteristics suggest dominant participants are transitioning from quiet accumulation to more visible position-building. Expanding net flows and improving flow quality indicate potential structural repositioning ahead of anticipated catalysts.";
+    } else if (marketMode === "Passive Distribution" || marketMode === "Post-Distribution Vacuum") {
+      primaryIntent = "Inventory Exit";
+      intentConfidence = flowQualityTrend === "deteriorating" ? "High" : "Medium";
+      intentExplanation = "Flow characteristics suggest dominant participants have largely completed their rotation cycle. Reduced institutional sponsorship and declining flow quality indicate a search for new valuation equilibrium.";
+    } else if (brokerRoleMix === "Accumulator-Dominant" && score > 60) {
+      primaryIntent = "Inventory Building";
+      intentConfidence = flowQualityTrend === "improving" ? "High" : "Medium";
+      intentExplanation = "Flow characteristics suggest dominant participants are building positions through steady absorption. Accumulator-skewed broker activity and moderate flow quality support a constructive institutional positioning thesis.";
+    } else {
+      primaryIntent = "Inventory Building";
+      intentConfidence = "Low";
+      intentExplanation = "Current flow patterns do not exhibit clear directional intent. Market participants appear to be awaiting additional catalysts before committing to sustained positioning. Monitor for changes in flow quality or broker role composition.";
+    }
+    
+    // Modify conviction explanation based on intent (per spec requirements)
+    if (primaryIntent === "Mark-Up Preparation") {
+      convictionExplanation += " Smart money intent analysis reinforces the constructive outlook, with flow characteristics suggesting active preparation for potential price appreciation.";
+    } else if (primaryIntent === "Inventory Exit" && (convictionPhase === "Crowding" || convictionPhase === "Distribution")) {
+      convictionExplanation += " However, smart money intent analysis suggests institutional rotation may be underway despite elevated positioning levels. Late-stage conviction should be treated with caution.";
+    } else if (primaryIntent === "Liquidity Harvesting") {
+      convictionExplanation += " Elevated churn patterns suggest tactical activity that may not translate to sustained directional conviction.";
+    }
+    
+    const smartMoneyIntent = {
+      primaryIntent,
+      secondaryIntent,
+      confidence: intentConfidence,
+      explanation: intentExplanation
+    };
+
     // Structured analyst-style response without buy/sell signals
     res.json({
       flow_analysis: `Institutional activity for ${payload.stock} indicates ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} with ${payload.flow_signals.flow_reliability} reliability. Broad-based positioning is supported by synchronized participation from both domestic and foreign institutional sources.`,
@@ -310,6 +381,7 @@ export async function registerRoutes(
       marketModeExplanation,
       convictionPhase,
       convictionExplanation,
+      smartMoneyIntent,
       event_analysis: {
         impact: "Medium",
         relevance: "Structural",

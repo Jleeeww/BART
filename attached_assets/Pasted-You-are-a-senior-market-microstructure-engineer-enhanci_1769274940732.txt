@@ -1,0 +1,122 @@
+You are a senior market microstructure engineer enhancing an institutional-grade Indonesian equities intelligence platform.
+
+GOAL:
+Add a Smart Money Intent Engine that interprets WHY dominant brokers are acting, not just WHAT they are doing.
+
+This layer must sit on top of:
+- Broker Behavior Classification
+- Tape-Control Detection
+- Accumulation–Distribution Mode Engine
+- Flow Quality Score
+- Conviction Timeline
+
+Do NOT add trading signals, buy/sell calls, or price targets.
+
+--------------------------------
+SMART MONEY INTENT ENGINE
+--------------------------------
+
+Create a new AI inference module that analyzes COMBINED behavior and outputs the most probable institutional intent.
+
+Possible Intent Classifications (return ONE primary + optional secondary):
+
+1. Inventory Building
+   - Quiet absorption
+   - Low volatility accumulation
+   - Minimal price displacement
+
+2. Inventory Exit
+   - Selling into strength
+   - Distribution masked by strong tape
+   - Rising supply into rallies
+
+3. Price Support Operation
+   - Defensive buying near key levels
+   - Tape-control characteristics
+   - Broker recycling with low net progress
+
+4. Mark-Up Preparation
+   - Transition from stealth accumulation to active accumulation
+   - Expanding net flow and improving Flow Quality
+
+5. Liquidity Harvesting
+   - False breakouts
+   - Stop-run behavior
+   - High churn with little net accumulation
+
+--------------------------------
+INFERENCE RULES
+--------------------------------
+
+Intent must be inferred using confluence of:
+
+- Market Mode (from A/D Engine)
+- Tape-Control Flag
+- Broker Role Mix (Accumulator vs Distributor dominance)
+- Flow Quality trend (improving, flat, deteriorating)
+- Conviction Timeline phase
+
+Intent should NOT change rapidly. Require multi-signal confirmation.
+
+--------------------------------
+OUTPUT FORMAT (BACKEND)
+--------------------------------
+
+Return:
+
+smartMoneyIntent: {
+  primaryIntent: string,
+  secondaryIntent?: string,
+  confidence: "Low" | "Medium" | "High",
+  explanation: string (2–4 sentences, institutional tone, educational)
+}
+
+Explanation should describe behavior, not make accusations.
+Use language like:
+"Flow characteristics suggest dominant participants are..."
+NOT "They are manipulating..."
+
+--------------------------------
+FRONTEND INTEGRATION
+--------------------------------
+
+1. OVERVIEW TAB
+   Add a new card:
+   🧠 Smart Money Intent
+   - Show primary intent
+   - Confidence badge
+   - Short explanation
+
+2. FLOW TAB
+   Under Broker Summary:
+   - Add line: "Dominant Institutional Objective: ______"
+
+3. RISK TAB
+   If intent = Inventory Exit or Liquidity Harvesting:
+     Add caution note under Contrarian Risks
+
+4. CONVICTION TIMELINE
+   Use intent to influence phase explanation:
+   - Mark-Up Preparation → strengthens Bullish Conviction
+   - Inventory Exit → weakens late-stage conviction
+
+--------------------------------
+LANGUAGE RULES
+--------------------------------
+
+- No price predictions
+- No trade instructions
+- No hype language
+- Must sound like institutional flow commentary
+
+--------------------------------
+RESULT
+--------------------------------
+
+The app should now explain:
+WHO is active (broker roles)
+HOW price is behaving (tape control)
+WHAT phase the stock is in (market mode)
+WHY smart money is acting this way (intent)
+
+Proceed with implementation.
