@@ -186,6 +186,52 @@ export async function registerRoutes(
       ? `Analysis indicates ${signals.length} distribution signals emerging. While headline net flow remains positive, internal price friction and sell-side pricing power suggest an early distribution phase. Market participants should monitor for potential liquidity traps as smarter money appears to be rotating out during periods of apparent strength.`
       : "Current flow structures appear structurally sound with institutional participation remaining synchronized and execution friction appearing minimal.";
 
+    // ─── Broker Control Score Calculation ───
+    // Measures concentration of net accumulation among top brokers
+    const calculateBrokerControlScore = (brokers: any[]) => {
+      const positive = brokers
+        .map(b => {
+          // Parse netBuy/netSell values (format: "125.5B IDR")
+          const buyVal = b.netBuy ? parseFloat(b.netBuy.replace(/[^\d.]/g, "")) : 0;
+          const sellVal = b.netSell ? parseFloat(b.netSell.replace(/[^\d.]/g, "")) : 0;
+          return { ...b, net: buyVal - sellVal };
+        })
+        .filter(b => b.net > 0);
+
+      if (positive.length === 0) {
+        return {
+          score: 0,
+          level: "None",
+          interpretation: "No broker accumulation detected."
+        };
+      }
+
+      positive.sort((a, b) => b.net - a.net);
+
+      const top3 = positive.slice(0, 3).reduce((sum, b) => sum + b.net, 0);
+      const total = positive.reduce((sum, b) => sum + b.net, 0);
+
+      const brokerScore = Math.round((top3 / total) * 100);
+
+      let level = "Low Concentration";
+      let interpretation =
+        "Accumulation is distributed across many brokers, suggesting broader institutional participation and healthier trend structure.";
+
+      if (brokerScore >= 70) {
+        level = "High Concentration";
+        interpretation =
+          "A small number of brokers control most accumulation. This increases continuation probability but raises exit volatility risk if they reverse.";
+      } else if (brokerScore >= 40) {
+        level = "Moderate Concentration";
+        interpretation =
+          "Accumulation is somewhat concentrated. Price movement has institutional support but still depends on key broker behavior.";
+      }
+
+      return { score: brokerScore, level, interpretation };
+    };
+
+    const brokerControlScore = calculateBrokerControlScore(payload.broker_data || []);
+
     // Advanced Bandarmology Logic
     // Tape Control Detection
     const tapeControlSignals = [];
@@ -377,6 +423,7 @@ export async function registerRoutes(
       tapeControlFlag,
       tapeControlExplanation,
       brokerInsights,
+      brokerControlScore,
       marketMode,
       marketModeExplanation,
       convictionPhase,

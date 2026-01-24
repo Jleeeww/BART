@@ -1,0 +1,154 @@
+You are working on a stock analysis dashboard that already includes broker flow (bandarmology) data and an AI analysis pipeline.
+
+Your task is to add a new institutional metric called “Broker Control Score” and integrate it into both backend analysis and the frontend Flow tab.
+
+Do NOT remove or rewrite existing features. Only extend the system.
+
+🎯 FEATURE PURPOSE
+
+Broker Control Score measures how concentrated net accumulation is among the top brokers.
+
+This helps detect whether price movement is:
+
+Broadly supported (healthy trend)
+
+Controlled by a few brokers (higher manipulation risk)
+
+🧮 BACKEND — CALCULATION
+
+Broker data already exists in this format:
+
+type BrokerFlow = {
+  broker: string
+  buyValue: number
+  sellValue: number
+}
+
+
+Net flow per broker:
+
+net = buyValue - sellValue
+
+➕ Create a new utility function
+
+Create a new file if needed (example: lib/bandarmology.ts) and add:
+
+export function calculateBrokerControlScore(brokers: BrokerFlow[]) {
+  const positive = brokers
+    .map(b => ({ ...b, net: b.buyValue - b.sellValue }))
+    .filter(b => b.net > 0)
+
+  if (positive.length === 0) {
+    return {
+      score: 0,
+      level: "None",
+      interpretation: "No broker accumulation detected."
+    }
+  }
+
+  positive.sort((a, b) => b.net - a.net)
+
+  const top3 = positive.slice(0, 3).reduce((sum, b) => sum + b.net, 0)
+  const total = positive.reduce((sum, b) => sum + b.net, 0)
+
+  const score = Math.round((top3 / total) * 100)
+
+  let level = "Low Concentration"
+  let interpretation =
+    "Accumulation is distributed across many brokers, suggesting broader institutional participation and healthier trend structure."
+
+  if (score >= 70) {
+    level = "High Concentration"
+    interpretation =
+      "A small number of brokers control most accumulation. This increases continuation probability but raises exit volatility risk if they reverse."
+  } else if (score >= 40) {
+    level = "Moderate Concentration"
+    interpretation =
+      "Accumulation is somewhat concentrated. Price movement has institutional support but still depends on key broker behavior."
+  }
+
+  return { score, level, interpretation }
+}
+
+🔌 INTEGRATE INTO ANALYSIS PIPELINE
+
+Find where broker flow data is processed (likely in /api/ai, /server/analysis, or similar).
+
+Import the function:
+
+import { calculateBrokerControlScore } from "@/lib/bandarmology"
+
+
+After broker summary is computed, run:
+
+const brokerControl = calculateBrokerControlScore(brokerFlows)
+
+
+Attach to AI/bandarmology output:
+
+analysis.bandarmology.brokerControlScore = brokerControl
+
+
+Make sure this is included in the JSON response sent to the frontend.
+
+🖥 FRONTEND — FLOW TAB UI
+
+Inside the Flow (Bandarmology) Tab, add a new metric card.
+
+Card Title
+
+Broker Control Score
+
+Display Format
+
+Large Number
+
+{score}%
+
+
+Sub Label
+
+Level: {level}
+
+
+Description Text
+
+{interpretation}
+
+🎨 COLOR RULES
+
+Use conditional styling:
+
+Green → score < 40
+
+Yellow → 40–69
+
+Red → ≥ 70
+
+Match the styling of existing metric cards.
+
+📍 PLACEMENT
+
+Place this card:
+
+In the Flow tab
+
+Near Broker Summary or Flow Quality Score
+
+Keep layout consistent with other analysis cards
+
+✅ FINAL RESULT EXPECTATION
+
+Example outputs:
+
+High concentration case
+Broker Control Score: 76%
+Level: High Concentration
+
+Low concentration case
+Broker Control Score: 28%
+Level: Low Concentration
+
+Do not break any existing functionality. Only extend analysis and UI.
+
+When finished, ensure the app compiles with zero TypeScript errors and the metric displays dynamically based on broker data.

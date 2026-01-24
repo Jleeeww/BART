@@ -523,6 +523,40 @@ export default function StockDashboard() {
                       </div>
                     </Card>
 
+                    {/* Broker Control Score Card */}
+                    {!aiLoading && aiData?.brokerControlScore && (
+                      <Card className="p-6 border-border/50 shadow-sm" data-testid="card-broker-control-score">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-base font-bold font-display text-foreground">Broker Control Score</h4>
+                          <div className="text-right">
+                            <p className={`text-2xl font-bold ${
+                              aiData.brokerControlScore.score >= 70 
+                                ? 'text-red-600 dark:text-red-400' 
+                                : aiData.brokerControlScore.score >= 40 
+                                  ? 'text-amber-600 dark:text-amber-400' 
+                                  : 'text-emerald-600 dark:text-emerald-400'
+                            }`} data-testid="text-broker-control-score-value">
+                              {aiData.brokerControlScore.score}%
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mb-4">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            aiData.brokerControlScore.score >= 70 
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
+                              : aiData.brokerControlScore.score >= 40 
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' 
+                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                          }`} data-testid="badge-broker-control-level">
+                            {aiData.brokerControlScore.level}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-broker-control-interpretation">
+                          {aiData.brokerControlScore.interpretation}
+                        </p>
+                      </Card>
+                    )}
+
                     {/* SECTION 2: Broker Summary */}
                     <Card className="p-6 border-border/50 shadow-sm">
                       <div className="flex items-center justify-between mb-4">

@@ -37,6 +37,12 @@ Analyzes combined signals to infer institutional objectives:
 ### Conviction Timeline
 Lifecycle phases: Positioning → Confirmation → Crowding → Distribution → Reset
 
+### Broker Control Score (0-100%)
+Measures concentration of net accumulation among top 3 brokers:
+- **Low Concentration** (<40%): Broadly distributed accumulation, healthier trend structure
+- **Moderate Concentration** (40-69%): Somewhat concentrated, depends on key broker behavior
+- **High Concentration** (≥70%): Few brokers control most accumulation, higher manipulation risk
+
 ### Additional Signals
 - Early Distribution Detection
 - Tape Control Detection
