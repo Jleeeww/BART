@@ -204,29 +204,66 @@ export async function registerRoutes(
     const brokerInsights = (payload.broker_data || []).map((b: any) => {
       let role = "Market Maker";
       let confidence = "Medium";
-      if (b.netBuy && !b.netSell) role = "Accumulator";
-      else if (b.netSell && !b.netBuy) role = "Distributor";
-      else if (parseFloat(b.volumePercent) < 5) role = "Retail Proxy";
+      const volPct = parseFloat((b.volumePercent || "0").replace("%", ""));
       
-      if (tapeControlFlag && (role === "Accumulator" || role === "Distributor")) role = "Operator";
+      // Role inference based on behavior patterns
+      if (b.netBuy && !b.netSell && volPct >= 8) {
+        role = "Accumulator";
+        confidence = "High";
+      } else if (b.netSell && !b.netBuy && volPct >= 8) {
+        role = "Distributor";
+        confidence = "High";
+      } else if (b.netBuy && !b.netSell) {
+        role = "Accumulator";
+      } else if (b.netSell && !b.netBuy) {
+        role = "Distributor";
+      } else if (volPct < 5) {
+        role = "Retail Proxy";
+        confidence = "Low";
+      } else if (b.netBuy && b.netSell) {
+        role = "Market Maker";
+      }
+      
+      // Operator detection: high volume with tape control signals
+      if (tapeControlFlag && volPct >= 10 && (role === "Accumulator" || role === "Distributor")) {
+        role = "Operator";
+        confidence = "High";
+      }
+      
+      const roleDescriptions: Record<string, string> = {
+        "Accumulator": "consistent net buying with position-building intent",
+        "Distributor": "net selling with inventory reduction patterns",
+        "Market Maker": "two-way flow providing liquidity without directional bias",
+        "Retail Proxy": "fragmented retail-driven activity with limited institutional characteristics",
+        "Operator": "coordinated activity suggesting inventory management or price stabilization"
+      };
       
       return {
         brokerCode: b.code,
         inferredRole: role,
         confidenceLevel: confidence,
         roleShiftFlag: false,
-        explanation: `${b.code} activity is characterized by ${role.toLowerCase()} behavior, showing ${b.netBuy ? "consistent net positioning" : "liquidity provision"} patterns.`
+        explanation: `${b.code} exhibits ${roleDescriptions[role] || "unclassified behavior"}.`
       };
     });
 
     // A/D Mode Engine
     let marketMode = "Active Accumulation";
-    if (earlyDistributionFlag) marketMode = "Distribution into Strength";
+    if (earlyDistributionFlag && score < 40) marketMode = "Post-Distribution Vacuum";
+    else if (earlyDistributionFlag) marketMode = "Distribution into Strength";
     else if (tapeControlFlag && score > 60) marketMode = "Stealth Accumulation";
     else if (score > 80) marketMode = "Active Accumulation";
-    else if (score < 40) marketMode = "Passive Distribution";
+    else if (score < 40 && payload.flow_signals.flow_bias === "Distribution") marketMode = "Passive Distribution";
+    else if (score < 30) marketMode = "Post-Distribution Vacuum";
     
-    const marketModeExplanation = `The current regime is classified as ${marketMode}. This classification is derived from ${tapeControlFlag ? "observed mechanical price defense" : "organic flow quality"} and the current ${payload.flow_signals.flow_bias.toLowerCase()} bias. Market participants should prioritize ${marketMode.includes("Accumulation") ? "institutional lead tracking" : "downside risk management"}.`;
+    let marketModeExplanation = "";
+    switch(marketMode) {
+      case "Stealth Accumulation": marketModeExplanation = "Dominant participants appear to be building positions quietly under mechanical price support. Flow quality is emerging but not yet reflected in organic price discovery."; break;
+      case "Active Accumulation": marketModeExplanation = "Synchronized institutional activity is driving organic price appreciation. Flow quality is high with broad-based participation."; break;
+      case "Distribution into Strength": marketModeExplanation = "Despite positive headline price action, internal flow structure suggests institutional rotation is underway. Headline strength may mask underlying distribution."; break;
+      case "Passive Distribution": marketModeExplanation = "Institutional selling is occurring without aggressive price marking. Liquidity is being absorbed gradually, reducing immediate volatility but building downside risk."; break;
+      case "Post-Distribution Vacuum": marketModeExplanation = "Prior distribution phase has concluded. Market is searching for a new valuation floor with limited institutional sponsorship. Liquidity may be thin."; break;
+    }
 
     // Conviction Timeline Inference
     let convictionPhase = "Positioning";

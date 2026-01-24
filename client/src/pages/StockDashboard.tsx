@@ -844,11 +844,19 @@ export default function StockDashboard() {
                                   <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
                                 </div>
                               )}
+                              {aiData?.marketMode && (
+                                <div className="mb-4 p-3 bg-secondary/50 rounded-lg border border-border/30">
+                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Market Regime</p>
+                                  <p className="text-sm font-semibold text-foreground">{aiData.marketMode}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">{aiData.marketModeExplanation}</p>
+                                </div>
+                              )}
                               <p className="text-muted-foreground leading-relaxed mb-6">
                                 {aiLoading ? "Evaluating risk factors..." : (aiData?.risk_analysis || stock.riskAnalystView)}
                                 {aiData?.flowQualityScore < 50 && " Fragmented flow quality increases the probability of structural de-rating if market consensus shifts."}
                                 {aiData?.flowQualityScore > 75 && " High consensus creates inherent crowding risks; any failure to meet elevated expectations could lead to disproportionate price responses."}
-                                {aiData?.earlyDistributionFlag && " DISTRIBUTION RISK: Internal dynamics suggest institutional participants are reducing exposure despite headline volume resilience."}
+                                {aiData?.earlyDistributionFlag && " Internal dynamics suggest institutional participants are reducing exposure despite headline volume resilience."}
+                                {(aiData?.marketMode?.includes("Distribution") || aiData?.marketMode === "Post-Distribution Vacuum") && " Current market regime suggests reduced alpha-seeking attractiveness. Price strength should be monitored for potential liquidity traps."}
                               </p>
                               <div className="grid grid-cols-2 gap-6">
                                 <div>
@@ -914,6 +922,28 @@ export default function StockDashboard() {
                                     </div>
                                   </div>
                                 ))}
+                                {aiData?.earlyDistributionFlag && (
+                                  <div className="p-5 border border-amber-500/20 bg-amber-500/5 rounded-xl space-y-3">
+                                    <h5 className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2 text-sm">
+                                      <AlertTriangle className="w-4 h-4" />
+                                      Early Distribution Risk
+                                    </h5>
+                                    <p className="text-sm text-muted-foreground leading-relaxed italic">
+                                      "{aiData.earlyDistributionExplanation}"
+                                    </p>
+                                  </div>
+                                )}
+                                {aiData?.tapeControlFlag && (
+                                  <div className="p-5 border border-blue-500/20 bg-blue-500/5 rounded-xl space-y-3">
+                                    <h5 className="font-bold text-blue-700 dark:text-blue-400 flex items-center gap-2 text-sm">
+                                      <Activity className="w-4 h-4" />
+                                      Tape Control Risk
+                                    </h5>
+                                    <p className="text-sm text-muted-foreground leading-relaxed italic">
+                                      "{aiData.tapeControlExplanation}"
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
