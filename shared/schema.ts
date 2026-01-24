@@ -59,6 +59,7 @@ export const stocks = pgTable("stocks", {
   flowAnalystView: text("flow_analyst_view").notNull(), // Analyst view for flow
   riskAnalystView: text("risk_analyst_view").notNull(), // Analyst view for risk
   riskData: text("risk_data").notNull(), // JSON stringified risk framework data
+  insiderData: text("insider_data"), // JSON stringified insider transaction data (optional)
   aiConfidence: text("ai_confidence").default("High").notNull(), // High, Medium, Low
   updatedAt: timestamp("updated_at").defaultNow(),
 });

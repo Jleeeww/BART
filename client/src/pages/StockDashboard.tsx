@@ -27,19 +27,27 @@ import {
   DollarSign, 
   Activity, 
   Newspaper, 
-  AlertTriangle 
+  AlertTriangle,
+  UserCheck
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 function ConvictionTimeline({ phase, explanation }: { phase: string; explanation: string }) {
   const phases = ["Positioning", "Confirmation", "Crowding", "Distribution", "Reset"];
+  const phaseLabels: Record<string, string> = {
+    "Positioning": "Posisi Awal",
+    "Confirmation": "Konfirmasi",
+    "Crowding": "Penuh Sesak",
+    "Distribution": "Distribusi",
+    "Reset": "Reset"
+  };
   const currentIndex = phases.indexOf(phase);
 
   return (
     <Card className="p-4 border-border/50 shadow-sm bg-muted/20">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Conviction Lifecycle</p>
-        <span className="text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">{phase}</span>
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Siklus Keyakinan Pasar</p>
+        <span className="text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">{phaseLabels[phase] || phase}</span>
       </div>
       <div className="relative h-2 bg-muted rounded-full overflow-hidden flex mb-3">
         {phases.map((p, idx) => (
@@ -53,7 +61,7 @@ function ConvictionTimeline({ phase, explanation }: { phase: string; explanation
       </div>
       <div className="flex justify-between text-[10px] text-muted-foreground uppercase font-bold px-0.5 mb-3">
         {phases.map((p, idx) => (
-          <span key={p} className={idx === currentIndex ? "text-primary" : ""}>{p}</span>
+          <span key={p} className={idx === currentIndex ? "text-primary" : ""}>{phaseLabels[p]}</span>
         ))}
       </div>
       <p className="text-xs text-muted-foreground leading-relaxed italic border-t border-border/20 pt-3">
@@ -120,7 +128,7 @@ export default function StockDashboard() {
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-12 h-12 text-primary animate-spin" />
-          <p className="text-muted-foreground font-medium animate-pulse">Loading market data...</p>
+          <p className="text-muted-foreground font-medium animate-pulse">Memuat data pasar...</p>
         </div>
       </div>
     );
@@ -131,15 +139,15 @@ export default function StockDashboard() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full p-8 text-center border-destructive/20 bg-destructive/5">
           <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-foreground mb-2">Unable to load stock</h2>
+          <h2 className="text-xl font-bold text-foreground mb-2">Gagal memuat saham</h2>
           <p className="text-muted-foreground mb-6">
-            We couldn't retrieve data for {symbol}. Please try again later.
+            Tidak dapat mengambil data untuk {symbol}. Silakan coba lagi nanti.
           </p>
           <button 
             onClick={() => window.location.reload()}
             className="px-6 py-2 bg-background border border-border rounded-lg font-semibold hover:bg-secondary transition-colors"
           >
-            Retry
+            Coba Lagi
           </button>
         </Card>
       </div>
@@ -176,7 +184,7 @@ export default function StockDashboard() {
           <div className="flex items-center gap-4">
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-sm font-medium">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Market Open
+              Pasar Buka
             </div>
             <div className="w-8 h-8 rounded-full bg-secondary border border-border overflow-hidden">
               <img 
@@ -209,12 +217,13 @@ export default function StockDashboard() {
               <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="w-full justify-start h-auto p-1 bg-secondary/50 rounded-xl overflow-x-auto no-scrollbar">
                   {[
-                    { id: "overview", label: "Overview", icon: PieChart },
-                    { id: "financials", label: "Financials", icon: DollarSign },
-                    { id: "valuation", label: "Valuation", icon: TrendingUp },
-                    { id: "flow", label: "Flow", icon: Activity },
-                    { id: "news", label: "News", icon: Newspaper },
-                    { id: "risk", label: "Risk", icon: AlertTriangle },
+                    { id: "overview", label: "Ringkasan", icon: PieChart },
+                    { id: "financials", label: "Keuangan", icon: DollarSign },
+                    { id: "valuation", label: "Valuasi", icon: TrendingUp },
+                    { id: "flow", label: "Aliran Dana", icon: Activity },
+                    { id: "news", label: "Berita", icon: Newspaper },
+                    { id: "risk", label: "Risiko", icon: AlertTriangle },
+                    { id: "insider", label: "Insider", icon: UserCheck },
                   ].map((tab) => (
                     <TabsTrigger 
                       key={tab.id} 
@@ -231,7 +240,7 @@ export default function StockDashboard() {
                   <TabsContent value="overview" className="mt-0 focus-visible:outline-none space-y-6">
                     <Card className="p-6 border-border/50 shadow-sm">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-bold font-display">Company Profile</h3>
+                        <h3 className="text-xl font-bold font-display">Profil Perusahaan</h3>
                         {!aiLoading && aiData?.marketMode && (
                           <span className="text-xs font-bold px-2 py-1 rounded bg-secondary text-foreground uppercase">
                             Mode: {aiData.marketMode}
@@ -242,7 +251,7 @@ export default function StockDashboard() {
                         <div className="mb-6 space-y-4">
                           <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
                           <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
-                            <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Market Regime</p>
+                            <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Rezim Pasar</p>
                             <p className="text-sm text-muted-foreground leading-relaxed">{aiData.marketModeExplanation}</p>
                           </div>
                         </div>
@@ -253,20 +262,20 @@ export default function StockDashboard() {
                       
                       <div className="grid grid-cols-2 gap-6 mb-8">
                         <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Sector</p>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Sektor</p>
                           <p className="text-lg font-semibold text-foreground">{stock.sector}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Subsector</p>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Subsektor</p>
                           <p className="text-lg font-semibold text-foreground">{stock.subsector}</p>
                         </div>
                       </div>
                       
                       <div className="pt-6 border-t border-border/50">
-                        <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Key Metrics</h4>
+                        <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Metrik Utama</h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <MetricCard 
-                            label="P/E Ratio" 
+                            label="Rasio P/E" 
                             value={parseFloat(stock.peRatio).toFixed(2)} 
                             trend="neutral"
                           />
@@ -276,12 +285,12 @@ export default function StockDashboard() {
                             trend="up"
                           />
                           <MetricCard 
-                            label="Net Margin" 
+                            label="Margin Bersih" 
                             value={`${parseFloat(stock.netMargin).toFixed(1)}%`}
                             trend="neutral"
                           />
                           <MetricCard 
-                            label="YoY Growth" 
+                            label="Pertumbuhan YoY" 
                             value={`${parseFloat(stock.growth).toFixed(1)}%`}
                             trend="up"
                           />
@@ -290,7 +299,7 @@ export default function StockDashboard() {
                     </Card>
 
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">How investors typically view this stock</h3>
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Bagaimana investor melihat saham ini</h3>
                       <p className="text-muted-foreground leading-relaxed">
                         {stock.investorView}
                         {aiData?.flowQualityScore < 50 && " Institutional consensus appears fragmented at current levels; market participants should monitor for potential divergence between price and flow quality."}
@@ -303,22 +312,22 @@ export default function StockDashboard() {
                         <div className="flex items-center justify-between mb-4">
                           <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2">
                             <Activity className="w-5 h-5 text-indigo-500" />
-                            Smart Money Intent
+                            Intensi Dana Besar
                           </h3>
                           <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${
                             aiData.smartMoneyIntent.confidence === "High" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" :
                             aiData.smartMoneyIntent.confidence === "Medium" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
                             "bg-slate-100 text-slate-600 dark:bg-slate-800/30 dark:text-slate-400"
                           }`}>
-                            {aiData.smartMoneyIntent.confidence} Confidence
+                            Kepercayaan {aiData.smartMoneyIntent.confidence === "High" ? "Tinggi" : aiData.smartMoneyIntent.confidence === "Medium" ? "Sedang" : "Rendah"}
                           </span>
                         </div>
                         <div className="mb-4">
-                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Primary Objective</p>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Tujuan Utama</p>
                           <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{aiData.smartMoneyIntent.primaryIntent}</p>
                           {aiData.smartMoneyIntent.secondaryIntent && (
                             <p className="text-sm text-muted-foreground mt-1">
-                              Secondary: <span className="font-semibold">{aiData.smartMoneyIntent.secondaryIntent}</span>
+                              Sekunder: <span className="font-semibold">{aiData.smartMoneyIntent.secondaryIntent}</span>
                             </p>
                           )}
                         </div>
@@ -332,7 +341,7 @@ export default function StockDashboard() {
                   {/* Financials Tab */}
                   <TabsContent value="financials" className="mt-0 focus-visible:outline-none space-y-6">
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Financial Performance Summary</h3>
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Ringkasan Kinerja Keuangan</h3>
                       <p className="text-muted-foreground leading-relaxed mb-4">
                         {stock.financialSummary}
                         {aiData?.flowQualityScore < 50 && " The structural financial narrative faces potential headwinds from emerging institutional distribution risks."}
@@ -341,7 +350,7 @@ export default function StockDashboard() {
                       <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-md">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-2">
                           <Activity className="w-3 h-3" />
-                          Analyst Financial Perspective
+                          Perspektif Analis Keuangan
                         </p>
                         <p className="text-sm text-muted-foreground leading-relaxed italic">
                           {stock.financialsAnalystView}
@@ -350,7 +359,7 @@ export default function StockDashboard() {
                     </Card>
 
                     <Card className="p-6 border-border/50 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Income Statement</h4>
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Laporan Laba Rugi</h4>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -363,13 +372,13 @@ export default function StockDashboard() {
                           </thead>
                           <tbody>
                             <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Revenue</td>
+                              <td className="py-3 px-3 text-muted-foreground">Pendapatan</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.revenue2023}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.revenue2024}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.revenue2025}</td>
                             </tr>
                             <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Net Profit</td>
+                              <td className="py-3 px-3 text-muted-foreground">Laba Bersih</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.netProfit2023}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.netProfit2024}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.netProfit2025}</td>
@@ -380,7 +389,7 @@ export default function StockDashboard() {
                     </Card>
 
                     <Card className="p-6 border-border/50 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Balance Sheet</h4>
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Neraca</h4>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -393,13 +402,13 @@ export default function StockDashboard() {
                           </thead>
                           <tbody>
                             <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Total Assets</td>
+                              <td className="py-3 px-3 text-muted-foreground">Total Aset</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.assets2023}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.assets2024}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.assets2025}</td>
                             </tr>
                             <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Total Liabilities</td>
+                              <td className="py-3 px-3 text-muted-foreground">Total Liabilitas</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.liabilities2023}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.liabilities2024}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.liabilities2025}</td>
@@ -410,7 +419,7 @@ export default function StockDashboard() {
                     </Card>
 
                     <Card className="p-6 border-border/50 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Cash Flow</h4>
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Arus Kas</h4>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -423,7 +432,7 @@ export default function StockDashboard() {
                           </thead>
                           <tbody>
                             <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Operating Cash Flow</td>
+                              <td className="py-3 px-3 text-muted-foreground">Arus Kas Operasional</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.ocf2023}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.ocf2024}</td>
                               <td className="text-right py-3 px-3 font-mono text-foreground">{stock.ocf2025}</td>
@@ -439,10 +448,10 @@ export default function StockDashboard() {
                     {/* SECTION 1: AI Flow Overview */}
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold font-display text-foreground">AI Flow Overview</h3>
+                        <h3 className="text-lg font-bold font-display text-foreground">Ringkasan AI Aliran Dana</h3>
                         {!aiLoading && aiData && (
                           <div className="text-right">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Flow Quality</p>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Kualitas Aliran</p>
                             <p className="text-2xl font-bold text-primary">{aiData.flowQualityScore}/100</p>
                           </div>
                         )}
@@ -461,7 +470,7 @@ export default function StockDashboard() {
                             <div className="mt-3 pt-3 border-t border-border/20">
                               <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
                                 <AlertTriangle className="w-3 h-3" />
-                                Early Distribution Risk Detected
+                                Risiko Distribusi Awal Terdeteksi
                               </p>
                               <p className="text-sm text-muted-foreground italic">{aiData.earlyDistributionExplanation}</p>
                             </div>
@@ -470,7 +479,7 @@ export default function StockDashboard() {
                             <div className="mt-3 pt-3 border-t border-border/20">
                               <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
                                 <Activity className="w-3 h-3" />
-                                Tape Control Behavior Detected
+                                Perilaku Kontrol Tape Terdeteksi
                               </p>
                               <p className="text-sm text-muted-foreground italic">{aiData.tapeControlExplanation}</p>
                             </div>
@@ -480,7 +489,7 @@ export default function StockDashboard() {
 
                       {/* Flow Intensity Gradient Bar */}
                       <div className="mb-6">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Flow Intensity</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Intensitas Aliran</p>
                         <div className="space-y-2">
                           <div className="relative h-8 rounded-md border border-border/30 overflow-hidden flex items-center">
                             <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-neutral-400 to-emerald-500 dark:from-red-600 dark:via-neutral-500 dark:to-emerald-600" />
@@ -502,8 +511,8 @@ export default function StockDashboard() {
                             })()}
                           </div>
                           <div className="flex justify-between text-xs text-muted-foreground px-1">
-                            <span>Big Distribution</span>
-                            <span>Big Accumulation</span>
+                            <span>Distribusi Besar</span>
+                            <span>Akumulasi Besar</span>
                           </div>
                         </div>
                         <p className="text-sm font-semibold text-foreground mt-3">{stock.flowIntensity}</p>
@@ -511,11 +520,11 @@ export default function StockDashboard() {
 
                       <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Flow Bias</p>
-                          <p className="text-base font-semibold text-foreground">{stock.flowBias}</p>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Bias Aliran</p>
+                          <p className="text-base font-semibold text-foreground">{stock.flowBias === "Accumulation" ? "Akumulasi" : stock.flowBias === "Distribution" ? "Distribusi" : stock.flowBias}</p>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Flow Reliability</p>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Reliabilitas Aliran</p>
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
                             {stock.flowReliability}
                           </span>
@@ -527,7 +536,7 @@ export default function StockDashboard() {
                     {!aiLoading && aiData?.brokerControlScore && (
                       <Card className="p-6 border-border/50 shadow-sm" data-testid="card-broker-control-score">
                         <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-base font-bold font-display text-foreground">Broker Control Score</h4>
+                          <h4 className="text-base font-bold font-display text-foreground">Skor Kontrol Broker</h4>
                           <div className="text-right">
                             <p className={`text-2xl font-bold ${
                               aiData.brokerControlScore.score >= 70 
@@ -562,8 +571,8 @@ export default function StockDashboard() {
                       <Card className="p-6 border-border/50 shadow-sm" data-testid="card-broker-stability-score">
                         <div className="flex items-center justify-between mb-2">
                           <div>
-                            <h4 className="text-base font-bold font-display text-foreground">Broker Stability</h4>
-                            <p className="text-xs text-muted-foreground">Measures whether the same institutions are consistently controlling accumulation</p>
+                            <h4 className="text-base font-bold font-display text-foreground">Stabilitas Broker</h4>
+                            <p className="text-xs text-muted-foreground">Mengukur apakah institusi yang sama secara konsisten mengendalikan akumulasi</p>
                           </div>
                           <div className="text-right">
                             <p className={`text-2xl font-bold ${
@@ -585,7 +594,7 @@ export default function StockDashboard() {
                                 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' 
                                 : 'bg-muted text-muted-foreground'
                           }`} data-testid="badge-broker-stability-level">
-                            {aiData.brokerStabilityScore.level} Stability
+                            Stabilitas {aiData.brokerStabilityScore.level === "High" ? "Tinggi" : aiData.brokerStabilityScore.level === "Moderate" ? "Sedang" : "Rendah"}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-broker-stability-interpretation">
@@ -597,10 +606,10 @@ export default function StockDashboard() {
                     {/* SECTION 2: Broker Summary */}
                     <Card className="p-6 border-border/50 shadow-sm">
                       <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-base font-bold font-display text-foreground">Broker Summary</h4>
+                        <h4 className="text-base font-bold font-display text-foreground">Ringkasan Broker</h4>
                         {aiData?.smartMoneyIntent && (
                           <div className="flex items-center gap-2 text-xs">
-                            <span className="text-muted-foreground">Dominant Institutional Objective:</span>
+                            <span className="text-muted-foreground">Tujuan Institusional Dominan:</span>
                             <span className="font-bold text-indigo-600 dark:text-indigo-400">{aiData.smartMoneyIntent.primaryIntent}</span>
                           </div>
                         )}
@@ -706,7 +715,7 @@ export default function StockDashboard() {
                     {/* SECTION 3: Foreign vs Domestic Activity */}
                     <Card className="p-6 border-border/50 shadow-sm space-y-6">
                       <div>
-                        <h4 className="text-base font-bold font-display mb-4 text-foreground">Foreign vs Domestic Activity</h4>
+                        <h4 className="text-base font-bold font-display mb-4 text-foreground">Aktivitas Asing vs Domestik</h4>
                         {(() => {
                           try {
                             const data = JSON.parse(stock.foreignActivityData);
@@ -715,7 +724,7 @@ export default function StockDashboard() {
                                 {/* ... existing visual elements ... */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   <div className="space-y-3">
-                                    <h5 className="text-sm font-semibold text-foreground">Foreign Investors</h5>
+                                    <h5 className="text-sm font-semibold text-foreground">Investor Asing</h5>
                                     <div className="space-y-2 text-sm">
                                       <div className="flex justify-between items-center">
                                         <span className="text-muted-foreground">Buy:</span>
@@ -733,7 +742,7 @@ export default function StockDashboard() {
                                   </div>
 
                                   <div className="space-y-3">
-                                    <h5 className="text-sm font-semibold text-foreground">Domestic Investors</h5>
+                                    <h5 className="text-sm font-semibold text-foreground">Investor Domestik</h5>
                                     <div className="space-y-2 text-sm">
                                       <div className="flex justify-between items-center">
                                         <span className="text-muted-foreground">Buy:</span>
@@ -749,7 +758,7 @@ export default function StockDashboard() {
 
                                 {/* Participation Split ... */}
                                 <div className="space-y-3">
-                                  <h5 className="text-sm font-semibold text-foreground">Participation Split</h5>
+                                  <h5 className="text-sm font-semibold text-foreground">Distribusi Partisipasi</h5>
                                   <div className="flex items-center gap-3">
                                     <div className="flex-1 h-6 rounded-md overflow-hidden border border-border/30 flex">
                                       <div className="bg-blue-500 dark:bg-blue-400 transition-all" style={{ width: `${data.domesticPercent}%` }} />
@@ -766,7 +775,7 @@ export default function StockDashboard() {
                                 <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-md">
                                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-2">
                                     <Activity className="w-3 h-3" />
-                                    Analyst Flow Perspective
+                                    Perspektif Analis Aliran Dana
                                   </p>
                                   <p className="text-sm text-muted-foreground leading-relaxed italic">
                                     {stock.flowAnalystView}
@@ -786,13 +795,13 @@ export default function StockDashboard() {
                   <TabsContent value="news" className="mt-0 focus-visible:outline-none space-y-6">
                     {/* SECTION 1: AI News Overview */}
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">AI News Overview</h3>
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Ringkasan AI Berita</h3>
                       <p className="text-muted-foreground leading-relaxed mb-6">
                         {aiLoading ? "Processing event data..." : (aiData?.event_analysis.thesis || stock.newsOverviewSummary)}
                       </p>
                       <div className="grid grid-cols-2 gap-6">
                         <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">News Impact</p>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Dampak Berita</p>
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
                             stock.newsImpact === "High" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
                             stock.newsImpact === "Medium" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
@@ -802,7 +811,7 @@ export default function StockDashboard() {
                           </span>
                         </div>
                         <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Relevance</p>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Relevansi</p>
                           <p className="text-base font-semibold text-foreground">{stock.newsRelevance}</p>
                         </div>
                       </div>
@@ -810,7 +819,7 @@ export default function StockDashboard() {
 
                     {/* SECTION 2: Event Analysis (Analyst Framework) */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-bold font-display text-foreground px-1">Event Analysis</h3>
+                      <h3 className="text-lg font-bold font-display text-foreground px-1">Analisis Peristiwa</h3>
                       {(() => {
                         try {
                           const events = JSON.parse(stock.eventAnalysis);
@@ -832,14 +841,14 @@ export default function StockDashboard() {
                                     <div>
                                       <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                                         <Activity className="w-3 h-3" />
-                                        What Happened?
+                                        Apa yang Terjadi?
                                       </p>
                                       <p className="text-sm text-foreground leading-relaxed">{event.event}</p>
                                     </div>
                                     <div>
                                       <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                                         <TrendingUp className="w-3 h-3" />
-                                        Drivers (Why?)
+                                        Pemicu (Mengapa?)
                                       </p>
                                       <p className="text-sm text-foreground leading-relaxed">{event.why}</p>
                                     </div>
@@ -848,14 +857,14 @@ export default function StockDashboard() {
                                     <div>
                                       <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                                         <Activity className="w-3 h-3" />
-                                        Immediate Market Reaction
+                                        Reaksi Pasar Langsung
                                       </p>
                                       <p className="text-sm text-foreground leading-relaxed">{event.immediate}</p>
                                     </div>
                                     <div>
                                       <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
                                         <Activity className="w-3 h-3" />
-                                        Second-Order Effects
+                                        Efek Lanjutan
                                       </p>
                                       <p className="text-sm text-foreground leading-relaxed">{event.secondOrder}</p>
                                     </div>
@@ -867,11 +876,11 @@ export default function StockDashboard() {
                                     <div className="flex items-center justify-between mb-2">
                                       <p className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-1.5">
                                         <AlertTriangle className="w-3 h-3" />
-                                        Analyst Confidence: {event.confidence}
+                                        Kepercayaan Analis: {event.confidence}
                                       </p>
                                     </div>
                                     <p className="text-xs text-muted-foreground italic leading-relaxed">
-                                      <span className="font-bold not-italic text-foreground">Conditions for continuation:</span> {event.conditions}
+                                      <span className="font-bold not-italic text-foreground">Kondisi keberlanjutan:</span> {event.conditions}
                                     </p>
                                   </div>
                                 </div>
@@ -886,7 +895,7 @@ export default function StockDashboard() {
 
                     {/* SECTION 3: News Feed */}
                     <Card className="p-6 border-border/50 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Recent Activity Feed</h4>
+                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Feed Aktivitas Terkini</h4>
                       <div className="space-y-4">
                         {(() => {
                           try {
@@ -920,7 +929,7 @@ export default function StockDashboard() {
 
                     {/* Corporate Action Summary */}
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">What This Means for Investors</h3>
+                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Apa Arti Ini Bagi Investor</h3>
                       <p className="text-muted-foreground leading-relaxed">
                         {stock.investorInterpretation}
                         {aiData?.flowQualityScore < 50 && " Current accumulation signals exhibit low conviction characteristics, suggesting potential narrative fatigue or false positioning."}
@@ -941,7 +950,7 @@ export default function StockDashboard() {
                             {/* SECTION 1: AI Risk Overview */}
                             <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
                               <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold font-display text-foreground uppercase tracking-tight">AI Risk Analysis</h3>
+                                <h3 className="text-lg font-bold font-display text-foreground uppercase tracking-tight">Analisis Risiko AI</h3>
                                 {!aiLoading && aiData && (
                                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">
                                     Cycle: {aiData.convictionPhase}
@@ -955,7 +964,7 @@ export default function StockDashboard() {
                               )}
                               {aiData?.marketMode && (
                                 <div className="mb-4 p-3 bg-secondary/50 rounded-lg border border-border/30">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Market Regime</p>
+                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Rezim Pasar</p>
                                   <p className="text-sm font-semibold text-foreground">{aiData.marketMode}</p>
                                   <p className="text-xs text-muted-foreground mt-1">{aiData.marketModeExplanation}</p>
                                 </div>
@@ -969,7 +978,7 @@ export default function StockDashboard() {
                               </p>
                               <div className="grid grid-cols-2 gap-6">
                                 <div>
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Overall Risk Level</p>
+                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Tingkat Risiko Keseluruhan</p>
                                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                                     risk.level === 'Low' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' :
                                     risk.level === 'Moderate' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
@@ -979,7 +988,7 @@ export default function StockDashboard() {
                                   </span>
                                 </div>
                                 <div>
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Analyst Skew</p>
+                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Kecenderungan Analis</p>
                                   <p className="text-base font-bold text-foreground">{risk.skew}</p>
                                 </div>
                               </div>
@@ -987,7 +996,7 @@ export default function StockDashboard() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <div className="space-y-4">
-                                <h4 className="text-sm font-bold text-foreground uppercase tracking-widest px-1">Primary Market Risks</h4>
+                                <h4 className="text-sm font-bold text-foreground uppercase tracking-widest px-1">Risiko Pasar Utama</h4>
                                 {risk.primaryRisks.map((r: any, idx: number) => (
                                   <Card key={idx} className="p-4 border-border/50 hover-elevate transition-all">
                                     <div className="flex justify-between items-start mb-2">
@@ -1009,7 +1018,7 @@ export default function StockDashboard() {
                               <div className="space-y-4">
                                 <h4 className="text-sm font-bold text-foreground uppercase tracking-widest px-1 flex items-center gap-2">
                                   <AlertTriangle className="w-4 h-4 text-amber-500" />
-                                  Contrarian Risks
+                                  Risiko Kontrarian
                                 </h4>
                                 {risk.contrarianRisks.map((r: any, idx: number) => (
                                   <div key={idx} className="p-5 border border-amber-500/20 bg-amber-500/5 rounded-xl space-y-3">
@@ -1021,11 +1030,11 @@ export default function StockDashboard() {
                                     </p>
                                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-amber-500/10">
                                       <div>
-                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mb-1">When it matters:</p>
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mb-1">Kapan relevan:</p>
                                         <p className="text-xs text-foreground font-medium">{r.material}</p>
                                       </div>
                                       <div>
-                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mb-1">Who is affected:</p>
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mb-1">Siapa yang terpengaruh:</p>
                                         <p className="text-xs text-foreground font-medium">{r.affected}</p>
                                       </div>
                                     </div>
@@ -1035,7 +1044,7 @@ export default function StockDashboard() {
                                   <div className="p-5 border border-amber-500/20 bg-amber-500/5 rounded-xl space-y-3">
                                     <h5 className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2 text-sm">
                                       <AlertTriangle className="w-4 h-4" />
-                                      Early Distribution Risk
+                                      Risiko Distribusi Awal
                                     </h5>
                                     <p className="text-sm text-muted-foreground leading-relaxed italic">
                                       "{aiData.earlyDistributionExplanation}"
@@ -1046,7 +1055,7 @@ export default function StockDashboard() {
                                   <div className="p-5 border border-blue-500/20 bg-blue-500/5 rounded-xl space-y-3">
                                     <h5 className="font-bold text-blue-700 dark:text-blue-400 flex items-center gap-2 text-sm">
                                       <Activity className="w-4 h-4" />
-                                      Tape Control Risk
+                                      Risiko Kontrol Tape
                                     </h5>
                                     <p className="text-sm text-muted-foreground leading-relaxed italic">
                                       "{aiData.tapeControlExplanation}"
@@ -1057,7 +1066,7 @@ export default function StockDashboard() {
                                   <div className="p-5 border border-red-500/20 bg-red-500/5 rounded-xl space-y-3">
                                     <h5 className="font-bold text-red-700 dark:text-red-400 flex items-center gap-2 text-sm">
                                       <AlertTriangle className="w-4 h-4" />
-                                      Smart Money Intent Warning
+                                      Peringatan Intensi Dana Besar
                                     </h5>
                                     <p className="text-sm text-muted-foreground leading-relaxed italic">
                                       Current institutional behavior patterns suggest "{aiData.smartMoneyIntent.primaryIntent}". 
@@ -1073,7 +1082,7 @@ export default function StockDashboard() {
                             </div>
 
                             <Card className="p-6 border-border/50 shadow-sm">
-                              <h4 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4">Thesis Invalidation</h4>
+                              <h4 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4">Pembatalan Tesis</h4>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {risk.invalidation.map((cond: string, idx: number) => (
                                   <div key={idx} className="flex items-start gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/10">
@@ -1090,14 +1099,14 @@ export default function StockDashboard() {
                               <div className="space-y-2">
                                 <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
                                   <TrendingUp className="w-4 h-4" />
-                                  Suitable For
+                                  Cocok Untuk
                                 </h4>
                                 <p className="text-xs text-muted-foreground leading-relaxed">{risk.investorFit.suitable}</p>
                               </div>
                               <div className="space-y-2">
                                 <h4 className="text-sm font-bold text-red-700 dark:text-red-400 uppercase tracking-widest flex items-center gap-2">
                                   <AlertTriangle className="w-4 h-4" />
-                                  Not Suitable For
+                                  Tidak Cocok Untuk
                                 </h4>
                                 <p className="text-xs text-muted-foreground leading-relaxed">{risk.investorFit.unsuitable}</p>
                               </div>
@@ -1107,8 +1116,161 @@ export default function StockDashboard() {
                       } catch (e) {
                         return (
                           <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
-                            <h3 className="text-lg font-bold mb-2 text-foreground">Error Loading Risk Data</h3>
-                            <p className="text-muted-foreground">Unable to parse analyst risk framework.</p>
+                            <h3 className="text-lg font-bold mb-2 text-foreground">Gagal Memuat Data Risiko</h3>
+                            <p className="text-muted-foreground">Tidak dapat memproses framework risiko analis.</p>
+                          </Card>
+                        );
+                      }
+                    })()}
+                  </TabsContent>
+
+                  {/* Insider Tab */}
+                  <TabsContent value="insider" className="mt-0 focus-visible:outline-none space-y-6">
+                    {(() => {
+                      try {
+                        const insider = stock.insiderData ? JSON.parse(stock.insiderData) : null;
+                        if (!insider) {
+                          return (
+                            <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
+                              <UserCheck className="w-12 h-12 text-muted-foreground mb-4" />
+                              <h3 className="text-lg font-bold mb-2">Tidak Ada Data Insider</h3>
+                              <p className="text-muted-foreground">Data transaksi insider belum tersedia untuk saham ini.</p>
+                            </Card>
+                          );
+                        }
+                        return (
+                          <div className="space-y-6">
+                            {/* Insider Overview */}
+                            <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
+                              <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-bold font-display text-foreground">Aktivitas Insider</h3>
+                                <div className="text-right">
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Skor Alignment</p>
+                                  <p className={`text-2xl font-bold ${
+                                    insider.alignmentScore >= 70 ? 'text-emerald-600 dark:text-emerald-400' :
+                                    insider.alignmentScore >= 40 ? 'text-amber-600 dark:text-amber-400' :
+                                    'text-red-600 dark:text-red-400'
+                                  }`}>{insider.alignmentScore}/100</p>
+                                </div>
+                              </div>
+                              <p className="text-muted-foreground leading-relaxed mb-4">
+                                {insider.overview}
+                              </p>
+                              <div className="grid grid-cols-3 gap-4 mt-4">
+                                <div className="text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Beli</p>
+                                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{insider.totalBuy}</p>
+                                </div>
+                                <div className="text-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Jual</p>
+                                  <p className="text-lg font-bold text-red-600 dark:text-red-400">{insider.totalSell}</p>
+                                </div>
+                                <div className="text-center p-3 rounded-lg bg-primary/10 border border-primary/20">
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Net Flow</p>
+                                  <p className={`text-lg font-bold ${insider.netFlow.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{insider.netFlow}</p>
+                                </div>
+                              </div>
+                            </Card>
+
+                            {/* AI Insider Analysis */}
+                            <Card className="p-6 border-border/50 shadow-sm">
+                              <div className="flex items-center gap-2 mb-4">
+                                <Activity className="w-5 h-5 text-indigo-500" />
+                                <h4 className="text-base font-bold font-display text-foreground">Analisis AI Insider</h4>
+                              </div>
+                              <div className="space-y-4">
+                                <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
+                                  <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Interpretasi</p>
+                                  <p className="text-sm text-muted-foreground leading-relaxed">{insider.aiInterpretation}</p>
+                                </div>
+                                <div className="p-4 bg-secondary/50 rounded-lg border border-border/30">
+                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Signal Strength</p>
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                      <div 
+                                        className={`h-full transition-all ${
+                                          insider.signalStrength === 'Kuat' ? 'bg-emerald-500 w-full' :
+                                          insider.signalStrength === 'Moderat' ? 'bg-amber-500 w-2/3' :
+                                          'bg-muted-foreground w-1/3'
+                                        }`}
+                                      />
+                                    </div>
+                                    <span className={`text-sm font-bold ${
+                                      insider.signalStrength === 'Kuat' ? 'text-emerald-600 dark:text-emerald-400' :
+                                      insider.signalStrength === 'Moderat' ? 'text-amber-600 dark:text-amber-400' :
+                                      'text-muted-foreground'
+                                    }`}>{insider.signalStrength}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </Card>
+
+                            {/* Recent Insider Transactions */}
+                            <Card className="p-6 border-border/50 shadow-sm">
+                              <h4 className="text-base font-bold font-display mb-4 text-foreground">Transaksi Insider Terkini</h4>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b border-border/50">
+                                      <th className="text-left py-3 px-3 font-semibold text-foreground">Nama</th>
+                                      <th className="text-left py-3 px-3 font-semibold text-foreground">Jabatan</th>
+                                      <th className="text-left py-3 px-3 font-semibold text-foreground">Tipe</th>
+                                      <th className="text-right py-3 px-3 font-semibold text-foreground">Jumlah</th>
+                                      <th className="text-right py-3 px-3 font-semibold text-foreground">Harga</th>
+                                      <th className="text-right py-3 px-3 font-semibold text-foreground">Tanggal</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {insider.transactions.map((tx: any, idx: number) => (
+                                      <tr key={idx} className="border-b border-border/30 hover:bg-muted/30">
+                                        <td className="py-3 px-3 font-medium text-foreground">{tx.name}</td>
+                                        <td className="py-3 px-3 text-muted-foreground">{tx.position}</td>
+                                        <td className="py-3 px-3">
+                                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                            tx.type === 'Beli' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                            'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                          }`}>
+                                            {tx.type}
+                                          </span>
+                                        </td>
+                                        <td className="text-right py-3 px-3 font-mono text-foreground">{tx.shares}</td>
+                                        <td className="text-right py-3 px-3 font-mono text-foreground">{tx.price}</td>
+                                        <td className="text-right py-3 px-3 text-muted-foreground">{tx.date}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </Card>
+
+                            {/* Insider Sentiment Indicator */}
+                            <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10">
+                              <h4 className="text-base font-bold font-display mb-4 text-foreground">Sentimen Insider (12 Bulan)</h4>
+                              <div className="flex items-center gap-4">
+                                <div className="flex-1 h-4 rounded-full overflow-hidden border border-border/30 flex">
+                                  <div className="bg-emerald-500 dark:bg-emerald-400" style={{ width: `${insider.buyPercent}%` }} />
+                                  <div className="bg-red-500 dark:bg-red-400" style={{ width: `${insider.sellPercent}%` }} />
+                                </div>
+                                <div className="flex items-center gap-4 text-xs">
+                                  <span className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                    Beli {insider.buyPercent}%
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                                    Jual {insider.sellPercent}%
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-3 italic">{insider.sentimentNote}</p>
+                            </Card>
+                          </div>
+                        );
+                      } catch (e) {
+                        return (
+                          <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
+                            <h3 className="text-lg font-bold mb-2 text-foreground">Gagal Memuat Data Insider</h3>
+                            <p className="text-muted-foreground">Tidak dapat memproses data transaksi insider.</p>
                           </Card>
                         );
                       }
@@ -1122,9 +1284,9 @@ export default function StockDashboard() {
                         <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center mb-4">
                           <Activity className="w-8 h-8 text-muted-foreground" />
                         </div>
-                        <h3 className="text-lg font-bold mb-2">Coming Soon</h3>
+                        <h3 className="text-lg font-bold mb-2">Segera Hadir</h3>
                         <p className="text-muted-foreground max-w-sm">
-                          The {tab} analysis module is currently being built. Check back soon for detailed insights.
+                          Modul analisis {tab === "valuation" ? "valuasi" : tab} sedang dalam pengembangan. Cek kembali nanti untuk insights mendetail.
                         </p>
                       </Card>
                     </TabsContent>

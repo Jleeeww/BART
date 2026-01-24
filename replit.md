@@ -49,6 +49,14 @@ Measures whether the same brokers consistently dominate accumulation across mult
 - **Moderate Stability** (40-69%): Emerging institutional interest, not full control
 - **High Stability** (≥70%): Structured operator-style campaign with sustained intent
 
+### Insider Activity Analysis
+Tracks insider transactions with institutional-grade analysis:
+- **Alignment Score** (0-100): Measures how well insider behavior aligns with positive outlook
+- **Transaction History**: Detailed log of insider buys/sells with position, shares, price, and date
+- **AI Interpretation**: Narrative analysis of what insider patterns indicate
+- **Signal Strength**: Kuat (Strong), Moderat (Moderate), Lemah (Weak)
+- **Sentiment Distribution**: Visual representation of buy vs sell activity over 12 months
+
 ### Additional Signals
 - Early Distribution Detection
 - Tape Control Detection

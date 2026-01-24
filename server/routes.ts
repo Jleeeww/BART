@@ -118,6 +118,25 @@ export async function registerRoutes(
             unsuitable: "Investors seeking high-beta growth or undervalued assets with significant turnaround potential."
           }
         }),
+        insiderData: JSON.stringify({
+          alignmentScore: 78,
+          overview: "Transaksi insider BBCA dalam 12 bulan terakhir menunjukkan pola akumulasi yang konsisten dari manajemen senior. Direktur Utama dan CFO tercatat melakukan pembelian signifikan pasca pengumuman dividen, mengindikasikan keyakinan internal terhadap prospek fundamental perusahaan.",
+          totalBuy: "45.2M IDR",
+          totalSell: "12.8M IDR",
+          netFlow: "+32.4M IDR",
+          buyPercent: 78,
+          sellPercent: 22,
+          signalStrength: "Kuat",
+          aiInterpretation: "Pola transaksi insider mengindikasikan keyakinan manajemen yang tinggi terhadap valuasi dan prospek pertumbuhan. Pembelian terkonsentrasi pada periode pasca earning release menunjukkan bahwa manajemen melihat harga saat ini sebagai entry point yang menarik. Tidak ada pola distribusi signifikan yang terdeteksi dari pemegang saham internal utama.",
+          sentimentNote: "Dominasi aktivitas beli (78%) mencerminkan sentimen positif internal. Transaksi jual yang ada umumnya terkait dengan diversifikasi portofolio pribadi dan bukan indikasi kekhawatiran fundamental.",
+          transactions: [
+            { name: "Jahja Setiaatmadja", position: "Presiden Direktur", type: "Beli", shares: "150,000", price: "11,200", date: "2025-12-18" },
+            { name: "Vera Eve Lim", position: "Direktur", type: "Beli", shares: "75,000", price: "11,150", date: "2025-12-10" },
+            { name: "Rudy Susanto", position: "Wakil Presiden Direktur", type: "Beli", shares: "100,000", price: "11,050", date: "2025-11-28" },
+            { name: "Armand W. Hartono", position: "Wakil Presiden Komisaris", type: "Jual", shares: "50,000", price: "11,300", date: "2025-11-15" },
+            { name: "Suwignyo Budiman", position: "Direktur", type: "Beli", shares: "60,000", price: "10,950", date: "2025-10-22" }
+          ]
+        }),
         aiConfidence: "High",
       });
       console.log("Seeded BBCA stock data");

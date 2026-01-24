@@ -1,0 +1,188 @@
+TASK: Add a new "Insider Activity" tab and convert all user-facing text in the app to Bahasa Indonesia.
+
+IMPORTANT RULES:
+- Do NOT remove any existing features
+- Do NOT break existing tabs (Overview, Flow, Risk, Financials, etc.)
+- Follow existing design system and component styles
+- Keep everything TypeScript-safe
+- Use clean, modular code
+
+========================================
+PART 1 — GLOBAL LANGUAGE LOCALIZATION
+========================================
+
+Convert all user-facing UI text from English to Bahasa Indonesia.
+
+Examples:
+- "Overview" → "Ringkasan"
+- "Flow" → "Aliran Dana"
+- "Risk" → "Risiko"
+- "Financials" → "Keuangan"
+- "Valuation" → "Valuasi"
+- "AI Summary" → "Ringkasan AI"
+- "Broker Summary" → "Ringkasan Broker"
+- "Market Regime" → "Rezim Pasar"
+- "Accumulation" → "Akumulasi"
+- "Distribution" → "Distribusi"
+- "Flow Quality" → "Kualitas Aliran Dana"
+- "Conviction" → "Keyakinan Pasar"
+- "Smart Money" → "Dana Besar"
+- "High / Medium / Low" → "Tinggi / Sedang / Rendah"
+
+All descriptions, labels, and AI explanations must also be in natural professional Bahasa Indonesia suitable for retail investors.
+
+========================================
+PART 2 — CREATE NEW TAB: "INSIDER"
+========================================
+
+Add a new tab in the navigation bar:
+
+Label: **"Insider"**
+Icon: Use a user or shield-style icon consistent with other tabs.
+
+Route example:
+`/stock/:symbol/insider`
+
+========================================
+PART 3 — BACKEND: MOCK INSIDER DATA
+========================================
+
+Inside server/routes.ts create a mock insider data generator:
+
+Function: `getMockInsiderActivity(symbol: string)`
+
+Return structure:
+
+{
+  insiderScore: {
+    netActivity: number, // % of shares outstanding
+    direction: "BUY" | "SELL" | "NEUTRAL",
+    interpretation: string
+  },
+  transactions: [
+    {
+      date: string,
+      name: string,
+      role: "Direktur" | "Komisaris" | "CEO" | "CFO" | "Pemegang Saham Besar",
+      type: "BUY" | "SELL" | "OPTION" | "TRANSFER",
+      shares: number,
+      valueIDR: number
+    }
+  ],
+  alignmentSignal: "ALIGNED" | "DIVERGING" | "NEUTRAL",
+  aiInsight: string
+}
+
+Create realistic mock data:
+- 3–6 insider transactions
+- Mix of roles
+- Some buy or sell activity
+
+========================================
+PART 4 — INSIDER SCORE LOGIC
+========================================
+
+Calculate Insider Net Activity Score:
+
+netActivity = (total shares bought - total shares sold) / shares outstanding (mock)
+
+Classify:
+
+If netActivity > +0.05% → "NET BUYING"
+If netActivity < -0.05% → "NET SELLING"
+Else → "NEUTRAL"
+
+Generate interpretation in Bahasa Indonesia:
+
+NET BUYING:
+"Manajemen dan pemegang saham internal menambah kepemilikan, menunjukkan kepercayaan terhadap prospek perusahaan."
+
+NET SELLING:
+"Sejumlah pihak internal mengurangi kepemilikan saham. Ini dapat menjadi sinyal kehati-hatian terhadap valuasi saat ini."
+
+NEUTRAL:
+"Tidak terdapat perubahan signifikan dalam kepemilikan internal."
+
+========================================
+PART 5 — FRONTEND INSIDER TAB UI
+========================================
+
+Create a new page component:
+`InsiderTab.tsx`
+
+SECTIONS:
+
+--------------------------------
+1️⃣ INSIDER ACTIVITY SCORE CARD
+--------------------------------
+Show:
+
+Title: "Aktivitas Insider"
+Large Badge:
+- Hijau → "Net Buying"
+- Merah → "Net Selling"
+- Abu-abu → "Netral"
+
+Show % value and interpretation text.
+
+--------------------------------
+2️⃣ INSIDER TRANSACTION TABLE
+--------------------------------
+Columns:
+
+Tanggal  
+Nama  
+Jabatan  
+Tipe Transaksi  
+Jumlah Saham  
+Nilai Transaksi (IDR)
+
+Color code:
+BUY → green
+SELL → red
+OPTION/TRANSFER → gray
+
+--------------------------------
+3️⃣ AI INSIDER ANALYSIS
+--------------------------------
+
+Title: "Analisis AI Insider"
+
+This connects insider activity with market flow.
+
+Logic:
+
+If Insider = BUY and Flow Regime = Accumulation:
+→ Alignment = ALIGNED
+Text:
+"Aktivitas pembelian oleh insider selaras dengan akumulasi dana besar di pasar. Ini memperkuat probabilitas tren naik yang sehat."
+
+If Insider = SELL and Flow = Accumulation:
+→ Alignment = DIVERGING
+Text:
+"Meskipun terjadi akumulasi oleh pelaku pasar besar, beberapa insider justru melakukan penjualan. Divergensi ini meningkatkan risiko distribusi tersembunyi."
+
+Else:
+→ NEUTRAL
+
+--------------------------------
+4️⃣ ALIGNMENT BADGE
+--------------------------------
+
+Show a visual badge:
+
+🟢 "Selaras dengan Dana Besar"
+🟡 "Netral"
+🔴 "Berlawanan dengan Dana Besar"
+
+========================================
+PART 6 — INTEGRATION
+========================================
+
+- Hook Insider tab into existing stock data fetch
+- Keep layout consistent with other tabs
+- Ensure zero TypeScript errors
+- Do not modify working Flow, Risk, or Overview logic
+
+FINAL RESULT:
+App now includes a professional Insider Activity intelligence layer fully in Bahasa Indonesia.
