@@ -1,0 +1,101 @@
+🎯 TASK
+
+Convert ALL AI-generated summaries, interpretations, and explanations across the entire app into natural Bahasa Indonesia for retail investors.
+
+⚠️ This is not just label translation — this includes dynamic AI narrative text.
+
+1️⃣ AI SUMMARY (TOP RIGHT BOX) — MUST BE INDONESIAN
+File Scope
+
+Backend AI summary generator or wherever this text is constructed (likely in:
+
+aiSummary
+
+analysisSummary
+
+generateAISummary()
+
+or stock response builder)
+
+Replace English Example Like:
+
+"BBCA shows stable fundamentals with consistent profitability and strong liquidity..."
+
+With Indonesian Style Like:
+
+"BBCA menunjukkan fundamental yang stabil dengan profitabilitas konsisten serta likuiditas yang kuat. Pergerakan harga terbaru lebih mencerminkan akumulasi bertahap dibandingkan spekulasi jangka pendek. Valuasi relatif premium dibanding bank lain, mencerminkan profil defensif perusahaan. Risiko utama berasal dari potensi perlambatan pertumbuhan dibanding bank berkapitalisasi lebih kecil."
+
+Make tone:
+✔ Professional
+✔ Easy to understand
+✔ Sounds like analyst commentary on Indonesian TV
+
+2️⃣ FLOW AI SUMMARY → BAHASA
+
+Change any sentences like:
+
+"Institutional accumulation detected"
+
+"Distribution into strength"
+
+"Flow turning negative"
+
+Into:
+
+English	Indonesian
+Institutional accumulation detected	Terlihat akumulasi oleh pelaku institusi
+Distribution into strength	Terjadi distribusi saat harga menguat
+Flow turning negative	Aliran dana mulai menunjukkan pelemahan
+Healthy accumulation structure	Struktur akumulasi masih sehat
+Weak participation	Partisipasi pasar relatif lemah
+3️⃣ MARKET REGIME EXPLANATIONS
+
+Translate regime descriptions:
+
+Regime	Indonesian Explanation
+Active Accumulation	Institusi aktif melakukan pembelian bertahap sambil menjaga struktur harga tetap stabil
+Stealth Accumulation	Akumulasi berlangsung diam-diam dengan volatilitas rendah
+Distribution Into Strength	Pelaku besar mulai menjual saat harga naik
+Passive Distribution	Distribusi perlahan tanpa tekanan harga besar
+Post-Distribution Vacuum	Setelah distribusi selesai, minat beli melemah dan harga rentan turun
+4️⃣ RISK TAB AI ANALYSIS → INDONESIAN
+
+Translate risk commentary style:
+
+English	Indonesian
+Valuation risk remains elevated	Risiko valuasi masih tergolong tinggi
+Momentum is slowing	Momentum kenaikan mulai melambat
+Downside risk increasing	Risiko penurunan mulai meningkat
+Market sentiment fragile	Sentimen pasar masih rapuh
+No major red flags	Belum terlihat risiko besar yang mengkhawatirkan
+5️⃣ INSIDER AI INTERPRETATION LANGUAGE FIX
+
+Make sure Insider interpretation is in this tone:
+
+"Aktivitas insider menunjukkan kecenderungan akumulasi moderat. Beberapa manajemen melakukan pembelian saham di harga pasar, yang dapat diartikan sebagai sinyal kepercayaan terhadap prospek bisnis perusahaan. Namun masih terdapat transaksi jual dari sebagian pihak, sehingga sinyal belum sepenuhnya kuat."
+
+6️⃣ REMOVE ALL THESE ENGLISH WORDS GLOBALLY
+
+Search and replace in AI output layer:
+
+REMOVE	REPLACE WITH
+Strong	Kuat
+Weak	Lemah
+Moderate	Sedang
+Bullish	Positif
+Bearish	Negatif
+Neutral	Netral
+Risk	Risiko
+Momentum	Momentum (ok to keep but in Indo sentence)
+Accumulation	Akumulasi
+Distribution	Distribusi
+7️⃣ FINAL CHECK
+
+After implementation:
+
+✅ AI Summary box fully Indonesian
+✅ Flow analysis paragraph Indonesian
+✅ Risk analysis Indonesian
+✅ Insider interpretation Indonesian
+✅ No full English sentences remain
+✅ Still professional financial tone

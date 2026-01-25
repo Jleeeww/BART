@@ -15,21 +15,21 @@ export async function registerRoutes(
       await storage.createStock({
         symbol: "BBCA",
         name: "Bank Central Asia Tbk",
-        price: "11,250",
+        price: "11250",
         change: "50",
         changePercent: "0.45",
-        summary: "Bank Central Asia (BBCA) continues to demonstrate structural resilience with a 12% YoY net profit growth in Q3 2025. This performance is underpinned by robust Net Interest Income (NII) expansion and maintained cost discipline, further solidified by a strong capital adequacy ratio.",
-        description: "Bank Central Asia (BBCA) is the largest private bank in Indonesia, serving as a primary pillar of the nation's financial infrastructure. Its business model focuses on transactional banking and a dominant position in low-cost funding (CASA), providing it with a unique competitive advantage in the Indonesian banking sector.",
+        summary: "BBCA menunjukkan fundamental yang stabil dengan profitabilitas konsisten serta likuiditas yang kuat. Pertumbuhan laba bersih 12% YoY di Q3 2025 didukung oleh ekspansi Net Interest Income (NII) dan disiplin biaya yang terjaga. Rasio kecukupan modal tetap kokoh, mencerminkan profil defensif perusahaan.",
+        description: "Bank Central Asia (BBCA) adalah bank swasta terbesar di Indonesia yang berperan sebagai pilar utama infrastruktur keuangan nasional. Model bisnisnya berfokus pada perbankan transaksional dengan dominasi pendanaan murah (CASA), memberikan keunggulan kompetitif unik di sektor perbankan Indonesia.",
         sector: "Financials",
         subsector: "Banks",
         marketCap: "1,385.4T IDR",
         peRatio: "24.2",
-        dividendYield: "2.1%",
+        dividendYield: "2.1",
         roe: "15.8",
         netMargin: "28.4",
         growth: "12.0",
-        investorView: "Investors prioritize BBCA for its exceptional asset quality and dominance in transactional banking. Its ability to maintain high margins and consistent growth even during macro shifts makes it a core defensive asset in Indonesian equity portfolios.",
-        financialSummary: "The Q3 2025 results show a consistent upward trajectory in revenue and net profit, driven by operational efficiency and favorable credit conditions. The bank's strong balance sheet and capital position allow for sustained dividend distributions while supporting credit expansion.",
+        investorView: "Investor memprioritaskan BBCA karena kualitas aset yang unggul dan dominasi di perbankan transaksional. Kemampuannya mempertahankan margin tinggi dan pertumbuhan konsisten bahkan saat kondisi makro berubah menjadikannya aset defensif inti dalam portofolio ekuitas Indonesia.",
+        financialSummary: "Hasil Q3 2025 menunjukkan tren kenaikan konsisten pada pendapatan dan laba bersih, didorong oleh efisiensi operasional dan kondisi kredit yang kondusif. Neraca kuat dan posisi modal yang solid memungkinkan distribusi dividen berkelanjutan sambil mendukung ekspansi kredit.",
         revenue2023: "94.5T IDR",
         revenue2024: "105.2T IDR",
         revenue2025: "117.8T IDR",
@@ -45,11 +45,11 @@ export async function registerRoutes(
         ocf2023: "28.5T IDR",
         ocf2024: "31.2T IDR",
         ocf2025: "34.7T IDR",
-        tradingActivitySummary: "Trading activity on Dec 22, 2025, showed a volume increase to 1.2x average, with synchronized accumulation from both domestic (130.4B IDR) and foreign (92.8B IDR) institutional participants.",
-        flowOverviewSummary: "Market participants exhibited synchronized accumulation on Dec 22, 2025, following the quarterly earnings release. The net inflow of 223.2B IDR was supported by both foreign and domestic institutional sources, with the top 3 brokers accounting for 41.2% of total volume, indicating concentrated institutional interest.",
-        flowBias: "Accumulation",
-        flowIntensity: "Moderate Accumulation",
-        flowReliability: "High",
+        tradingActivitySummary: "Aktivitas perdagangan pada 22 Des 2025 menunjukkan peningkatan volume 1.2x rata-rata, dengan akumulasi tersinkronisasi dari institusi domestik (130.4B IDR) dan asing (92.8B IDR).",
+        flowOverviewSummary: "Pelaku pasar menunjukkan akumulasi tersinkronisasi pada 22 Des 2025 pasca rilis laporan keuangan kuartalan. Aliran masuk bersih 223.2B IDR didukung oleh sumber institusi asing dan domestik, dengan 3 broker teratas menguasai 41.2% total volume, mengindikasikan minat institusi yang terkonsentrasi.",
+        flowBias: "Akumulasi",
+        flowIntensity: "Akumulasi Sedang",
+        flowReliability: "Tinggi",
         brokerData: JSON.stringify([
           { code: "BK", name: "PT Mandiri Sekuritas", netBuy: "125.5B IDR", netSell: null, volumePercent: "12.4%", avgBuy: "9,540", avgSell: "9,530" },
           { code: "BNI", name: "PT BNI Securities", netBuy: "98.2B IDR", netSell: null, volumePercent: "9.8%", avgBuy: "9,545", avgSell: "9,535" },
@@ -68,54 +68,54 @@ export async function registerRoutes(
         }),
         avgBuyPrice: "9,542 IDR",
         avgSellPrice: "9,538 IDR",
-        newsOverviewSummary: "The Q3 2025 earnings release is the primary driver of current sentiment, confirming the bank's operational resilience. Headline net profit growth of 12% YoY aligns with long-term structural trends, while maintained asset quality mitigates immediate credit risk concerns.",
-        newsImpact: "Medium",
-        newsRelevance: "Structural",
+        newsOverviewSummary: "Rilis laporan keuangan Q3 2025 menjadi pendorong utama sentimen saat ini, mengkonfirmasi ketahanan operasional bank. Pertumbuhan laba bersih 12% YoY sejalan dengan tren struktural jangka panjang, sementara kualitas aset yang terjaga meredam kekhawatiran risiko kredit.",
+        newsImpact: "Sedang",
+        newsRelevance: "Struktural",
         newsFeed: JSON.stringify([
-          { headline: "BBCA Reports 12% YoY Net Profit Growth in Q3 2025", date: "2025-12-22", source: "IDX News", impact: "Structural" },
-          { headline: "Bank Indonesia Maintains Policy Rate, Positive for Banking Margins", date: "2025-11-15", source: "Business Times", impact: "Structural" },
-          { headline: "BBCA Digital App Reaches 30 Million Active Users", date: "2025-12-05", source: "TechDaily", impact: "Temporary" }
+          { headline: "BBCA Catat Pertumbuhan Laba Bersih 12% YoY di Q3 2025", date: "2025-12-22", source: "IDX News", impact: "Struktural" },
+          { headline: "Bank Indonesia Pertahankan Suku Bunga Acuan, Positif untuk Margin Perbankan", date: "2025-11-15", source: "Business Times", impact: "Struktural" },
+          { headline: "Aplikasi Digital BBCA Capai 30 Juta Pengguna Aktif", date: "2025-12-05", source: "TechDaily", impact: "Sementara" }
         ]),
         corporateActions: JSON.stringify([
-          { type: "Earnings Release", date: "2025-12-22", status: "Completed", explanation: "Official reporting of Q3 2025 results showing 12% profit expansion." },
-          { type: "Cash Dividend", date: "2025-04-10", status: "Completed", explanation: "Distributed IDR 205 per share, reflecting strong capital position." }
+          { type: "Rilis Laporan Keuangan", date: "2025-12-22", status: "Selesai", explanation: "Pelaporan resmi hasil Q3 2025 yang menunjukkan ekspansi laba 12%." },
+          { type: "Dividen Tunai", date: "2025-04-10", status: "Selesai", explanation: "Distribusi IDR 205 per saham, mencerminkan posisi modal yang kuat." }
         ]),
-        investorInterpretation: "The Q3 results validate the thesis of superior operational leverage. Investors should note the synchronization of foreign and domestic flows (net total 223.2B IDR) as a signal of broad-based institutional support post-earnings.",
+        investorInterpretation: "Hasil Q3 memvalidasi tesis leverage operasional yang unggul. Investor perlu mencermati sinkronisasi aliran dana asing dan domestik (total bersih 223.2B IDR) sebagai sinyal dukungan institusi yang meluas pasca rilis laporan keuangan.",
         eventAnalysis: JSON.stringify([
           {
-            title: "Q3 2025 Earnings Report",
-            event: "Bank Central Asia (BBCA) reported a 12% year-over-year increase in net profit for the third quarter of 2025.",
-            why: "Drivers include NII expansion, sustained cost discipline, and stable asset quality metrics despite global macro headwinds.",
-            immediate: "0.45% price appreciation on 1.2x average volume, indicating a firm positive absorption of results by the market.",
-            secondOrder: "Reinforcement of the 'flight-to-quality' trade in Indonesian financials. BBCA's funding dominance (CASA) likely to strengthen as smaller peers face higher liquidity costs.",
-            thesis: "Positive. Confirms structural growth and operational efficiency milestones.",
-            confidence: "High",
-            conditions: "Thesis assumes continued stability in domestic credit demand. Invalidation would involve a sharp uptick in NPLs or unexpected regulatory caps on Net Interest Margins."
+            title: "Laporan Keuangan Q3 2025",
+            event: "Bank Central Asia (BBCA) mencatat peningkatan laba bersih 12% dibanding periode yang sama tahun lalu (YoY) pada kuartal ketiga 2025.",
+            why: "Pendorong utama meliputi ekspansi NII, disiplin biaya yang terjaga, dan metrik kualitas aset yang stabil meski menghadapi tekanan makro global.",
+            immediate: "Apresiasi harga 0.45% dengan volume 1.2x rata-rata, mengindikasikan penyerapan positif hasil oleh pasar.",
+            secondOrder: "Penguatan tren perpindahan ke aset berkualitas di sektor keuangan Indonesia. Dominasi pendanaan BBCA (CASA) kemungkinan menguat seiring bank kecil menghadapi biaya likuiditas lebih tinggi.",
+            thesis: "Positif. Mengkonfirmasi pertumbuhan struktural dan pencapaian efisiensi operasional.",
+            confidence: "Tinggi",
+            conditions: "Tesis mengasumsikan stabilitas permintaan kredit domestik yang berkelanjutan. Invalidasi akan terjadi jika ada lonjakan NPL atau pembatasan regulasi pada Net Interest Margin."
           }
         ]),
-        financialsAnalystView: "ROE of 15.8% and Net Margin of 28.4% reflect a high level of profitability and efficiency. The structural advantage lies in the bank's ability to maintain these metrics while growing the loan book by 12% YoY, supported by a Strong capital adequacy position.",
-        flowAnalystView: "Dec 22 flow was characterized by a healthy 1.2x volume spike and net accumulation of 223.2B IDR. The High reliability of this flow is supported by the tight 4 IDR spread between buy (9542) and sell (9538) average prices, suggesting efficient institutional execution.",
-        riskAnalystView: "While capital adequacy is 'Strong', the primary risk remains valuation-driven de-rating if profit growth falls below the 10-12% range. Macro-sensitivity to BI rate decisions remains the most significant external uncertainty.",
+        financialsAnalystView: "ROE 15.8% dan Net Margin 28.4% mencerminkan tingkat profitabilitas dan efisiensi yang tinggi. Keunggulan struktural terletak pada kemampuan bank mempertahankan metrik ini sambil menumbuhkan portofolio kredit 12% YoY, didukung posisi kecukupan modal yang kuat.",
+        flowAnalystView: "Aliran dana 22 Des ditandai dengan lonjakan volume sehat 1.2x dan akumulasi bersih 223.2B IDR. Reliabilitas tinggi dari aliran ini didukung oleh spread ketat 4 IDR antara harga beli rata-rata (9542) dan jual (9538), menunjukkan eksekusi institusi yang efisien.",
+        riskAnalystView: "Meski kecukupan modal 'Kuat', risiko utama tetap pada potensi de-rating valuasi jika pertumbuhan laba turun di bawah kisaran 10-12%. Sensitivitas makro terhadap keputusan suku bunga BI tetap menjadi ketidakpastian eksternal paling signifikan.",
         riskData: JSON.stringify({
-          overview: "BBCA maintains a conservative risk profile characterized by high capital adequacy and superior asset quality.",
-          level: "Moderate",
-          skew: "Balanced",
+          overview: "BBCA mempertahankan profil risiko konservatif yang ditandai dengan kecukupan modal tinggi dan kualitas aset yang unggul.",
+          level: "Sedang",
+          skew: "Seimbang",
           primaryRisks: [
-            { title: "NIM Compression", why: "Potential for funding cost increases if deposit competition intensifies.", likelihood: "Medium", impact: "High" },
-            { title: "Macro Slowdown", why: "Deceleration in Indonesian GDP would directly impact credit demand.", likelihood: "Low", impact: "Very High" }
+            { title: "Kompresi NIM", why: "Potensi kenaikan biaya pendanaan jika persaingan deposito meningkat.", likelihood: "Sedang", impact: "Tinggi" },
+            { title: "Perlambatan Makro", why: "Perlambatan PDB Indonesia akan berdampak langsung pada permintaan kredit.", likelihood: "Rendah", impact: "Sangat Tinggi" }
           ],
           contrarianRisks: [
-            { title: "Institutional Concentration", why: "High institutional ownership makes the stock a proxy for EM sentiment shifts.", material: "Simultaneous EM fund redemptions.", affected: "Long-term institutional holders." }
+            { title: "Konsentrasi Institusi", why: "Kepemilikan institusi yang tinggi menjadikan saham ini proxy untuk pergeseran sentimen emerging market.", material: "Redemption dana EM secara bersamaan.", affected: "Pemegang institusi jangka panjang." }
           ],
-          tension: "Trading at a premium for operational certainty; investors trade potential capital gains for high reliability and defensive characteristics.",
+          tension: "Diperdagangkan pada premi untuk kepastian operasional; investor menukar potensi capital gain dengan reliabilitas tinggi dan karakteristik defensif.",
           invalidation: [
-            "Net Interest Margin contraction below 5.0%.",
-            "Sustained NPL spike above 3.0%.",
-            "Loss of CASA dominance (CASA ratio < 70%)."
+            "Kontraksi Net Interest Margin di bawah 5.0%.",
+            "Lonjakan NPL berkelanjutan di atas 3.0%.",
+            "Kehilangan dominasi CASA (rasio CASA < 70%)."
           ],
           investorFit: {
-            suitable: "Conservative institutional and retail investors seeking proxies for Indonesia's economy with lower volatility.",
-            unsuitable: "Investors seeking high-beta growth or undervalued assets with significant turnaround potential."
+            suitable: "Investor institusi dan ritel konservatif yang mencari proxy ekonomi Indonesia dengan volatilitas lebih rendah.",
+            unsuitable: "Investor yang mencari pertumbuhan high-beta atau aset undervalued dengan potensi turnaround signifikan."
           }
         }),
         insiderData: JSON.stringify({
@@ -137,7 +137,7 @@ export async function registerRoutes(
             { name: "Suwignyo Budiman", position: "Direktur", type: "Beli", shares: "60,000", price: "10,950", date: "2025-10-22" }
           ]
         }),
-        aiConfidence: "High",
+        aiConfidence: "Tinggi",
       });
       console.log("Seeded BBCA stock data");
     }
@@ -354,38 +354,38 @@ export async function registerRoutes(
     // Broker Classification
     const brokerInsights = (payload.broker_data || []).map((b: any) => {
       let role = "Market Maker";
-      let confidence = "Medium";
+      let confidence = "Sedang";
       const volPct = parseFloat((b.volumePercent || "0").replace("%", ""));
       
       // Role inference based on behavior patterns
       if (b.netBuy && !b.netSell && volPct >= 8) {
-        role = "Accumulator";
-        confidence = "High";
+        role = "Akumulator";
+        confidence = "Tinggi";
       } else if (b.netSell && !b.netBuy && volPct >= 8) {
         role = "Distributor";
-        confidence = "High";
+        confidence = "Tinggi";
       } else if (b.netBuy && !b.netSell) {
-        role = "Accumulator";
+        role = "Akumulator";
       } else if (b.netSell && !b.netBuy) {
         role = "Distributor";
       } else if (volPct < 5) {
-        role = "Retail Proxy";
-        confidence = "Low";
+        role = "Proxy Ritel";
+        confidence = "Rendah";
       } else if (b.netBuy && b.netSell) {
         role = "Market Maker";
       }
       
       // Operator detection: high volume with tape control signals
-      if (tapeControlFlag && volPct >= 10 && (role === "Accumulator" || role === "Distributor")) {
+      if (tapeControlFlag && volPct >= 10 && (role === "Akumulator" || role === "Distributor")) {
         role = "Operator";
-        confidence = "High";
+        confidence = "Tinggi";
       }
       
       const roleDescriptions: Record<string, string> = {
-        "Accumulator": "pembelian bersih konsisten dengan niat membangun posisi",
+        "Akumulator": "pembelian bersih konsisten dengan niat membangun posisi",
         "Distributor": "penjualan bersih dengan pola pengurangan inventori",
         "Market Maker": "aliran dua arah menyediakan likuiditas tanpa bias arah",
-        "Retail Proxy": "aktivitas ritel terfragmentasi dengan karakteristik institusional terbatas",
+        "Proxy Ritel": "aktivitas ritel terfragmentasi dengan karakteristik institusional terbatas",
         "Operator": "aktivitas terkoordinasi menunjukkan manajemen inventori atau stabilisasi harga"
       };
       
@@ -399,31 +399,31 @@ export async function registerRoutes(
     });
 
     // A/D Mode Engine
-    let marketMode = "Active Accumulation";
-    if (earlyDistributionFlag && score < 40) marketMode = "Post-Distribution Vacuum";
-    else if (earlyDistributionFlag) marketMode = "Distribution into Strength";
-    else if (tapeControlFlag && score > 60) marketMode = "Stealth Accumulation";
-    else if (score > 80) marketMode = "Active Accumulation";
-    else if (score < 40 && payload.flow_signals.flow_bias === "Distribution") marketMode = "Passive Distribution";
-    else if (score < 30) marketMode = "Post-Distribution Vacuum";
+    let marketMode = "Akumulasi Aktif";
+    if (earlyDistributionFlag && score < 40) marketMode = "Vakum Pasca-Distribusi";
+    else if (earlyDistributionFlag) marketMode = "Distribusi Saat Menguat";
+    else if (tapeControlFlag && score > 60) marketMode = "Akumulasi Tersembunyi";
+    else if (score > 80) marketMode = "Akumulasi Aktif";
+    else if (score < 40 && payload.flow_signals.flow_bias === "Distribution") marketMode = "Distribusi Pasif";
+    else if (score < 30) marketMode = "Vakum Pasca-Distribusi";
     
     let marketModeExplanation = "";
     switch(marketMode) {
-      case "Stealth Accumulation": marketModeExplanation = "Pelaku dominan tampak membangun posisi secara diam-diam dengan dukungan harga mekanis. Kualitas aliran mulai terbentuk namun belum tercermin dalam penemuan harga organik."; break;
-      case "Active Accumulation": marketModeExplanation = "Aktivitas institusi tersinkronisasi mendorong apresiasi harga organik. Kualitas aliran tinggi dengan partisipasi yang luas."; break;
-      case "Distribution into Strength": marketModeExplanation = "Meski harga naik, struktur aliran internal menunjukkan rotasi institusional sedang berlangsung. Penguatan headline mungkin menyembunyikan distribusi yang mendasari."; break;
-      case "Passive Distribution": marketModeExplanation = "Penjualan institusi terjadi tanpa penekanan harga agresif. Likuiditas diserap secara bertahap, mengurangi volatilitas langsung namun membangun risiko penurunan."; break;
-      case "Post-Distribution Vacuum": marketModeExplanation = "Fase distribusi sebelumnya telah selesai. Pasar mencari level harga baru dengan dukungan institusional terbatas. Likuiditas mungkin tipis."; break;
+      case "Akumulasi Tersembunyi": marketModeExplanation = "Pelaku dominan tampak membangun posisi secara diam-diam dengan dukungan harga mekanis. Kualitas aliran mulai terbentuk namun belum tercermin dalam penemuan harga organik."; break;
+      case "Akumulasi Aktif": marketModeExplanation = "Aktivitas institusi tersinkronisasi mendorong apresiasi harga organik. Kualitas aliran tinggi dengan partisipasi yang luas."; break;
+      case "Distribusi Saat Menguat": marketModeExplanation = "Meski harga naik, struktur aliran internal menunjukkan rotasi institusional sedang berlangsung. Penguatan headline mungkin menyembunyikan distribusi yang mendasari."; break;
+      case "Distribusi Pasif": marketModeExplanation = "Penjualan institusi terjadi tanpa penekanan harga agresif. Likuiditas diserap secara bertahap, mengurangi volatilitas langsung namun membangun risiko penurunan."; break;
+      case "Vakum Pasca-Distribusi": marketModeExplanation = "Fase distribusi sebelumnya telah selesai. Pasar mencari level harga baru dengan dukungan institusional terbatas. Likuiditas mungkin tipis."; break;
     }
 
     // Conviction Timeline Inference
-    let convictionPhase = "Positioning";
-    if (earlyDistributionFlag || marketMode.includes("Distribution")) {
-      convictionPhase = "Distribution";
-    } else if (score > 80 || marketMode === "Stealth Accumulation") {
-      convictionPhase = "Crowding";
+    let convictionPhase = "Penempatan";
+    if (earlyDistributionFlag || marketMode.includes("Distribusi")) {
+      convictionPhase = "Distribusi";
+    } else if (score > 80 || marketMode === "Akumulasi Tersembunyi") {
+      convictionPhase = "Kepadatan";
     } else if (score > 60) {
-      convictionPhase = "Confirmation";
+      convictionPhase = "Konfirmasi";
     } else if (score < 30) {
       convictionPhase = "Reset";
     }
@@ -431,10 +431,10 @@ export async function registerRoutes(
     // Base conviction explanation (will be modified by intent later)
     let convictionExplanation = "";
     switch(convictionPhase) {
-      case "Positioning": convictionExplanation = "Posisi awal institusional terdeteksi. Kualitas aliran masih dini; tesis tetap spekulatif hingga partisipasi tersinkronisasi dikonfirmasi dari pelaku domestik dan asing."; break;
-      case "Confirmation": convictionExplanation = "Narasi yang berlaku mendapat validasi struktural. Akumulasi tersinkronisasi dan respons harga positif menunjukkan keyakinan institusional meningkat untuk jangka menengah."; break;
-      case "Crowding": convictionExplanation = "Konsensus institusional telah mencapai level tinggi. Meski aliran teknis tetap berkualitas, asimetri perdagangan bergeser karena posisi semakin terkonsentrasi."; break;
-      case "Distribution": convictionExplanation = "Kualitas aliran internal memburuk. Akumulasi yang diamati tampak semakin didorong oleh partisipasi siklus akhir, sementara pemimpin institusional menunjukkan tanda rotasi struktural."; break;
+      case "Penempatan": convictionExplanation = "Posisi awal institusional terdeteksi. Kualitas aliran masih dini; tesis tetap spekulatif hingga partisipasi tersinkronisasi dikonfirmasi dari pelaku domestik dan asing."; break;
+      case "Konfirmasi": convictionExplanation = "Narasi yang berlaku mendapat validasi struktural. Akumulasi tersinkronisasi dan respons harga positif menunjukkan keyakinan institusional meningkat untuk jangka menengah."; break;
+      case "Kepadatan": convictionExplanation = "Konsensus institusional telah mencapai level tinggi. Meski aliran teknis tetap berkualitas, asimetri perdagangan bergeser karena posisi semakin terkonsentrasi."; break;
+      case "Distribusi": convictionExplanation = "Kualitas aliran internal memburuk. Akumulasi yang diamati tampak semakin didorong oleh partisipasi siklus akhir, sementara pemimpin institusional menunjukkan tanda rotasi struktural."; break;
       case "Reset": convictionExplanation = "Siklus sebelumnya telah selesai. Pelaku pasar saat ini mencari katalis struktural baru dan level institusional yang segar."; break;
     }
 
@@ -449,65 +449,65 @@ export async function registerRoutes(
     else interpretation = "Distribusi signifikan dari berbagai meja, menunjukkan penurunan keyakinan institusional secara luas.";
 
     // Smart Money Intent Engine
-    const accumulatorCount = brokerInsights.filter((b: any) => b.inferredRole === "Accumulator").length;
+    const accumulatorCount = brokerInsights.filter((b: any) => b.inferredRole === "Akumulator").length;
     const distributorCount = brokerInsights.filter((b: any) => b.inferredRole === "Distributor").length;
     const operatorCount = brokerInsights.filter((b: any) => b.inferredRole === "Operator").length;
-    const brokerRoleMix = accumulatorCount > distributorCount ? "Accumulator-Dominant" : 
-                          distributorCount > accumulatorCount ? "Distributor-Dominant" : "Balanced";
+    const brokerRoleMix = accumulatorCount > distributorCount ? "Dominan Akumulator" : 
+                          distributorCount > accumulatorCount ? "Dominan Distributor" : "Seimbang";
     
     // Flow quality trend inference (simplified - based on current score position)
-    const flowQualityTrend = score > 70 ? "improving" : score > 50 ? "flat" : "deteriorating";
+    const flowQualityTrend = score > 70 ? "membaik" : score > 50 ? "stabil" : "melemah";
     
     // Intent inference using multi-signal confluence
-    let primaryIntent = "Inventory Building";
+    let primaryIntent = "Pembangunan Inventori";
     let secondaryIntent: string | undefined = undefined;
-    let intentConfidence: "Low" | "Medium" | "High" = "Medium";
+    let intentConfidence: "Rendah" | "Sedang" | "Tinggi" = "Sedang";
     let intentExplanation = "";
     
     // Multi-signal confluence logic (incorporating flowQualityTrend)
-    if (earlyDistributionFlag || marketMode === "Distribution into Strength") {
-      primaryIntent = "Inventory Exit";
-      intentConfidence = earlyDistributionFlag ? "High" : "Medium";
-      if (flowQualityTrend === "deteriorating") intentConfidence = "High";
+    if (earlyDistributionFlag || marketMode === "Distribusi Saat Menguat") {
+      primaryIntent = "Keluar Inventori";
+      intentConfidence = earlyDistributionFlag ? "Tinggi" : "Sedang";
+      if (flowQualityTrend === "melemah") intentConfidence = "Tinggi";
       intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan mengurangi eksposur sambil menjaga perilaku harga yang teratur. Kombinasi kualitas aliran internal yang memburuk dan aksi harga headline yang tangguh konsisten dengan pola rotasi institusional.";
-    } else if (tapeControlFlag && score < 50 && brokerRoleMix === "Balanced") {
-      primaryIntent = "Liquidity Harvesting";
-      intentConfidence = flowQualityTrend === "flat" ? "Medium" : "Low";
+    } else if (tapeControlFlag && score < 50 && brokerRoleMix === "Seimbang") {
+      primaryIntent = "Pemanenan Likuiditas";
+      intentConfidence = flowQualityTrend === "stabil" ? "Sedang" : "Rendah";
       intentExplanation = "Struktur mikro pasar menunjukkan churn tinggi dengan kemajuan arah bersih terbatas. Aktivitas broker tinggi tanpa bias akumulasi atau distribusi mungkin mengindikasikan penempatan taktis di sekitar level teknis kunci.";
     } else if (tapeControlFlag && score > 50) {
-      primaryIntent = "Price Support Operation";
-      intentConfidence = operatorCount > 0 ? "High" : "Medium";
-      secondaryIntent = "Inventory Building";
+      primaryIntent = "Operasi Dukungan Harga";
+      intentConfidence = operatorCount > 0 ? "Tinggi" : "Sedang";
+      secondaryIntent = "Pembangunan Inventori";
       intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan secara aktif mengelola stabilitas harga di zona support. Perilaku tape mekanis dikombinasikan dengan kualitas aliran moderat menunjukkan posisi defensif daripada akumulasi agresif.";
-    } else if (marketMode === "Stealth Accumulation" && convictionPhase === "Positioning") {
-      primaryIntent = "Inventory Building";
-      intentConfidence = flowQualityTrend === "improving" ? "High" : "Medium";
+    } else if (marketMode === "Akumulasi Tersembunyi" && convictionPhase === "Penempatan") {
+      primaryIntent = "Pembangunan Inventori";
+      intentConfidence = flowQualityTrend === "membaik" ? "Tinggi" : "Sedang";
       intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan membangun posisi secara diam-diam dengan pergeseran harga minimal. Pola akumulasi volatilitas rendah dan eksekusi terkendali konsisten dengan penempatan institusional tahap awal.";
-    } else if (marketMode === "Active Accumulation" && (convictionPhase === "Confirmation" || convictionPhase === "Crowding")) {
-      primaryIntent = "Mark-Up Preparation";
-      intentConfidence = (score > 70 && flowQualityTrend === "improving") ? "High" : "Medium";
-      secondaryIntent = "Inventory Building";
+    } else if (marketMode === "Akumulasi Aktif" && (convictionPhase === "Konfirmasi" || convictionPhase === "Kepadatan")) {
+      primaryIntent = "Persiapan Mark-Up";
+      intentConfidence = (score > 70 && flowQualityTrend === "membaik") ? "Tinggi" : "Sedang";
+      secondaryIntent = "Pembangunan Inventori";
       intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan bertransisi dari akumulasi diam-diam ke pembangunan posisi yang lebih terlihat. Aliran bersih yang meluas dan kualitas aliran yang membaik mengindikasikan repositioning struktural menjelang katalis yang diantisipasi.";
-    } else if (marketMode === "Passive Distribution" || marketMode === "Post-Distribution Vacuum") {
-      primaryIntent = "Inventory Exit";
-      intentConfidence = flowQualityTrend === "deteriorating" ? "High" : "Medium";
+    } else if (marketMode === "Distribusi Pasif" || marketMode === "Vakum Pasca-Distribusi") {
+      primaryIntent = "Keluar Inventori";
+      intentConfidence = flowQualityTrend === "melemah" ? "Tinggi" : "Sedang";
       intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan sebagian besar telah menyelesaikan siklus rotasi mereka. Berkurangnya sponsorship institusional dan kualitas aliran yang menurun mengindikasikan pencarian keseimbangan valuasi baru.";
-    } else if (brokerRoleMix === "Accumulator-Dominant" && score > 60) {
-      primaryIntent = "Inventory Building";
-      intentConfidence = flowQualityTrend === "improving" ? "High" : "Medium";
+    } else if (brokerRoleMix === "Dominan Akumulator" && score > 60) {
+      primaryIntent = "Pembangunan Inventori";
+      intentConfidence = flowQualityTrend === "membaik" ? "Tinggi" : "Sedang";
       intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan membangun posisi melalui absorpsi yang stabil. Aktivitas broker yang condong akumulator dan kualitas aliran moderat mendukung tesis penempatan institusional yang konstruktif.";
     } else {
-      primaryIntent = "Inventory Building";
-      intentConfidence = "Low";
+      primaryIntent = "Pembangunan Inventori";
+      intentConfidence = "Rendah";
       intentExplanation = "Pola aliran saat ini tidak menunjukkan intensi arah yang jelas. Pelaku pasar tampak menunggu katalis tambahan sebelum berkomitmen pada penempatan berkelanjutan. Pantau perubahan kualitas aliran atau komposisi peran broker.";
     }
     
     // Modify conviction explanation based on intent (per spec requirements)
-    if (primaryIntent === "Mark-Up Preparation") {
+    if (primaryIntent === "Persiapan Mark-Up") {
       convictionExplanation += " Analisis intensi smart money memperkuat pandangan konstruktif, dengan karakteristik aliran menunjukkan persiapan aktif untuk potensi apresiasi harga.";
-    } else if (primaryIntent === "Inventory Exit" && (convictionPhase === "Crowding" || convictionPhase === "Distribution")) {
+    } else if (primaryIntent === "Keluar Inventori" && (convictionPhase === "Kepadatan" || convictionPhase === "Distribusi")) {
       convictionExplanation += " Namun, analisis intensi smart money menunjukkan rotasi institusional mungkin sedang berlangsung meski level posisi tinggi. Keyakinan tahap akhir perlu diperlakukan dengan hati-hati.";
-    } else if (primaryIntent === "Liquidity Harvesting") {
+    } else if (primaryIntent === "Pemanenan Likuiditas") {
       convictionExplanation += " Pola churn tinggi menunjukkan aktivitas taktis yang mungkin tidak diterjemahkan menjadi keyakinan arah berkelanjutan.";
     }
     
