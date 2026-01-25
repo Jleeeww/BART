@@ -202,8 +202,8 @@ export async function registerRoutes(
 
     const earlyDistributionFlag = signals.length >= 3;
     const earlyDistributionExplanation = earlyDistributionFlag 
-      ? `Analysis indicates ${signals.length} distribution signals emerging. While headline net flow remains positive, internal price friction and sell-side pricing power suggest an early distribution phase. Market participants should monitor for potential liquidity traps as smarter money appears to be rotating out during periods of apparent strength.`
-      : "Current flow structures appear structurally sound with institutional participation remaining synchronized and execution friction appearing minimal.";
+      ? `Analisis menunjukkan ${signals.length} sinyal distribusi mulai muncul. Meski aliran bersih masih positif, struktur harga internal dan kekuatan jual menunjukkan fase distribusi awal. Pelaku pasar perlu waspada terhadap potensi jebakan likuiditas karena smart money tampak melakukan rotasi di tengah penguatan harga.`
+      : "Struktur aliran dana saat ini masih sehat dengan partisipasi institusi yang tersinkronisasi dan eksekusi yang efisien.";
 
     // ─── Broker Control Score Calculation ───
     // Measures concentration of net accumulation among top brokers
@@ -220,8 +220,8 @@ export async function registerRoutes(
       if (positive.length === 0) {
         return {
           score: 0,
-          level: "None",
-          interpretation: "No broker accumulation detected."
+          level: "Tidak Ada",
+          interpretation: "Tidak terdeteksi akumulasi dari broker."
         };
       }
 
@@ -232,18 +232,18 @@ export async function registerRoutes(
 
       const brokerScore = Math.round((top3 / total) * 100);
 
-      let level = "Low Concentration";
+      let level = "Konsentrasi Rendah";
       let interpretation =
-        "Accumulation is distributed across many brokers, suggesting broader institutional participation and healthier trend structure.";
+        "Akumulasi tersebar di banyak broker, menunjukkan partisipasi institusi yang lebih luas dan struktur tren yang lebih sehat.";
 
       if (brokerScore >= 70) {
-        level = "High Concentration";
+        level = "Konsentrasi Tinggi";
         interpretation =
-          "A small number of brokers control most accumulation. This increases continuation probability but raises exit volatility risk if they reverse.";
+          "Sedikit broker menguasai sebagian besar akumulasi. Ini meningkatkan probabilitas kelanjutan tren tapi juga risiko volatilitas jika mereka berbalik arah.";
       } else if (brokerScore >= 40) {
-        level = "Moderate Concentration";
+        level = "Konsentrasi Sedang";
         interpretation =
-          "Accumulation is somewhat concentrated. Price movement has institutional support but still depends on key broker behavior.";
+          "Akumulasi cukup terkonsentrasi. Pergerakan harga didukung institusi tapi masih bergantung pada perilaku broker utama.";
       }
 
       return { score: brokerScore, level, interpretation };
@@ -282,8 +282,8 @@ export async function registerRoutes(
       if (historicalData.length === 0) {
         return {
           score: 0,
-          level: "Low" as const,
-          interpretation: "Insufficient historical data to assess broker stability."
+          level: "Rendah" as const,
+          interpretation: "Data historis tidak cukup untuk menilai stabilitas broker."
         };
       }
       
@@ -306,8 +306,8 @@ export async function registerRoutes(
       if (totalTop3Slots === 0) {
         return {
           score: 0,
-          level: "Low" as const,
-          interpretation: "No consistent accumulation patterns detected across analyzed periods."
+          level: "Rendah" as const,
+          interpretation: "Tidak terdeteksi pola akumulasi konsisten dalam periode yang dianalisis."
         };
       }
       
@@ -321,15 +321,15 @@ export async function registerRoutes(
       const stabilityScore = Math.round((topRecurringAppearances / totalTop3Slots) * 100);
       
       // Step 4: Classify
-      let level: "Low" | "Moderate" | "High" = "Low";
-      let interpretation = "Accumulation leadership is rotating. This suggests short-term positioning rather than a coordinated institutional campaign.";
+      let level: "Rendah" | "Sedang" | "Tinggi" = "Rendah";
+      let interpretation = "Kepemimpinan akumulasi berputar. Ini menunjukkan penempatan jangka pendek daripada kampanye institusional terkoordinasi.";
       
       if (stabilityScore >= 70) {
-        level = "High";
-        interpretation = "The same brokers consistently dominate accumulation, signaling a structured operator-style campaign with sustained intent.";
+        level = "Tinggi";
+        interpretation = "Broker yang sama secara konsisten mendominasi akumulasi, menandakan kampanye operator terstruktur dengan intensi berkelanjutan.";
       } else if (stabilityScore >= 40) {
-        level = "Moderate";
-        interpretation = "Some brokers are repeatedly active, indicating emerging institutional interest but not full control.";
+        level = "Sedang";
+        interpretation = "Beberapa broker aktif berulang kali, mengindikasikan minat institusional yang mulai terbentuk namun belum sepenuhnya mengendalikan.";
       }
       
       return { score: stabilityScore, level, interpretation };
@@ -348,8 +348,8 @@ export async function registerRoutes(
     }
     const tapeControlFlag = tapeControlSignals.length >= 2;
     const tapeControlExplanation = tapeControlFlag 
-      ? "Price behavior appears mechanically supported rather than organically driven. Observed tape control suggests a phase of inventory consolidation by a dominant participant, likely intended to stabilize the current valuation floor."
-      : "Market activity appears to be driven by organic institutional participation with no significant signs of mechanical price defense.";
+      ? "Perilaku harga tampak didukung secara mekanis daripada organik. Kontrol tape menunjukkan fase konsolidasi inventori oleh pelaku dominan, kemungkinan untuk menstabilkan level harga saat ini."
+      : "Aktivitas pasar tampak didorong oleh partisipasi institusi organik tanpa tanda-tanda signifikan pertahanan harga mekanis.";
 
     // Broker Classification
     const brokerInsights = (payload.broker_data || []).map((b: any) => {
@@ -382,11 +382,11 @@ export async function registerRoutes(
       }
       
       const roleDescriptions: Record<string, string> = {
-        "Accumulator": "consistent net buying with position-building intent",
-        "Distributor": "net selling with inventory reduction patterns",
-        "Market Maker": "two-way flow providing liquidity without directional bias",
-        "Retail Proxy": "fragmented retail-driven activity with limited institutional characteristics",
-        "Operator": "coordinated activity suggesting inventory management or price stabilization"
+        "Accumulator": "pembelian bersih konsisten dengan niat membangun posisi",
+        "Distributor": "penjualan bersih dengan pola pengurangan inventori",
+        "Market Maker": "aliran dua arah menyediakan likuiditas tanpa bias arah",
+        "Retail Proxy": "aktivitas ritel terfragmentasi dengan karakteristik institusional terbatas",
+        "Operator": "aktivitas terkoordinasi menunjukkan manajemen inventori atau stabilisasi harga"
       };
       
       return {
@@ -394,7 +394,7 @@ export async function registerRoutes(
         inferredRole: role,
         confidenceLevel: confidence,
         roleShiftFlag: false,
-        explanation: `${b.code} exhibits ${roleDescriptions[role] || "unclassified behavior"}.`
+        explanation: `${b.code} menunjukkan ${roleDescriptions[role] || "perilaku tidak terklasifikasi"}.`
       };
     });
 
@@ -409,11 +409,11 @@ export async function registerRoutes(
     
     let marketModeExplanation = "";
     switch(marketMode) {
-      case "Stealth Accumulation": marketModeExplanation = "Dominant participants appear to be building positions quietly under mechanical price support. Flow quality is emerging but not yet reflected in organic price discovery."; break;
-      case "Active Accumulation": marketModeExplanation = "Synchronized institutional activity is driving organic price appreciation. Flow quality is high with broad-based participation."; break;
-      case "Distribution into Strength": marketModeExplanation = "Despite positive headline price action, internal flow structure suggests institutional rotation is underway. Headline strength may mask underlying distribution."; break;
-      case "Passive Distribution": marketModeExplanation = "Institutional selling is occurring without aggressive price marking. Liquidity is being absorbed gradually, reducing immediate volatility but building downside risk."; break;
-      case "Post-Distribution Vacuum": marketModeExplanation = "Prior distribution phase has concluded. Market is searching for a new valuation floor with limited institutional sponsorship. Liquidity may be thin."; break;
+      case "Stealth Accumulation": marketModeExplanation = "Pelaku dominan tampak membangun posisi secara diam-diam dengan dukungan harga mekanis. Kualitas aliran mulai terbentuk namun belum tercermin dalam penemuan harga organik."; break;
+      case "Active Accumulation": marketModeExplanation = "Aktivitas institusi tersinkronisasi mendorong apresiasi harga organik. Kualitas aliran tinggi dengan partisipasi yang luas."; break;
+      case "Distribution into Strength": marketModeExplanation = "Meski harga naik, struktur aliran internal menunjukkan rotasi institusional sedang berlangsung. Penguatan headline mungkin menyembunyikan distribusi yang mendasari."; break;
+      case "Passive Distribution": marketModeExplanation = "Penjualan institusi terjadi tanpa penekanan harga agresif. Likuiditas diserap secara bertahap, mengurangi volatilitas langsung namun membangun risiko penurunan."; break;
+      case "Post-Distribution Vacuum": marketModeExplanation = "Fase distribusi sebelumnya telah selesai. Pasar mencari level harga baru dengan dukungan institusional terbatas. Likuiditas mungkin tipis."; break;
     }
 
     // Conviction Timeline Inference
@@ -431,22 +431,22 @@ export async function registerRoutes(
     // Base conviction explanation (will be modified by intent later)
     let convictionExplanation = "";
     switch(convictionPhase) {
-      case "Positioning": convictionExplanation = "Initial institutional positioning is detected. Flow quality is nascent; the thesis remains speculative until synchronized participation is confirmed across domestic and foreign desks."; break;
-      case "Confirmation": convictionExplanation = "The prevailing narrative is gaining structural validation. Synchronized accumulation and positive price response suggest increasing institutional conviction in the mid-term trajectory."; break;
-      case "Crowding": convictionExplanation = "Institutional consensus has reached elevated levels. While technical flows remain high-quality, the asymmetry of the trade is shifting as positioning becomes increasingly concentrated."; break;
-      case "Distribution": convictionExplanation = "Internal flow quality is deteriorating. Observed accumulation appears increasingly driven by late-cycle participation, while institutional leads show signs of structural rotation."; break;
-      case "Reset": convictionExplanation = "The previous lifecycle has concluded. Market participants are currently searching for new structural catalysts and a fresh institutional floor."; break;
+      case "Positioning": convictionExplanation = "Posisi awal institusional terdeteksi. Kualitas aliran masih dini; tesis tetap spekulatif hingga partisipasi tersinkronisasi dikonfirmasi dari pelaku domestik dan asing."; break;
+      case "Confirmation": convictionExplanation = "Narasi yang berlaku mendapat validasi struktural. Akumulasi tersinkronisasi dan respons harga positif menunjukkan keyakinan institusional meningkat untuk jangka menengah."; break;
+      case "Crowding": convictionExplanation = "Konsensus institusional telah mencapai level tinggi. Meski aliran teknis tetap berkualitas, asimetri perdagangan bergeser karena posisi semakin terkonsentrasi."; break;
+      case "Distribution": convictionExplanation = "Kualitas aliran internal memburuk. Akumulasi yang diamati tampak semakin didorong oleh partisipasi siklus akhir, sementara pemimpin institusional menunjukkan tanda rotasi struktural."; break;
+      case "Reset": convictionExplanation = "Siklus sebelumnya telah selesai. Pelaku pasar saat ini mencari katalis struktural baru dan level institusional yang segar."; break;
     }
 
     // Clamp score 0-100
     score = Math.max(0, Math.min(100, score));
     
     let interpretation = "";
-    if (score > 80) interpretation = "Exceptional institutional conviction characterized by high synchronization across participant types.";
-    else if (score > 60) interpretation = "Solid accumulation pattern with moderate reliability; requires continued structural catalyst validation.";
-    else if (score > 40) interpretation = "Neutral flow dynamics suggesting a lack of clear institutional consensus at current valuation levels.";
-    else if (score > 20) interpretation = "Distribution bias emerging; institutional participants appear to be reducing exposure during volatility.";
-    else interpretation = "Significant distribution across multiple desks, suggesting a broad-based reduction in institutional conviction.";
+    if (score > 80) interpretation = "Keyakinan institusional luar biasa ditandai sinkronisasi tinggi antar tipe pelaku.";
+    else if (score > 60) interpretation = "Pola akumulasi solid dengan reliabilitas moderat; memerlukan validasi katalis struktural berkelanjutan.";
+    else if (score > 40) interpretation = "Dinamika aliran netral menunjukkan kurangnya konsensus institusional yang jelas pada level valuasi saat ini.";
+    else if (score > 20) interpretation = "Bias distribusi mulai muncul; pelaku institusi tampak mengurangi eksposur selama volatilitas.";
+    else interpretation = "Distribusi signifikan dari berbagai meja, menunjukkan penurunan keyakinan institusional secara luas.";
 
     // Smart Money Intent Engine
     const accumulatorCount = brokerInsights.filter((b: any) => b.inferredRole === "Accumulator").length;
@@ -469,46 +469,46 @@ export async function registerRoutes(
       primaryIntent = "Inventory Exit";
       intentConfidence = earlyDistributionFlag ? "High" : "Medium";
       if (flowQualityTrend === "deteriorating") intentConfidence = "High";
-      intentExplanation = "Flow characteristics suggest dominant participants are reducing exposure while maintaining orderly price behavior. The combination of deteriorating internal flow quality and resilient headline price action is consistent with institutional rotation patterns.";
+      intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan mengurangi eksposur sambil menjaga perilaku harga yang teratur. Kombinasi kualitas aliran internal yang memburuk dan aksi harga headline yang tangguh konsisten dengan pola rotasi institusional.";
     } else if (tapeControlFlag && score < 50 && brokerRoleMix === "Balanced") {
       primaryIntent = "Liquidity Harvesting";
       intentConfidence = flowQualityTrend === "flat" ? "Medium" : "Low";
-      intentExplanation = "Market microstructure suggests elevated churn with limited net directional progress. High broker activity without corresponding accumulation or distribution bias may indicate tactical positioning around key technical levels.";
+      intentExplanation = "Struktur mikro pasar menunjukkan churn tinggi dengan kemajuan arah bersih terbatas. Aktivitas broker tinggi tanpa bias akumulasi atau distribusi mungkin mengindikasikan penempatan taktis di sekitar level teknis kunci.";
     } else if (tapeControlFlag && score > 50) {
       primaryIntent = "Price Support Operation";
       intentConfidence = operatorCount > 0 ? "High" : "Medium";
       secondaryIntent = "Inventory Building";
-      intentExplanation = "Flow characteristics suggest dominant participants are actively managing price stability near perceived support zones. Mechanical tape behavior combined with moderate flow quality indicates defensive positioning rather than aggressive accumulation.";
+      intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan secara aktif mengelola stabilitas harga di zona support. Perilaku tape mekanis dikombinasikan dengan kualitas aliran moderat menunjukkan posisi defensif daripada akumulasi agresif.";
     } else if (marketMode === "Stealth Accumulation" && convictionPhase === "Positioning") {
       primaryIntent = "Inventory Building";
       intentConfidence = flowQualityTrend === "improving" ? "High" : "Medium";
-      intentExplanation = "Flow characteristics suggest dominant participants are quietly building positions with minimal price displacement. Low volatility accumulation patterns and contained execution are consistent with early-stage institutional positioning.";
+      intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan membangun posisi secara diam-diam dengan pergeseran harga minimal. Pola akumulasi volatilitas rendah dan eksekusi terkendali konsisten dengan penempatan institusional tahap awal.";
     } else if (marketMode === "Active Accumulation" && (convictionPhase === "Confirmation" || convictionPhase === "Crowding")) {
       primaryIntent = "Mark-Up Preparation";
       intentConfidence = (score > 70 && flowQualityTrend === "improving") ? "High" : "Medium";
       secondaryIntent = "Inventory Building";
-      intentExplanation = "Flow characteristics suggest dominant participants are transitioning from quiet accumulation to more visible position-building. Expanding net flows and improving flow quality indicate potential structural repositioning ahead of anticipated catalysts.";
+      intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan bertransisi dari akumulasi diam-diam ke pembangunan posisi yang lebih terlihat. Aliran bersih yang meluas dan kualitas aliran yang membaik mengindikasikan repositioning struktural menjelang katalis yang diantisipasi.";
     } else if (marketMode === "Passive Distribution" || marketMode === "Post-Distribution Vacuum") {
       primaryIntent = "Inventory Exit";
       intentConfidence = flowQualityTrend === "deteriorating" ? "High" : "Medium";
-      intentExplanation = "Flow characteristics suggest dominant participants have largely completed their rotation cycle. Reduced institutional sponsorship and declining flow quality indicate a search for new valuation equilibrium.";
+      intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan sebagian besar telah menyelesaikan siklus rotasi mereka. Berkurangnya sponsorship institusional dan kualitas aliran yang menurun mengindikasikan pencarian keseimbangan valuasi baru.";
     } else if (brokerRoleMix === "Accumulator-Dominant" && score > 60) {
       primaryIntent = "Inventory Building";
       intentConfidence = flowQualityTrend === "improving" ? "High" : "Medium";
-      intentExplanation = "Flow characteristics suggest dominant participants are building positions through steady absorption. Accumulator-skewed broker activity and moderate flow quality support a constructive institutional positioning thesis.";
+      intentExplanation = "Karakteristik aliran menunjukkan pelaku dominan membangun posisi melalui absorpsi yang stabil. Aktivitas broker yang condong akumulator dan kualitas aliran moderat mendukung tesis penempatan institusional yang konstruktif.";
     } else {
       primaryIntent = "Inventory Building";
       intentConfidence = "Low";
-      intentExplanation = "Current flow patterns do not exhibit clear directional intent. Market participants appear to be awaiting additional catalysts before committing to sustained positioning. Monitor for changes in flow quality or broker role composition.";
+      intentExplanation = "Pola aliran saat ini tidak menunjukkan intensi arah yang jelas. Pelaku pasar tampak menunggu katalis tambahan sebelum berkomitmen pada penempatan berkelanjutan. Pantau perubahan kualitas aliran atau komposisi peran broker.";
     }
     
     // Modify conviction explanation based on intent (per spec requirements)
     if (primaryIntent === "Mark-Up Preparation") {
-      convictionExplanation += " Smart money intent analysis reinforces the constructive outlook, with flow characteristics suggesting active preparation for potential price appreciation.";
+      convictionExplanation += " Analisis intensi smart money memperkuat pandangan konstruktif, dengan karakteristik aliran menunjukkan persiapan aktif untuk potensi apresiasi harga.";
     } else if (primaryIntent === "Inventory Exit" && (convictionPhase === "Crowding" || convictionPhase === "Distribution")) {
-      convictionExplanation += " However, smart money intent analysis suggests institutional rotation may be underway despite elevated positioning levels. Late-stage conviction should be treated with caution.";
+      convictionExplanation += " Namun, analisis intensi smart money menunjukkan rotasi institusional mungkin sedang berlangsung meski level posisi tinggi. Keyakinan tahap akhir perlu diperlakukan dengan hati-hati.";
     } else if (primaryIntent === "Liquidity Harvesting") {
-      convictionExplanation += " Elevated churn patterns suggest tactical activity that may not translate to sustained directional conviction.";
+      convictionExplanation += " Pola churn tinggi menunjukkan aktivitas taktis yang mungkin tidak diterjemahkan menjadi keyakinan arah berkelanjutan.";
     }
     
     const smartMoneyIntent = {
@@ -520,7 +520,7 @@ export async function registerRoutes(
 
     // Structured analyst-style response without buy/sell signals
     res.json({
-      flow_analysis: `Institutional activity for ${payload.stock} indicates ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} with ${payload.flow_signals.flow_reliability} reliability. Broad-based positioning is supported by synchronized participation from both domestic and foreign institutional sources.`,
+      flow_analysis: `Aktivitas institusional untuk ${payload.stock} menunjukkan ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} dengan reliabilitas ${payload.flow_signals.flow_reliability}. Posisi berbasis luas didukung oleh partisipasi tersinkronisasi dari sumber institusi domestik dan asing.`,
       flowQualityScore: score,
       flowQualityInterpretation: interpretation,
       earlyDistributionFlag,
@@ -536,13 +536,13 @@ export async function registerRoutes(
       convictionExplanation,
       smartMoneyIntent,
       event_analysis: {
-        impact: "Medium",
-        relevance: "Structural",
-        thesis: `The ${payload.event_specifics.event_type} (${payload.event_specifics.headline}) is consistent with observed operational trends. While structural efficiency gains are evident, macro-sensitivity remains the primary variable for valuation persistence.`,
-        confidence: "High",
-        conditions: "Thesis persistence assumes stability in domestic credit demand and no significant contraction in prevailing Net Interest Margins (NIM)."
+        impact: "Sedang",
+        relevance: "Struktural",
+        thesis: `${payload.event_specifics.event_type} (${payload.event_specifics.headline}) konsisten dengan tren operasional yang diamati. Meski peningkatan efisiensi struktural terlihat, sensitivitas makro tetap menjadi variabel utama untuk persistensi valuasi.`,
+        confidence: "Tinggi",
+        conditions: "Persistensi tesis mengasumsikan stabilitas permintaan kredit domestik dan tidak ada kontraksi signifikan pada Net Interest Margin (NIM) yang berlaku."
       },
-      risk_analysis: `Primary risks for ${payload.stock} center on macro-driven de-rating and potential NIM compression should deposit competition intensify. Existing asset quality provides a defensive cushion, though valuation premium remains sensitive to growth decelerations.`
+      risk_analysis: `Risiko utama untuk ${payload.stock} berpusat pada de-rating yang didorong makro dan potensi kompresi NIM jika persaingan deposito meningkat. Kualitas aset yang ada memberikan bantalan defensif, meski premi valuasi tetap sensitif terhadap perlambatan pertumbuhan.`
     });
   });
 

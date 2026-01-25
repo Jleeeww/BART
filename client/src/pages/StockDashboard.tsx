@@ -1145,7 +1145,7 @@ export default function StockDashboard() {
                               <div className="flex items-center justify-between mb-4">
                                 <h3 className="text-lg font-bold font-display text-foreground">Aktivitas Insider</h3>
                                 <div className="text-right">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Skor Alignment</p>
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Skor Keselarasan</p>
                                   <p className={`text-2xl font-bold ${
                                     insider.alignmentScore >= 70 ? 'text-emerald-600 dark:text-emerald-400' :
                                     insider.alignmentScore >= 40 ? 'text-amber-600 dark:text-amber-400' :
@@ -1153,21 +1153,39 @@ export default function StockDashboard() {
                                   }`}>{insider.alignmentScore}/100</p>
                                 </div>
                               </div>
-                              <p className="text-muted-foreground leading-relaxed mb-4">
-                                {insider.overview}
-                              </p>
+                              {(insider.overview || insider.interpretation) && (
+                                <p className="text-muted-foreground leading-relaxed mb-4">
+                                  {insider.overview || insider.interpretation}
+                                </p>
+                              )}
                               <div className="grid grid-cols-3 gap-4 mt-4">
                                 <div className="text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Beli</p>
-                                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{insider.totalBuy}</p>
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Pembelian</p>
+                                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                    {typeof insider.totalBuyValue === 'number' 
+                                      ? `${(insider.totalBuyValue / 1000000000).toFixed(1)}B IDR`
+                                      : insider.totalBuy || '-'}
+                                  </p>
                                 </div>
                                 <div className="text-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Jual</p>
-                                  <p className="text-lg font-bold text-red-600 dark:text-red-400">{insider.totalSell}</p>
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Penjualan</p>
+                                  <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                                    {typeof insider.totalSellValue === 'number'
+                                      ? `${(insider.totalSellValue / 1000000000).toFixed(1)}B IDR`
+                                      : insider.totalSell || '-'}
+                                  </p>
                                 </div>
                                 <div className="text-center p-3 rounded-lg bg-primary/10 border border-primary/20">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Net Flow</p>
-                                  <p className={`text-lg font-bold ${insider.netFlow.startsWith('-') ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{insider.netFlow}</p>
+                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Arus Bersih</p>
+                                  <p className={`text-lg font-bold ${
+                                    (typeof insider.netFlow === 'number' ? insider.netFlow < 0 : String(insider.netFlow).startsWith('-'))
+                                      ? 'text-red-600 dark:text-red-400' 
+                                      : 'text-emerald-600 dark:text-emerald-400'
+                                  }`}>
+                                    {typeof insider.netFlow === 'number'
+                                      ? `${insider.netFlow >= 0 ? '+' : ''}${(insider.netFlow / 1000000000).toFixed(1)}B IDR`
+                                      : insider.netFlow}
+                                  </p>
                                 </div>
                               </div>
                             </Card>
@@ -1176,28 +1194,28 @@ export default function StockDashboard() {
                             <Card className="p-6 border-border/50 shadow-sm">
                               <div className="flex items-center gap-2 mb-4">
                                 <Activity className="w-5 h-5 text-indigo-500" />
-                                <h4 className="text-base font-bold font-display text-foreground">Analisis AI Insider</h4>
+                                <h4 className="text-base font-bold font-display text-foreground">Interpretasi AI</h4>
                               </div>
                               <div className="space-y-4">
                                 <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
-                                  <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Interpretasi</p>
-                                  <p className="text-sm text-muted-foreground leading-relaxed">{insider.aiInterpretation}</p>
+                                  <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Interpretasi AI</p>
+                                  <p className="text-sm text-muted-foreground leading-relaxed">{insider.aiInterpretation || insider.interpretation}</p>
                                 </div>
                                 <div className="p-4 bg-secondary/50 rounded-lg border border-border/30">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Signal Strength</p>
+                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Kekuatan Sinyal</p>
                                   <div className="flex items-center gap-3">
                                     <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                                       <div 
                                         className={`h-full transition-all ${
-                                          insider.signalStrength === 'Kuat' ? 'bg-emerald-500 w-full' :
-                                          insider.signalStrength === 'Moderat' ? 'bg-amber-500 w-2/3' :
+                                          insider.signalStrength === 'Kuat' || insider.signalStrength === 'Strong' ? 'bg-emerald-500 w-full' :
+                                          insider.signalStrength === 'Sedang' || insider.signalStrength === 'Moderat' || insider.signalStrength === 'Moderate' ? 'bg-amber-500 w-2/3' :
                                           'bg-muted-foreground w-1/3'
                                         }`}
                                       />
                                     </div>
                                     <span className={`text-sm font-bold ${
-                                      insider.signalStrength === 'Kuat' ? 'text-emerald-600 dark:text-emerald-400' :
-                                      insider.signalStrength === 'Moderat' ? 'text-amber-600 dark:text-amber-400' :
+                                      insider.signalStrength === 'Kuat' || insider.signalStrength === 'Strong' ? 'text-emerald-600 dark:text-emerald-400' :
+                                      insider.signalStrength === 'Sedang' || insider.signalStrength === 'Moderat' || insider.signalStrength === 'Moderate' ? 'text-amber-600 dark:text-amber-400' :
                                       'text-muted-foreground'
                                     }`}>{insider.signalStrength}</span>
                                   </div>
@@ -1207,7 +1225,7 @@ export default function StockDashboard() {
 
                             {/* Recent Insider Transactions */}
                             <Card className="p-6 border-border/50 shadow-sm">
-                              <h4 className="text-base font-bold font-display mb-4 text-foreground">Transaksi Insider Terkini</h4>
+                              <h4 className="text-base font-bold font-display mb-4 text-foreground">Riwayat Transaksi</h4>
                               <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                   <thead>
@@ -1215,55 +1233,75 @@ export default function StockDashboard() {
                                       <th className="text-left py-3 px-3 font-semibold text-foreground">Nama</th>
                                       <th className="text-left py-3 px-3 font-semibold text-foreground">Jabatan</th>
                                       <th className="text-left py-3 px-3 font-semibold text-foreground">Tipe</th>
-                                      <th className="text-right py-3 px-3 font-semibold text-foreground">Jumlah</th>
+                                      <th className="text-right py-3 px-3 font-semibold text-foreground">Jumlah Saham</th>
                                       <th className="text-right py-3 px-3 font-semibold text-foreground">Harga</th>
                                       <th className="text-right py-3 px-3 font-semibold text-foreground">Tanggal</th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {insider.transactions.map((tx: any, idx: number) => (
-                                      <tr key={idx} className="border-b border-border/30 hover:bg-muted/30">
-                                        <td className="py-3 px-3 font-medium text-foreground">{tx.name}</td>
-                                        <td className="py-3 px-3 text-muted-foreground">{tx.position}</td>
-                                        <td className="py-3 px-3">
-                                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                            tx.type === 'Beli' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                                            'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                          }`}>
-                                            {tx.type}
-                                          </span>
-                                        </td>
-                                        <td className="text-right py-3 px-3 font-mono text-foreground">{tx.shares}</td>
-                                        <td className="text-right py-3 px-3 font-mono text-foreground">{tx.price}</td>
-                                        <td className="text-right py-3 px-3 text-muted-foreground">{tx.date}</td>
-                                      </tr>
-                                    ))}
+                                    {insider.transactions?.map((tx: any, idx: number) => {
+                                      const isBuy = tx.type === 'BUY' || tx.type === 'Beli';
+                                      const typeLabel = isBuy ? 'Beli' : 'Jual';
+                                      return (
+                                        <tr key={idx} className="border-b border-border/30 hover:bg-muted/30">
+                                          <td className="py-3 px-3 font-medium text-foreground">{tx.name}</td>
+                                          <td className="py-3 px-3 text-muted-foreground">{tx.position}</td>
+                                          <td className="py-3 px-3">
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                              isBuy ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                              'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                            }`}>
+                                              {typeLabel}
+                                            </span>
+                                          </td>
+                                          <td className="text-right py-3 px-3 font-mono text-foreground">
+                                            {typeof tx.shares === 'number' ? tx.shares.toLocaleString('id-ID') : tx.shares}
+                                          </td>
+                                          <td className="text-right py-3 px-3 font-mono text-foreground">
+                                            {typeof tx.price === 'number' ? `IDR ${tx.price.toLocaleString('id-ID')}` : tx.price}
+                                          </td>
+                                          <td className="text-right py-3 px-3 text-muted-foreground">{tx.date}</td>
+                                        </tr>
+                                      );
+                                    })}
                                   </tbody>
                                 </table>
                               </div>
                             </Card>
 
                             {/* Insider Sentiment Indicator */}
-                            <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10">
-                              <h4 className="text-base font-bold font-display mb-4 text-foreground">Sentimen Insider (12 Bulan)</h4>
-                              <div className="flex items-center gap-4">
-                                <div className="flex-1 h-4 rounded-full overflow-hidden border border-border/30 flex">
-                                  <div className="bg-emerald-500 dark:bg-emerald-400" style={{ width: `${insider.buyPercent}%` }} />
-                                  <div className="bg-red-500 dark:bg-red-400" style={{ width: `${insider.sellPercent}%` }} />
-                                </div>
-                                <div className="flex items-center gap-4 text-xs">
-                                  <span className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                    Beli {insider.buyPercent}%
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <div className="w-2 h-2 rounded-full bg-red-500" />
-                                    Jual {insider.sellPercent}%
-                                  </span>
-                                </div>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-3 italic">{insider.sentimentNote}</p>
-                            </Card>
+                            {(() => {
+                              // Calculate percentages if not provided
+                              const buyVal = insider.totalBuyValue || 0;
+                              const sellVal = insider.totalSellValue || 0;
+                              const total = buyVal + sellVal;
+                              const buyPct = insider.buyPercent ?? (total > 0 ? Math.round((buyVal / total) * 100) : 50);
+                              const sellPct = insider.sellPercent ?? (total > 0 ? Math.round((sellVal / total) * 100) : 50);
+                              return (
+                                <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10">
+                                  <h4 className="text-base font-bold font-display mb-4 text-foreground">Sentimen Insider (12 Bulan)</h4>
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex-1 h-4 rounded-full overflow-hidden border border-border/30 flex">
+                                      <div className="bg-emerald-500 dark:bg-emerald-400" style={{ width: `${buyPct}%` }} />
+                                      <div className="bg-red-500 dark:bg-red-400" style={{ width: `${sellPct}%` }} />
+                                    </div>
+                                    <div className="flex items-center gap-4 text-xs">
+                                      <span className="flex items-center gap-1">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                        Beli {buyPct}%
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        <div className="w-2 h-2 rounded-full bg-red-500" />
+                                        Jual {sellPct}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                  {(insider.sentimentNote || insider.sentiment) && (
+                                    <p className="text-xs text-muted-foreground mt-3 italic">{insider.sentimentNote || `Sentimen: ${insider.sentiment}`}</p>
+                                  )}
+                                </Card>
+                              );
+                            })()}
                           </div>
                         );
                       } catch (e) {

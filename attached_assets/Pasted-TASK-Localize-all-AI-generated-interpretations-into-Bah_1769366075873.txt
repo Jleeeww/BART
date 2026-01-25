@@ -1,0 +1,126 @@
+TASK:
+
+Localize all AI-generated interpretations into Bahasa Indonesia and populate the Insider Activity tab with realistic sample data so the UI shows how it will look with real insider transactions.
+
+1️⃣ TRANSLATE ALL AI ANALYSIS TO BAHASA INDONESIA
+Scope
+
+Translate every AI-generated interpretation field from English to Bahasa Indonesia, including:
+
+Flow AI Summary
+
+Flow Quality Interpretation
+
+Broker Control Interpretation
+
+Market Regime Explanation
+
+Risk Analysis AI Summary
+
+News AI Summary
+
+Insider AI Interpretation
+
+Signal Strength explanations
+
+Conviction Phase explanations
+
+Rules
+
+Keep a professional but simple tone for Indonesian retail investors
+
+Avoid literal robotic translations — make them sound like market commentary
+
+Use common Indonesian financial terms
+
+Example Conversions
+English	Bahasa Indonesia
+"Strong institutional accumulation detected"	"Terlihat akumulasi kuat dari pelaku institusi"
+"Distribution into strength"	"Distribusi saat harga menguat"
+"Early signs of weakness"	"Tanda awal pelemahan mulai terlihat"
+"Flow remains constructive"	"Aliran dana masih menunjukkan struktur yang sehat"
+"High concentration risk"	"Risiko konsentrasi tinggi pada broker tertentu"
+"Conviction is building"	"Keyakinan pasar mulai terbentuk"
+
+Apply this across all AI explanation fields in backend responses.
+
+2️⃣ FIX INSIDER TAB — ADD SAMPLE DATA
+
+Currently Insider tab shows "Tidak Ada Data Insider".
+We need sample (dummy but realistic) insider transaction data added to the backend seed for BBCA.
+
+Add this to BBCA insiderData:
+insiderData: {
+  alignmentScore: 72,
+  totalBuyValue: 18500000000,
+  totalSellValue: 7200000000,
+  netFlow: 11300000000,
+  sentiment: "Bullish Moderat",
+  signalStrength: "Sedang",
+  interpretation: "Aktivitas insider menunjukkan kecenderungan akumulasi moderat. Beberapa direksi melakukan pembelian saham di harga pasar, yang mengindikasikan keyakinan terhadap prospek jangka menengah perusahaan. Namun masih terdapat sebagian aksi jual yang menandakan belum semua pihak sepenuhnya optimis.",
+  transactions: [
+    {
+      name: "Direktur Utama",
+      position: "Direksi",
+      type: "BUY",
+      shares: 150000,
+      price: 9150,
+      date: "2025-11-12"
+    },
+    {
+      name: "Komisaris Independen",
+      position: "Komisaris",
+      type: "SELL",
+      shares: 80000,
+      price: 9400,
+      date: "2025-10-28"
+    },
+    {
+      name: "Direktur Keuangan",
+      position: "Direksi",
+      type: "BUY",
+      shares: 120000,
+      price: 9050,
+      date: "2025-09-30"
+    },
+    {
+      name: "VP Operasional",
+      position: "Manajemen",
+      type: "BUY",
+      shares: 60000,
+      price: 8900,
+      date: "2025-09-12"
+    }
+  ]
+}
+
+3️⃣ INSIDER AI LABEL TRANSLATIONS (FRONTEND)
+
+Update Insider tab labels:
+
+English	Bahasa Indonesia
+Insider Activity	Aktivitas Insider
+Alignment Score	Skor Keselarasan Insider
+Total Buy	Total Pembelian
+Total Sell	Total Penjualan
+Net Flow	Arus Bersih
+AI Interpretation	Interpretasi AI
+Signal Strength	Kekuatan Sinyal
+Transaction History	Riwayat Transaksi
+Shares	Jumlah Saham
+Price	Harga
+Date	Tanggal
+4️⃣ SIGNAL STRENGTH BADGES (INDONESIAN)
+English	Indonesian
+Strong	Kuat
+Moderate	Sedang
+Weak	Lemah
+5️⃣ AFTER IMPLEMENTATION
+
+Confirm:
+
+✅ Insider tab shows transaction table
+✅ AI interpretation appears in Bahasa Indonesia
+✅ No "Tidak Ada Data Insider" message
+✅ Alignment score & sentiment visible
+✅ All AI summaries across app now in Indonesian
