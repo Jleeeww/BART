@@ -138,6 +138,20 @@ export async function registerRoutes(
           ]
         }),
         aiConfidence: "Tinggi",
+        // IDX-specific fields
+        idxIndices: JSON.stringify(["IDX30", "LQ45", "IDX80"]),
+        sectorBadge: "SEKTOR KEUANGAN",
+        stockTags: JSON.stringify(["Bank Besar", "Blue Chip"]),
+        stockCharacter: "Institusional",
+        stockCharacterDesc: "Pergerakan harga terlihat dikendalikan oleh transaksi besar bertahap. Volatilitas relatif terjaga dengan pola akumulasi yang terstruktur.",
+        retailSentiment: "Kenaikan harga cenderung didorong akumulasi perlahan, bukan euforia ritel. Partisipasi institusi mendominasi struktur perdagangan.",
+        foreignDomesticInterpretation: "Investor asing dan domestik sama-sama mencatat pembelian bersih, menunjukkan konsensus positif lintas segmen investor terhadap saham ini.",
+        localRiskFactors: JSON.stringify([
+          { type: "Rupiah Risk", text: "Pelemahan nilai tukar Rupiah dapat memengaruhi sentimen investor asing dan arus modal portofolio." },
+          { type: "BI Rate Risk", text: "Perubahan suku bunga Bank Indonesia dapat memengaruhi margin bunga bersih dan permintaan kredit." },
+          { type: "Political Cycle", text: "Dinamika politik domestik dapat meningkatkan volatilitas pasar dalam jangka pendek." }
+        ]),
+        retailSummary: "Saham ini cocok untuk investor yang mencari stabilitas jangka menengah dengan risiko relatif terkontrol. Pergerakan harga tidak terlalu agresif, namun didukung fundamental yang solid. BBCA menjadi pilihan defensif bagi investor yang mengutamakan keamanan modal dibanding pertumbuhan agresif."
       });
       console.log("Seeded BBCA stock data");
     }

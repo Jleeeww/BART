@@ -1,0 +1,135 @@
+🎯 OBJECTIVE
+
+Enhance the app so it reflects how Indonesian investors actually see the market, not US-style stock apps.
+
+We are adding IDX-specific context, investor behavior cues, and local market intelligence.
+
+1️⃣ ADD IDX MARKET SESSION STATUS (REALISTIC LOCAL TOUCH)
+
+At the top near “Pasar Buka”, expand to include IDX session phases.
+
+Replace simple status with:
+Time (WIB)	Status Label
+08:45–08:59	Pra-Pembukaan
+09:00–12:00	Sesi 1
+12:00–13:30	Istirahat
+13:30–15:49	Sesi 2
+15:50–16:00	Pra-Penutupan
+Otherwise	Pasar Tutup
+
+Show example badge:
+
+🟢 Sesi 2 Berlangsung
+🟡 Pra-Pembukaan
+🔴 Pasar Tutup
+
+2️⃣ ADD IDX INDEX TAGS ON STOCK HEADER
+
+Under stock name add badges like:
+
+If stock is big cap →
+IDX30 LQ45 IDX80
+
+If banking →
+SEKTOR KEUANGAN
+
+Example display under BBCA:
+
+Bank Central Asia Tbk
+IDX30 LQ45 Bank Besar Blue Chip
+
+3️⃣ ADD FOREIGN VS DOMESTIC FLOW INTERPRETATION
+
+You already show numbers — now add AI explanation:
+
+If foreign net buy:
+
+"Investor asing mencatat pembelian bersih, menunjukkan minat dana global terhadap saham ini."
+
+If foreign net sell:
+
+"Investor asing melakukan penjualan bersih, yang dapat menekan pergerakan harga dalam jangka pendek."
+
+If domestic dominating:
+
+"Pergerakan saham saat ini lebih banyak didorong oleh investor domestik."
+
+4️⃣ ADD RETAIL SENTIMENT INTERPRETATION
+
+Indonesian markets are heavily retail-driven. Add a small AI sentiment box:
+
+Label:
+
+Sentimen Investor Ritel
+
+Logic Examples:
+Condition	Output
+High volatility + high volume	"Aktivitas ritel meningkat, potensi pergerakan harga lebih agresif."
+Low volume grind up	"Kenaikan harga cenderung didorong akumulasi perlahan, bukan euforia ritel."
+Sudden spike	"Terjadi lonjakan minat spekulatif jangka pendek."
+5️⃣ ADD “GAYA PERGERAKAN SAHAM” (STOCK PERSONALITY)
+
+Indonesian traders LOVE stock “character”.
+
+Add new AI section:
+
+Title:
+
+Karakter Pergerakan Saham
+
+Example Outputs:
+Type	Description
+Defensive	"Pergerakan cenderung stabil dengan volatilitas relatif rendah."
+Momentum	"Saham memiliki kecenderungan mengikuti tren kuat saat volume meningkat."
+Spekulatif	"Pergerakan harga agresif dengan volatilitas tinggi."
+Institusional	"Pergerakan harga terlihat dikendalikan oleh transaksi besar bertahap."
+6️⃣ ADD LOCAL RISK FACTORS
+
+In Risk tab include Indonesia-specific risks:
+
+Risk	AI Text
+Rupiah Risk	"Pelemahan nilai tukar Rupiah dapat memengaruhi sentimen investor asing."
+BI Rate Risk	"Perubahan suku bunga Bank Indonesia dapat memengaruhi sektor keuangan dan konsumsi."
+Commodity Exposure	"Kinerja saham sensitif terhadap pergerakan harga komoditas global."
+Political Cycle	"Tahun politik dapat meningkatkan volatilitas pasar."
+7️⃣ ADD LOT SIZE CONTEXT (VERY LOCAL FEATURE)
+
+Near price, add:
+
+1 Lot = 100 Saham
+Nilai 1 Lot ≈ IDR 1.125.000
+
+This helps retail investors instantly understand affordability.
+
+8️⃣ ADD WARNA KHAS PASAR INDONESIA
+
+Change UI terminology:
+
+Instead of	Use
+Bullish	Tren Naik
+Bearish	Tren Turun
+Breakout	Tembus Resistensi
+Support	Area Support
+Resistance	Area Resistensi
+Sideways	Bergerak Sideways
+9️⃣ ADD “KESIMPULAN UNTUK INVESTOR RITEL”
+
+At bottom of summary tab add AI box:
+
+Title:
+
+Ringkasan untuk Investor Ritel
+
+Example output:
+
+"Saham ini cocok untuk investor yang mencari stabilitas jangka menengah dengan risiko relatif terkontrol. Pergerakan harga tidak terlalu agresif, namun didukung fundamental yang solid."
+
+✅ RESULT AFTER THIS STEP
+
+App will feel like:
+
+✔ Built for IDX
+✔ Speaks like Indonesian analyst
+✔ Matches local trading culture
+✔ Easier for retail investors to relate
+✔ No Western-market bias

@@ -14,6 +14,16 @@ export const stocks = pgTable("stocks", {
   sector: text("sector").notNull(),
   subsector: text("subsector").notNull(),
   marketCap: text("market_cap").notNull(),
+  // IDX-specific fields
+  idxIndices: text("idx_indices"), // JSON array: ["IDX30", "LQ45", "IDX80"]
+  sectorBadge: text("sector_badge"), // e.g., "SEKTOR KEUANGAN"
+  stockTags: text("stock_tags"), // JSON array: ["Bank Besar", "Blue Chip"]
+  stockCharacter: text("stock_character"), // Stock personality: Defensive, Momentum, Spekulatif, Institusional
+  stockCharacterDesc: text("stock_character_desc"), // Description of stock character
+  retailSentiment: text("retail_sentiment"), // Retail sentiment interpretation
+  foreignDomesticInterpretation: text("foreign_domestic_interpretation"), // Foreign vs domestic flow interpretation
+  localRiskFactors: text("local_risk_factors"), // JSON array of Indonesia-specific risks
+  retailSummary: text("retail_summary"), // Summary for retail investors
   peRatio: numeric("pe_ratio").notNull(),
   dividendYield: numeric("dividend_yield").notNull(),
   roe: numeric("roe").notNull(), // Return on Equity

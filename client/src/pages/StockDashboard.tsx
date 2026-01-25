@@ -1,6 +1,52 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
+import { Users, Sparkles, Shield, Target } from "lucide-react";
+
+// IDX Market Session Status based on WIB time
+function getIDXSessionStatus(): { label: string; color: "green" | "yellow" | "red" } {
+  const now = new Date();
+  // Convert to WIB (UTC+7)
+  const wibOffset = 7 * 60; // 7 hours in minutes
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const wibMinutes = (utcMinutes + wibOffset) % (24 * 60);
+  const hour = Math.floor(wibMinutes / 60);
+  const minute = wibMinutes % 60;
+  const totalMinutes = hour * 60 + minute;
+  
+  // Check day of week (0 = Sunday, 6 = Saturday) in WIB
+  const wibDate = new Date(now.getTime() + wibOffset * 60 * 1000);
+  const dayOfWeek = wibDate.getUTCDay();
+  
+  // Market closed on weekends
+  if (dayOfWeek === 0 || dayOfWeek === 6) {
+    return { label: "Pasar Tutup", color: "red" };
+  }
+  
+  // 08:45-08:59 Pra-Pembukaan
+  if (totalMinutes >= 8 * 60 + 45 && totalMinutes < 9 * 60) {
+    return { label: "Pra-Pembukaan", color: "yellow" };
+  }
+  // 09:00-12:00 Sesi 1
+  if (totalMinutes >= 9 * 60 && totalMinutes < 12 * 60) {
+    return { label: "Sesi 1 Berlangsung", color: "green" };
+  }
+  // 12:00-13:30 Istirahat
+  if (totalMinutes >= 12 * 60 && totalMinutes < 13 * 60 + 30) {
+    return { label: "Istirahat", color: "yellow" };
+  }
+  // 13:30-15:49 Sesi 2
+  if (totalMinutes >= 13 * 60 + 30 && totalMinutes < 15 * 60 + 50) {
+    return { label: "Sesi 2 Berlangsung", color: "green" };
+  }
+  // 15:50-16:00 Pra-Penutupan
+  if (totalMinutes >= 15 * 60 + 50 && totalMinutes < 16 * 60) {
+    return { label: "Pra-Penutupan", color: "yellow" };
+  }
+  // Otherwise closed
+  return { label: "Pasar Tutup", color: "red" };
+}
+
 async function fetchAIAnalysis(payload: any) {
   const res = await fetch("/api/ai", {
     method: "POST",
@@ -33,15 +79,21 @@ import {
 import { motion } from "framer-motion";
 
 function ConvictionTimeline({ phase, explanation }: { phase: string; explanation: string }) {
-  const phases = ["Positioning", "Confirmation", "Crowding", "Distribution", "Reset"];
+  const phases = ["Penempatan", "Konfirmasi", "Kepadatan", "Distribusi", "Reset"];
   const phaseLabels: Record<string, string> = {
-    "Positioning": "Posisi Awal",
+    "Penempatan": "Penempatan",
+    "Konfirmasi": "Konfirmasi",
+    "Kepadatan": "Kepadatan",
+    "Distribusi": "Distribusi",
+    "Reset": "Reset",
+    // Legacy English labels for backward compatibility
+    "Positioning": "Penempatan",
     "Confirmation": "Konfirmasi",
-    "Crowding": "Penuh Sesak",
-    "Distribution": "Distribusi",
-    "Reset": "Reset"
+    "Crowding": "Kepadatan",
+    "Distribution": "Distribusi"
   };
-  const currentIndex = phases.indexOf(phase);
+  const currentIndex = phases.indexOf(phase) !== -1 ? phases.indexOf(phase) : 
+    phase === "Positioning" ? 0 : phase === "Confirmation" ? 1 : phase === "Crowding" ? 2 : phase === "Distribution" ? 3 : 4;
 
   return (
     <Card className="p-4 border-border/50 shadow-sm bg-muted/20">
@@ -77,6 +129,15 @@ export default function StockDashboard() {
   const { data: stock, isLoading, error } = useStock(symbol);
   const [aiData, setAIData] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState(getIDXSessionStatus());
+
+  // Update session status every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSessionStatus(getIDXSessionStatus());
+    }, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (!stock) return;
@@ -182,10 +243,20 @@ export default function StockDashboard() {
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary text-secondary-foreground text-sm font-medium">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Pasar Buka
-            </div>
+            {(() => {
+              const dotColor = sessionStatus.color === "green" ? "bg-emerald-500" : 
+                               sessionStatus.color === "yellow" ? "bg-amber-500" : "bg-rose-500";
+              const bgColor = sessionStatus.color === "green" ? "bg-emerald-50 dark:bg-emerald-900/20" : 
+                              sessionStatus.color === "yellow" ? "bg-amber-50 dark:bg-amber-900/20" : "bg-rose-50 dark:bg-rose-900/20";
+              const textColor = sessionStatus.color === "green" ? "text-emerald-700 dark:text-emerald-400" : 
+                                sessionStatus.color === "yellow" ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400";
+              return (
+                <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${bgColor} ${textColor}`} data-testid="badge-session-status">
+                  <div className={`w-2 h-2 rounded-full ${dotColor} ${sessionStatus.color === "green" ? "animate-pulse" : ""}`} />
+                  {sessionStatus.label}
+                </div>
+              );
+            })()}
             <div className="w-8 h-8 rounded-full bg-secondary border border-border overflow-hidden">
               <img 
                 src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" 
@@ -302,8 +373,8 @@ export default function StockDashboard() {
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">Bagaimana investor melihat saham ini</h3>
                       <p className="text-muted-foreground leading-relaxed">
                         {stock.investorView}
-                        {aiData?.flowQualityScore < 50 && " Institutional consensus appears fragmented at current levels; market participants should monitor for potential divergence between price and flow quality."}
-                        {aiData?.flowQualityScore > 75 && " While institutional conviction remains high, the risk-reward profile is shifting as positioning becomes increasingly crowded."}
+                        {aiData?.flowQualityScore < 50 && " Konsensus institusi tampak terfragmentasi pada level saat ini; pelaku pasar perlu memantau potensi divergensi antara harga dan kualitas aliran."}
+                        {aiData?.flowQualityScore > 75 && " Meski keyakinan institusi tetap tinggi, profil risiko-imbal hasil bergeser karena posisi semakin padat."}
                       </p>
                     </Card>
 
@@ -336,6 +407,63 @@ export default function StockDashboard() {
                         </p>
                       </Card>
                     )}
+
+                    {/* Stock Personality (Karakter Pergerakan Saham) */}
+                    {stock.stockCharacter && (
+                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 dark:from-violet-500/10 dark:to-fuchsia-500/10" data-testid="card-stock-character">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-violet-500" />
+                            Karakter Pergerakan Saham
+                          </h3>
+                          <span className="text-xs font-bold px-2 py-1 rounded bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 uppercase">
+                            {stock.stockCharacter}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {stock.stockCharacterDesc}
+                        </p>
+                      </Card>
+                    )}
+
+                    {/* Retail Sentiment Interpretation */}
+                    {stock.retailSentiment && (
+                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-amber-500/5 to-orange-500/5 dark:from-amber-500/10 dark:to-orange-500/10" data-testid="card-retail-sentiment">
+                        <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2 mb-4">
+                          <Users className="w-5 h-5 text-amber-500" />
+                          Sentimen Investor Ritel
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {stock.retailSentiment}
+                        </p>
+                      </Card>
+                    )}
+
+                    {/* Foreign vs Domestic Flow Interpretation */}
+                    {stock.foreignDomesticInterpretation && (
+                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-cyan-500/5 to-sky-500/5 dark:from-cyan-500/10 dark:to-sky-500/10" data-testid="card-foreign-domestic">
+                        <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2 mb-4">
+                          <Target className="w-5 h-5 text-cyan-500" />
+                          Aliran Asing vs Domestik
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {stock.foreignDomesticInterpretation}
+                        </p>
+                      </Card>
+                    )}
+
+                    {/* Retail Investor Summary (Ringkasan untuk Investor Ritel) */}
+                    {stock.retailSummary && (
+                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-emerald-500/5 to-teal-500/5 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-emerald-200 dark:border-emerald-800/30" data-testid="card-retail-summary">
+                        <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2 mb-4">
+                          <Shield className="w-5 h-5 text-emerald-500" />
+                          Ringkasan untuk Investor Ritel
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {stock.retailSummary}
+                        </p>
+                      </Card>
+                    )}
                   </TabsContent>
                   
                   {/* Financials Tab */}
@@ -344,8 +472,8 @@ export default function StockDashboard() {
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">Ringkasan Kinerja Keuangan</h3>
                       <p className="text-muted-foreground leading-relaxed mb-4">
                         {stock.financialSummary}
-                        {aiData?.flowQualityScore < 50 && " The structural financial narrative faces potential headwinds from emerging institutional distribution risks."}
-                        {aiData?.flowQualityScore > 75 && " Sustained financial outperformance is being met with concentrated institutional accumulation, increasing macro-sensitivity."}
+                        {aiData?.flowQualityScore < 50 && " Narasi keuangan struktural menghadapi potensi hambatan dari risiko distribusi institusional yang muncul."}
+                        {aiData?.flowQualityScore > 75 && " Kinerja keuangan yang berkelanjutan diimbangi dengan akumulasi institusi terkonsentrasi, meningkatkan sensitivitas makro."}
                       </p>
                       <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-md">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -970,11 +1098,11 @@ export default function StockDashboard() {
                                 </div>
                               )}
                               <p className="text-muted-foreground leading-relaxed mb-6">
-                                {aiLoading ? "Evaluating risk factors..." : (aiData?.risk_analysis || stock.riskAnalystView)}
-                                {aiData?.flowQualityScore < 50 && " Fragmented flow quality increases the probability of structural de-rating if market consensus shifts."}
-                                {aiData?.flowQualityScore > 75 && " High consensus creates inherent crowding risks; any failure to meet elevated expectations could lead to disproportionate price responses."}
-                                {aiData?.earlyDistributionFlag && " Internal dynamics suggest institutional participants are reducing exposure despite headline volume resilience."}
-                                {(aiData?.marketMode?.includes("Distribution") || aiData?.marketMode === "Post-Distribution Vacuum") && " Current market regime suggests reduced alpha-seeking attractiveness. Price strength should be monitored for potential liquidity traps."}
+                                {aiLoading ? "Mengevaluasi faktor risiko..." : (aiData?.risk_analysis || stock.riskAnalystView)}
+                                {aiData?.flowQualityScore < 50 && " Kualitas aliran terfragmentasi meningkatkan probabilitas de-rating struktural jika konsensus pasar bergeser."}
+                                {aiData?.flowQualityScore > 75 && " Konsensus tinggi menciptakan risiko kepadatan inheren; kegagalan memenuhi ekspektasi tinggi dapat menyebabkan respons harga yang tidak proporsional."}
+                                {aiData?.earlyDistributionFlag && " Dinamika internal menunjukkan partisipan institusional mengurangi eksposur meski ketahanan volume headline."}
+                                {(aiData?.marketMode?.includes("Distribusi") || aiData?.marketMode === "Vakum Pasca-Distribusi") && " Rezim pasar saat ini menunjukkan daya tarik alpha-seeking berkurang. Kekuatan harga perlu dipantau untuk potensi jebakan likuiditas."}
                               </p>
                               <div className="grid grid-cols-2 gap-6">
                                 <div>
@@ -1069,12 +1197,12 @@ export default function StockDashboard() {
                                       Peringatan Intensi Dana Besar
                                     </h5>
                                     <p className="text-sm text-muted-foreground leading-relaxed italic">
-                                      Current institutional behavior patterns suggest "{aiData.smartMoneyIntent.primaryIntent}". 
-                                      {aiData.smartMoneyIntent.primaryIntent === "Inventory Exit" && " Dominant participants appear to be reducing exposure through orderly liquidation. Price resilience may mask underlying rotation."}
-                                      {aiData.smartMoneyIntent.primaryIntent === "Liquidity Harvesting" && " Elevated tactical activity around key levels may indicate stop-run behavior or false breakout patterns. Net directional progress may be limited despite visible volume."}
+                                      Pola perilaku institusional saat ini menunjukkan "{aiData.smartMoneyIntent.primaryIntent}". 
+                                      {aiData.smartMoneyIntent.primaryIntent === "Keluar Inventori" && " Pelaku dominan tampak mengurangi eksposur melalui likuidasi teratur. Ketahanan harga mungkin menyembunyikan rotasi yang mendasari."}
+                                      {aiData.smartMoneyIntent.primaryIntent === "Pemanenan Likuiditas" && " Aktivitas taktis tinggi di sekitar level kunci mungkin mengindikasikan perilaku stop-run atau pola tembus palsu. Kemajuan arah bersih mungkin terbatas meski volume terlihat."}
                                     </p>
                                     <p className="text-xs text-muted-foreground/70 mt-2">
-                                      Confidence: {aiData.smartMoneyIntent.confidence}
+                                      Kepercayaan: {aiData.smartMoneyIntent.confidence}
                                     </p>
                                   </div>
                                 )}
@@ -1094,6 +1222,28 @@ export default function StockDashboard() {
                                 ))}
                               </div>
                             </Card>
+
+                            {/* Indonesia-Specific Risk Factors */}
+                            {stock.localRiskFactors && (
+                              <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-orange-500/5 to-red-500/5 dark:from-orange-500/10 dark:to-red-500/10" data-testid="card-local-risks">
+                                <h4 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
+                                  <Shield className="w-4 h-4 text-orange-500" />
+                                  Faktor Risiko Lokal Indonesia
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  {JSON.parse(stock.localRiskFactors).map((risk: { type: string; text: string }, idx: number) => (
+                                    <div key={idx} className="p-4 rounded-lg bg-background border border-border/50">
+                                      <p className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-widest mb-2">
+                                        {risk.type}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground leading-relaxed">
+                                        {risk.text}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </Card>
+                            )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
                               <div className="space-y-2">
