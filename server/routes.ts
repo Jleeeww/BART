@@ -532,6 +532,57 @@ export async function registerRoutes(
       explanation: intentExplanation
     };
 
+    // Bandar Heatmap mock data - shows broker dominance over time
+    const bandarHeatmap = [
+      {
+        date: "2025-01",
+        brokers: [
+          { code: "BK", intensity: 80, role: "Akumulator" },
+          { code: "BNI", intensity: 65, role: "Akumulator" },
+          { code: "CIMB", intensity: 40, role: "Netral" },
+          { code: "YP", intensity: 20, role: "Distributor" }
+        ]
+      },
+      {
+        date: "2025-02",
+        brokers: [
+          { code: "BK", intensity: 75, role: "Akumulator" },
+          { code: "BNI", intensity: 70, role: "Akumulator" },
+          { code: "CIMB", intensity: 55, role: "Akumulator" },
+          { code: "YP", intensity: 35, role: "Distributor" }
+        ]
+      },
+      {
+        date: "2025-03",
+        brokers: [
+          { code: "BK", intensity: 50, role: "Netral" },
+          { code: "BNI", intensity: 60, role: "Akumulator" },
+          { code: "CIMB", intensity: 65, role: "Akumulator" },
+          { code: "YP", intensity: 45, role: "Netral" }
+        ]
+      },
+      {
+        date: "2025-04",
+        brokers: [
+          { code: "BK", intensity: 30, role: "Distributor" },
+          { code: "BNI", intensity: 25, role: "Distributor" },
+          { code: "CIMB", intensity: 35, role: "Distributor" },
+          { code: "YP", intensity: 70, role: "Akumulator" }
+        ]
+      }
+    ];
+
+    // Phase Timeline mock data - shows market phase evolution
+    const phaseTimeline = [
+      { date: "2025-01", phase: "Akumulasi Senyap", description: "Institusi membangun posisi secara diam-diam tanpa mempengaruhi harga secara signifikan." },
+      { date: "2025-02", phase: "Akumulasi Aktif", description: "Institusi mulai meningkatkan volume pembelian dan mendukung kenaikan harga secara bertahap." },
+      { date: "2025-03", phase: "Konfirmasi", description: "Pola akumulasi terkonfirmasi dengan volume dan momentum yang konsisten." },
+      { date: "2025-04", phase: "Mark-Up", description: "Fase kenaikan harga aktif dimana institusi mulai mendorong valuasi lebih tinggi." }
+    ];
+
+    // AI interpretation for phase timeline
+    const bandarPhaseInterpretation = `Perpindahan dari Akumulasi Senyap ke Akumulasi Aktif menunjukkan peningkatan keyakinan institusi. Stabilitas broker yang tinggi selama periode ini mengindikasikan adanya kampanye terstruktur, bukan akumulasi acak. Rotasi kepemilikan dari broker BK dan BNI ke YP pada bulan April menandakan potensi pergeseran fase pasar yang perlu dipantau.`;
+
     // Structured analyst-style response without buy/sell signals
     res.json({
       flow_analysis: `Aktivitas institusional untuk ${payload.stock} menunjukkan ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} dengan reliabilitas ${payload.flow_signals.flow_reliability}. Posisi berbasis luas didukung oleh partisipasi tersinkronisasi dari sumber institusi domestik dan asing.`,
@@ -549,6 +600,9 @@ export async function registerRoutes(
       convictionPhase,
       convictionExplanation,
       smartMoneyIntent,
+      bandarHeatmap,
+      phaseTimeline,
+      bandarPhaseInterpretation,
       event_analysis: {
         impact: "Sedang",
         relevance: "Struktural",

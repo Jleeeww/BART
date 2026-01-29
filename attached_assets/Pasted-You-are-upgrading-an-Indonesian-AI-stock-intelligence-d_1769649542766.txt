@@ -1,0 +1,157 @@
+You are upgrading an Indonesian AI stock intelligence dashboard.
+
+Add a new visual component called:
+
+🔥 “Bandar Heatmap & Fase Timeline”
+
+This feature visually shows:
+
+Which brokers dominated accumulation/distribution over time
+
+What market phase the stock was in during each period
+
+This must be fully in Bahasa Indonesia.
+
+🎯 FEATURE 1 — BANDAR HEATMAP
+Purpose
+
+Show broker dominance over time so users can visually see:
+
+When accumulation was broad vs concentrated
+
+When control shifted between brokers
+
+UI Placement
+
+Add this section in Tab: Aliran Dana, below Broker Stability Score.
+
+Title
+
+“Peta Panas Aktivitas Bandar”
+
+Subtitle
+
+“Menunjukkan broker mana yang paling dominan dalam akumulasi/distribusi di setiap periode waktu.”
+
+Data Structure (Backend)
+
+Create historical mock data for now:
+
+bandarHeatmap: [
+  {
+    date: "2025-01",
+    brokers: [
+      { code: "BK", intensity: 80, role: "Akumulator" },
+      { code: "BNI", intensity: 65, role: "Akumulator" },
+      { code: "CIMB", intensity: 40, role: "Netral" },
+      { code: "YP", intensity: 20, role: "Distributor" }
+    ]
+  },
+  {
+    date: "2025-02",
+    brokers: [
+      { code: "BK", intensity: 75, role: "Akumulator" },
+      { code: "BNI", intensity: 70, role: "Akumulator" },
+      { code: "CIMB", intensity: 55, role: "Akumulator" },
+      { code: "YP", intensity: 35, role: "Distributor" }
+    ]
+  }
+]
+
+Frontend Visualization
+
+Display as a grid heatmap:
+
+Broker ↓ / Waktu →	Jan	Feb	Mar	Apr
+BK	🟩🟩🟩🟩	🟩🟩🟩	🟨	🟥
+BNI	🟩🟩🟩	🟩🟩🟩🟩	🟨	🟥
+CIMB	🟨	🟩🟩	🟩	🟥
+YP	🟥	🟥	🟨	🟩
+Color Rules
+
+🟩 Hijau = Akumulasi kuat
+
+🟨 Kuning = Aktivitas ringan / transisi
+
+🟥 Merah = Distribusi dominan
+
+Abu = Tidak aktif
+
+Add tooltip on hover:
+“BNI — Akumulasi Kuat (Intensitas 70%)”
+
+🎯 FEATURE 2 — FASE PASAR TIMELINE
+Purpose
+
+Show how the stock moved through institutional phases over time.
+
+Title
+
+“Timeline Fase Pergerakan Bandar”
+
+Subtitle
+
+“Menunjukkan evolusi fase akumulasi hingga distribusi berdasarkan perilaku institusi.”
+
+Backend Mock Data
+phaseTimeline: [
+  { date: "2025-01", phase: "Akumulasi Senyap" },
+  { date: "2025-02", phase: "Akumulasi Aktif" },
+  { date: "2025-03", phase: "Konfirmasi" },
+  { date: "2025-04", phase: "Mark-Up" }
+]
+
+Frontend Visualization
+
+Create a horizontal timeline bar:
+
+🟦 Akumulasi Senyap → 🟩 Akumulasi Aktif → 🟢 Konfirmasi → 🟡 Mark-Up → 🟥 Distribusi → ⚫ Reset
+
+Each segment:
+
+Has label in Bahasa Indonesia
+
+Has tooltip explaining phase meaning
+
+Example tooltip:
+
+Akumulasi Aktif
+“Institusi mulai meningkatkan volume pembelian dan mendukung kenaikan harga secara bertahap.”
+
+🎨 DESIGN STYLE
+
+Match existing dashboard card style
+
+Use soft gradients, rounded cards
+
+Keep clean fintech aesthetic
+
+All explanations must be Bahasa Indonesia
+
+🧠 AI INTERPRETATION BELOW TIMELINE
+
+Add a paragraph:
+
+“Interpretasi AI Fase Bandar”
+
+Example text:
+
+“Perpindahan dari Akumulasi Senyap ke Akumulasi Aktif menunjukkan peningkatan keyakinan institusi. Stabilitas broker yang tinggi selama periode ini mengindikasikan adanya kampanye terstruktur, bukan akumulasi acak.”
+
+🚫 DO NOT USE REAL DATA YET
+
+Use mock data for structure.
+
+When complete, the Flow tab should now have:
+
+AI Flow Overview
+
+Flow Intensity
+
+Broker Control Score
+
+Broker Stability Score
+
+🔥 Bandar Heatmap
+
+🧭 Fase Timeline
