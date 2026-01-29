@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
-import { Users, Sparkles, Shield, Target } from "lucide-react";
+import { Users, Sparkles, Shield, Target, Activity } from "lucide-react";
 
 // IDX Market Session Status based on WIB time
 function getIDXSessionStatus(): { label: string; color: "green" | "yellow" | "red" } {
@@ -71,7 +71,6 @@ import {
   PieChart, 
   TrendingUp, 
   DollarSign, 
-  Activity, 
   Newspaper, 
   AlertTriangle,
   UserCheck
@@ -728,6 +727,200 @@ export default function StockDashboard() {
                         <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-broker-stability-interpretation">
                           {aiData.brokerStabilityScore.interpretation}
                         </p>
+                      </Card>
+                    )}
+
+                    {/* Bandar Heatmap - Peta Panas Aktivitas Bandar */}
+                    {!aiLoading && aiData?.bandarHeatmap && (
+                      <Card className="p-6 border-border/50 shadow-sm" data-testid="card-bandar-heatmap">
+                        <div className="mb-4">
+                          <h4 className="text-base font-bold font-display text-foreground flex items-center gap-2" data-testid="text-heatmap-title">
+                            <div className="w-5 h-5 rounded bg-gradient-to-br from-emerald-500 to-amber-500 flex items-center justify-center">
+                              <Activity className="w-3 h-3 text-white" />
+                            </div>
+                            Peta Panas Aktivitas Bandar
+                          </h4>
+                          <p className="text-xs text-muted-foreground mt-1" data-testid="text-heatmap-subtitle">
+                            Menunjukkan broker mana yang paling dominan dalam akumulasi/distribusi di setiap periode waktu.
+                          </p>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm" data-testid="table-bandar-heatmap">
+                            <thead>
+                              <tr className="border-b border-border/50">
+                                <th className="text-left py-2 px-3 font-semibold text-foreground text-xs">Broker</th>
+                                {aiData.bandarHeatmap.map((period: any) => (
+                                  <th key={period.date} className="text-center py-2 px-3 font-semibold text-foreground text-xs" data-testid={`th-period-${period.date}`}>
+                                    {period.date.split("-")[1] === "01" ? "Jan" : 
+                                     period.date.split("-")[1] === "02" ? "Feb" : 
+                                     period.date.split("-")[1] === "03" ? "Mar" : 
+                                     period.date.split("-")[1] === "04" ? "Apr" : 
+                                     period.date.split("-")[1]}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(() => {
+                                const allCodes = aiData.bandarHeatmap.flatMap((p: any) => p.brokers.map((b: any) => b.code));
+                                const brokerCodes = Array.from(new Set(allCodes)) as string[];
+                                return brokerCodes.map((brokerCode: string) => (
+                                  <tr key={brokerCode} className="border-b border-border/30" data-testid={`row-broker-${brokerCode}`}>
+                                    <td className="py-2 px-3 font-mono font-semibold text-foreground text-xs">{brokerCode}</td>
+                                    {aiData.bandarHeatmap.map((period: any) => {
+                                      const broker = period.brokers.find((b: any) => b.code === brokerCode);
+                                      if (!broker) return <td key={period.date} className="text-center py-2 px-3"><div className="w-8 h-6 mx-auto rounded bg-slate-200 dark:bg-slate-700" /></td>;
+                                      
+                                      const intensity = broker.intensity;
+                                      const role = broker.role;
+                                      const bgColor = role === "Akumulator" 
+                                        ? intensity >= 70 ? "bg-emerald-500" : intensity >= 50 ? "bg-emerald-400" : "bg-emerald-300"
+                                        : role === "Distributor"
+                                        ? intensity >= 70 ? "bg-rose-500" : intensity >= 50 ? "bg-rose-400" : "bg-rose-300"
+                                        : "bg-amber-400";
+                                      
+                                      return (
+                                        <td key={period.date} className="text-center py-2 px-3" data-testid={`cell-${brokerCode}-${period.date}`}>
+                                          <div className="relative group">
+                                            <div 
+                                              className={`w-8 h-6 mx-auto rounded ${bgColor} cursor-pointer`}
+                                              style={{ opacity: 0.3 + (intensity / 100) * 0.7 }}
+                                              data-testid={`heatmap-cell-${brokerCode}-${period.date}`}
+                                            />
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded invisible group-hover:visible transition-opacity whitespace-nowrap z-10 pointer-events-none" data-testid={`tooltip-${brokerCode}-${period.date}`}>
+                                              {brokerCode} — {role === "Akumulator" ? "Akumulasi" : role === "Distributor" ? "Distribusi" : "Netral"} (Intensitas {intensity}%)
+                                            </div>
+                                          </div>
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ));
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground" data-testid="legend-heatmap">
+                          <div className="flex items-center gap-1.5" data-testid="legend-akumulasi">
+                            <div className="w-3 h-3 rounded bg-emerald-500" />
+                            <span>Akumulasi</span>
+                          </div>
+                          <div className="flex items-center gap-1.5" data-testid="legend-netral">
+                            <div className="w-3 h-3 rounded bg-amber-400" />
+                            <span>Netral/Transisi</span>
+                          </div>
+                          <div className="flex items-center gap-1.5" data-testid="legend-distribusi">
+                            <div className="w-3 h-3 rounded bg-rose-500" />
+                            <span>Distribusi</span>
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* Phase Timeline - Timeline Fase Pergerakan Bandar */}
+                    {!aiLoading && aiData?.phaseTimeline && (
+                      <Card className="p-6 border-border/50 shadow-sm" data-testid="card-phase-timeline">
+                        <div className="mb-4">
+                          <h4 className="text-base font-bold font-display text-foreground flex items-center gap-2" data-testid="text-timeline-title">
+                            <div className="w-5 h-5 rounded bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center">
+                              <Target className="w-3 h-3 text-white" />
+                            </div>
+                            Timeline Fase Pergerakan Bandar
+                          </h4>
+                          <p className="text-xs text-muted-foreground mt-1" data-testid="text-timeline-subtitle">
+                            Menunjukkan evolusi fase akumulasi hingga distribusi berdasarkan perilaku institusi.
+                          </p>
+                        </div>
+                        
+                        {/* Timeline Bar */}
+                        <div className="relative mb-6" data-testid="timeline-bar-container">
+                          <div className="flex items-stretch h-12 rounded-lg overflow-hidden border border-border/50">
+                            {aiData.phaseTimeline.map((item: any, index: number) => {
+                              const phaseColors: Record<string, string> = {
+                                "Akumulasi Senyap": "bg-blue-500",
+                                "Akumulasi Aktif": "bg-emerald-500",
+                                "Konfirmasi": "bg-green-600",
+                                "Mark-Up": "bg-amber-500",
+                                "Distribusi": "bg-rose-500",
+                                "Reset": "bg-slate-600"
+                              };
+                              const bgColor = phaseColors[item.phase] || "bg-slate-400";
+                              
+                              return (
+                                <div 
+                                  key={index}
+                                  className={`relative flex-1 ${bgColor} flex items-center justify-center group cursor-pointer`}
+                                  data-testid={`phase-segment-${index}`}
+                                >
+                                  <span className="text-xs font-semibold text-white drop-shadow-sm text-center px-1 leading-tight" data-testid={`phase-label-${index}`}>
+                                    {item.phase}
+                                  </span>
+                                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground font-mono" data-testid={`phase-date-${index}`}>
+                                    {item.date.split("-")[1] === "01" ? "Jan" : 
+                                     item.date.split("-")[1] === "02" ? "Feb" : 
+                                     item.date.split("-")[1] === "03" ? "Mar" : 
+                                     item.date.split("-")[1] === "04" ? "Apr" : 
+                                     item.date.split("-")[1]}
+                                  </div>
+                                  {/* Tooltip */}
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-2 bg-foreground text-background text-xs rounded-lg invisible group-hover:visible z-20 w-48 pointer-events-none shadow-lg" data-testid={`phase-tooltip-${index}`}>
+                                    <p className="font-bold mb-1">{item.phase}</p>
+                                    <p className="text-[11px] leading-relaxed opacity-90">{item.description}</p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {/* Arrow indicators */}
+                          <div className="flex justify-between mt-3 px-2">
+                            {aiData.phaseTimeline.map((_: any, index: number) => (
+                              index < aiData.phaseTimeline.length - 1 && (
+                                <div key={index} className="flex-1 flex items-center justify-end pr-2" data-testid={`arrow-indicator-${index}`}>
+                                  <span className="text-muted-foreground text-lg">
+                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <path d="M5 12h14M12 5l7 7-7 7" />
+                                    </svg>
+                                  </span>
+                                </div>
+                              )
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Phase Legend - Only show phases that exist in data */}
+                        <div className="flex flex-wrap gap-3 mb-4 text-xs" data-testid="legend-timeline">
+                          {(() => {
+                            const phases = aiData.phaseTimeline.map((p: any) => p.phase);
+                            const phaseColors: Record<string, string> = {
+                              "Akumulasi Senyap": "bg-blue-500",
+                              "Akumulasi Aktif": "bg-emerald-500",
+                              "Konfirmasi": "bg-green-600",
+                              "Mark-Up": "bg-amber-500",
+                              "Distribusi": "bg-rose-500",
+                              "Reset": "bg-slate-600"
+                            };
+                            const uniquePhases = Array.from(new Set(phases)) as string[];
+                            return uniquePhases.map((phase: string) => (
+                              <div key={phase} className="flex items-center gap-1.5" data-testid={`legend-phase-${phase.replace(/\s+/g, '-').toLowerCase()}`}>
+                                <div className={`w-3 h-3 rounded ${phaseColors[phase] || 'bg-slate-400'}`} />
+                                <span className="text-muted-foreground">{phase}</span>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+
+                        {/* AI Interpretation */}
+                        {aiData.bandarPhaseInterpretation && (
+                          <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg" data-testid="card-ai-phase-interpretation">
+                            <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2 flex items-center gap-2" data-testid="text-ai-interpretation-label">
+                              <Sparkles className="w-3 h-3" />
+                              Interpretasi AI Fase Bandar
+                            </p>
+                            <p className="text-sm text-muted-foreground leading-relaxed italic" data-testid="text-ai-interpretation-content">
+                              {aiData.bandarPhaseInterpretation}
+                            </p>
+                          </div>
+                        )}
                       </Card>
                     )}
 
