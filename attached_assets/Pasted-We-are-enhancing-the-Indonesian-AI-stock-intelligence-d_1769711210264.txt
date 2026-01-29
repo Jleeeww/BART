@@ -1,0 +1,130 @@
+We are enhancing the Indonesian AI stock intelligence dashboard.
+
+Two upgrades are required:
+
+🎨 1️⃣ HEATMAP COLOR IMPROVEMENT (IMPORTANT)
+
+Update the Bandar Heatmap color system for clearer psychological impact.
+
+Color Rules (FINAL)
+Activity	Color	Meaning
+Strong Accumulation	🟢 Bright Green	Bandar aggressively buying
+Mild / Transition	🟡 Soft Yellow	Phase shift / light activity
+Distribution	🔴 Dark Red	Bandar distributing (selling into strength)
+Inactive	⚪ Light Gray	No major activity
+UI Requirement
+
+Distribution cells must use dark red (#8B0000 or similar)
+
+Add legend above heatmap:
+
+Legenda Warna Aktivitas Bandar
+🟢 Akumulasi Kuat
+🟡 Aktivitas Ringan / Transisi
+🔴 Distribusi Dominan
+⚪ Tidak Signifikan
+
+🧠 2️⃣ ADD: SMART TRAP DETECTION PANEL
+
+We now add behavioral trap detection — a key institutional feature.
+
+📍 Place this in Tab: Risiko, below “Risiko Pasar Utama”
+
+🔍 Section Title
+
+“Deteksi Jebakan Pasar oleh AI”
+
+Subtitle:
+“Sistem mendeteksi potensi pergerakan harga yang menyesatkan berdasarkan perilaku bandar.”
+
+🧠 Trap Types to Detect
+
+Create logic-based mock detection using flow + phase:
+
+🟥 Bull Trap (Jebakan Bullish)
+
+Condition example:
+
+Harga naik
+
+Broker Stability menurun
+
+Distributor mulai dominan
+
+Phase = Distribution into Strength
+
+Display:
+
+⚠️ Potensi Bull Trap Terdeteksi
+
+Explanation (AI-generated in Bahasa Indonesia):
+
+“Kenaikan harga saat ini terjadi bersamaan dengan peningkatan distribusi oleh broker besar. Stabilitas akumulasi menurun, menunjukkan bahwa kenaikan kemungkinan dimanfaatkan sebagai likuiditas keluar bagi pelaku besar.”
+
+🟦 Bear Trap (Jebakan Bearish)
+
+Condition example:
+
+Harga turun
+
+Accumulator mulai aktif
+
+Foreign flow masuk
+
+Phase = Stealth Accumulation
+
+Display:
+
+💡 Potensi Bear Trap Terdeteksi
+
+Explanation:
+
+“Penurunan harga terjadi di tengah peningkatan akumulasi oleh broker institusi. Hal ini sering terjadi saat pelaku besar menekan harga sementara untuk mengumpulkan saham sebelum fase kenaikan berikutnya.”
+
+🟨 No Trap Condition
+
+If no signals:
+
+Tidak Ada Jebakan Signifikan Terdeteksi
+
+🎯 Visual Design
+
+Each trap card should have:
+
+Large icon (⚠️ or 💡)
+
+Confidence Meter (Low / Sedang / Tinggi)
+
+Short AI paragraph explanation
+
+Background color:
+
+Bull Trap → Soft red background
+
+Bear Trap → Soft blue background
+
+🧠 WHY THIS MATTERS
+
+This feature helps retail investors avoid:
+
+❌ Chasing fake breakouts
+❌ Panic selling into institutional accumulation
+
+This is a behavioral defense system, not just analysis.
+
+📌 FINAL STRUCTURE OF RISK TAB
+
+AI Risk Overview
+
+Overall Risk Level
+
+Market Structure Risks
+
+Contrarian Risk
+
+🔥 Trap Detection Panel
+
+All text must be in Bahasa Indonesia.
+Use mock logic for now.
+
+PROMPT END

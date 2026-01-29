@@ -744,6 +744,29 @@ export default function StockDashboard() {
                             Menunjukkan broker mana yang paling dominan dalam akumulasi/distribusi di setiap periode waktu.
                           </p>
                         </div>
+                        
+                        {/* Legend above heatmap */}
+                        <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/50" data-testid="legend-heatmap-header">
+                          <p className="text-xs font-bold text-foreground uppercase tracking-widest mb-2">Legenda Warna Aktivitas Bandar</p>
+                          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1.5" data-testid="legend-akumulasi-kuat">
+                              <div className="w-4 h-4 rounded" style={{ backgroundColor: "#22c55e" }} />
+                              <span>Akumulasi Kuat</span>
+                            </div>
+                            <div className="flex items-center gap-1.5" data-testid="legend-aktivitas-ringan">
+                              <div className="w-4 h-4 rounded" style={{ backgroundColor: "#fde047" }} />
+                              <span>Aktivitas Ringan / Transisi</span>
+                            </div>
+                            <div className="flex items-center gap-1.5" data-testid="legend-distribusi-dominan">
+                              <div className="w-4 h-4 rounded" style={{ backgroundColor: "#8B0000" }} />
+                              <span>Distribusi Dominan</span>
+                            </div>
+                            <div className="flex items-center gap-1.5" data-testid="legend-tidak-signifikan">
+                              <div className="w-4 h-4 rounded bg-slate-300 dark:bg-slate-600" />
+                              <span>Tidak Signifikan</span>
+                            </div>
+                          </div>
+                        </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm" data-testid="table-bandar-heatmap">
                             <thead>
@@ -773,22 +796,36 @@ export default function StockDashboard() {
                                       
                                       const intensity = broker.intensity;
                                       const role = broker.role;
-                                      const bgColor = role === "Akumulator" 
-                                        ? intensity >= 70 ? "bg-emerald-500" : intensity >= 50 ? "bg-emerald-400" : "bg-emerald-300"
-                                        : role === "Distributor"
-                                        ? intensity >= 70 ? "bg-rose-500" : intensity >= 50 ? "bg-rose-400" : "bg-rose-300"
-                                        : "bg-amber-400";
+                                      
+                                      // New color scheme: Bright Green, Soft Yellow, Dark Red, Light Gray
+                                      const getCellColor = () => {
+                                        if (role === "Tidak Aktif" || intensity < 20) {
+                                          return { bg: "#94a3b8", label: "Tidak Aktif" }; // Light Gray
+                                        }
+                                        if (role === "Akumulator") {
+                                          return { bg: "#22c55e", label: "Akumulasi" }; // Bright Green
+                                        }
+                                        if (role === "Distributor") {
+                                          return { bg: "#8B0000", label: "Distribusi" }; // Dark Red
+                                        }
+                                        return { bg: "#fde047", label: "Transisi" }; // Soft Yellow
+                                      };
+                                      
+                                      const cellStyle = getCellColor();
                                       
                                       return (
                                         <td key={period.date} className="text-center py-2 px-3" data-testid={`cell-${brokerCode}-${period.date}`}>
                                           <div className="relative group">
                                             <div 
-                                              className={`w-8 h-6 mx-auto rounded ${bgColor} cursor-pointer`}
-                                              style={{ opacity: 0.3 + (intensity / 100) * 0.7 }}
+                                              className="w-8 h-6 mx-auto rounded cursor-pointer"
+                                              style={{ 
+                                                backgroundColor: cellStyle.bg,
+                                                opacity: role === "Tidak Aktif" || intensity < 20 ? 0.5 : 0.4 + (intensity / 100) * 0.6
+                                              }}
                                               data-testid={`heatmap-cell-${brokerCode}-${period.date}`}
                                             />
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded invisible group-hover:visible transition-opacity whitespace-nowrap z-10 pointer-events-none" data-testid={`tooltip-${brokerCode}-${period.date}`}>
-                                              {brokerCode} — {role === "Akumulator" ? "Akumulasi" : role === "Distributor" ? "Distribusi" : "Netral"} (Intensitas {intensity}%)
+                                              {brokerCode} — {cellStyle.label} (Intensitas {intensity}%)
                                             </div>
                                           </div>
                                         </td>
@@ -799,20 +836,6 @@ export default function StockDashboard() {
                               })()}
                             </tbody>
                           </table>
-                        </div>
-                        <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground" data-testid="legend-heatmap">
-                          <div className="flex items-center gap-1.5" data-testid="legend-akumulasi">
-                            <div className="w-3 h-3 rounded bg-emerald-500" />
-                            <span>Akumulasi</span>
-                          </div>
-                          <div className="flex items-center gap-1.5" data-testid="legend-netral">
-                            <div className="w-3 h-3 rounded bg-amber-400" />
-                            <span>Netral/Transisi</span>
-                          </div>
-                          <div className="flex items-center gap-1.5" data-testid="legend-distribusi">
-                            <div className="w-3 h-3 rounded bg-rose-500" />
-                            <span>Distribusi</span>
-                          </div>
                         </div>
                       </Card>
                     )}
