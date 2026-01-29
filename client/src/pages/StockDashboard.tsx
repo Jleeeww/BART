@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
-import { Users, Sparkles, Shield, Target, Activity } from "lucide-react";
+import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge } from "lucide-react";
 
 // IDX Market Session Status based on WIB time
 function getIDXSessionStatus(): { label: string; color: "green" | "yellow" | "red" } {
@@ -1424,6 +1424,121 @@ export default function StockDashboard() {
                                 )}
                               </div>
                             </div>
+
+                            {/* Smart Trap Detection Panel */}
+                            {aiData?.trapDetection && (
+                              <Card className="p-6 border-border/50 shadow-sm" data-testid="card-trap-detection">
+                                <div className="mb-4">
+                                  <h4 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2" data-testid="text-trap-title">
+                                    <div className="w-5 h-5 rounded bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center">
+                                      <Shield className="w-3 h-3 text-white" />
+                                    </div>
+                                    Deteksi Jebakan Pasar oleh AI
+                                  </h4>
+                                  <p className="text-xs text-muted-foreground mt-1" data-testid="text-trap-subtitle">
+                                    Sistem mendeteksi potensi pergerakan harga yang menyesatkan berdasarkan perilaku bandar.
+                                  </p>
+                                </div>
+                                
+                                <div 
+                                  className={`p-5 rounded-xl space-y-4 ${
+                                    aiData.trapDetection.type === "bull_trap" 
+                                      ? "bg-red-500/10 border border-red-500/30" 
+                                      : aiData.trapDetection.type === "bear_trap"
+                                      ? "bg-blue-500/10 border border-blue-500/30"
+                                      : "bg-muted/30 border border-border/50"
+                                  }`}
+                                  data-testid={`trap-card-${aiData.trapDetection.type}`}
+                                >
+                                  {/* Trap Icon and Title */}
+                                  <div className="flex items-start gap-3">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                      aiData.trapDetection.type === "bull_trap"
+                                        ? "bg-red-500/20"
+                                        : aiData.trapDetection.type === "bear_trap"
+                                        ? "bg-blue-500/20"
+                                        : "bg-emerald-500/20"
+                                    }`}>
+                                      {aiData.trapDetection.type === "bull_trap" ? (
+                                        <AlertOctagon className="w-5 h-5 text-red-500" />
+                                      ) : aiData.trapDetection.type === "bear_trap" ? (
+                                        <Lightbulb className="w-5 h-5 text-blue-500" />
+                                      ) : (
+                                        <Shield className="w-5 h-5 text-emerald-500" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1">
+                                      <h5 className={`font-bold text-base ${
+                                        aiData.trapDetection.type === "bull_trap"
+                                          ? "text-red-700 dark:text-red-400"
+                                          : aiData.trapDetection.type === "bear_trap"
+                                          ? "text-blue-700 dark:text-blue-400"
+                                          : "text-emerald-700 dark:text-emerald-400"
+                                      }`} data-testid="text-trap-type-title">
+                                        {aiData.trapDetection.title}
+                                      </h5>
+                                      
+                                      {/* Confidence Meter */}
+                                      <div className="flex items-center gap-2 mt-2" data-testid="confidence-meter">
+                                        <Gauge className="w-4 h-4 text-muted-foreground" />
+                                        <span className="text-xs text-muted-foreground">Keyakinan:</span>
+                                        <div className="flex gap-1">
+                                          {["Rendah", "Sedang", "Tinggi"].map((level) => (
+                                            <span 
+                                              key={level}
+                                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                                level === aiData.trapDetection.confidence
+                                                  ? aiData.trapDetection.type === "bull_trap"
+                                                    ? "bg-red-500 text-white"
+                                                    : aiData.trapDetection.type === "bear_trap"
+                                                    ? "bg-blue-500 text-white"
+                                                    : "bg-emerald-500 text-white"
+                                                  : "bg-muted text-muted-foreground"
+                                              }`}
+                                              data-testid={`confidence-level-${level.toLowerCase()}`}
+                                            >
+                                              {level}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* AI Explanation */}
+                                  <div className="pt-3 border-t border-border/30">
+                                    <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-trap-explanation">
+                                      {aiData.trapDetection.explanation}
+                                    </p>
+                                  </div>
+                                  
+                                  {/* Warning for detected traps */}
+                                  {aiData.trapDetection.detected && (
+                                    <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                                      aiData.trapDetection.type === "bull_trap"
+                                        ? "bg-red-500/20"
+                                        : "bg-blue-500/20"
+                                    }`} data-testid="trap-warning-box">
+                                      <AlertOctagon className={`w-4 h-4 ${
+                                        aiData.trapDetection.type === "bull_trap"
+                                          ? "text-red-600 dark:text-red-400"
+                                          : "text-blue-600 dark:text-blue-400"
+                                      }`} />
+                                      <p className={`text-xs font-medium ${
+                                        aiData.trapDetection.type === "bull_trap"
+                                          ? "text-red-700 dark:text-red-300"
+                                          : "text-blue-700 dark:text-blue-300"
+                                      }`}>
+                                        {aiData.trapDetection.type === "bull_trap"
+                                          ? "Waspada: Hindari mengejar kenaikan harga tanpa konfirmasi volume institusional."
+                                          : "Perhatian: Jangan panik jual — institusi mungkin sedang mengumpulkan saham."
+                                        }
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </Card>
+                            )}
 
                             <Card className="p-6 border-border/50 shadow-sm">
                               <h4 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4">Pembatalan Tesis</h4>
