@@ -583,6 +583,54 @@ export async function registerRoutes(
     // AI interpretation for phase timeline
     const bandarPhaseInterpretation = `Perpindahan dari Akumulasi Senyap ke Akumulasi Aktif menunjukkan peningkatan keyakinan institusi. Stabilitas broker yang tinggi selama periode ini mengindikasikan adanya kampanye terstruktur, bukan akumulasi acak. Rotasi kepemilikan dari broker BK dan BNI ke YP pada bulan April menandakan potensi pergeseran fase pasar yang perlu dipantau.`;
 
+    // Smart Trap Detection - Mock logic based on flow patterns
+    // Bull Trap: Price rising + Broker Stability falling + Distributor dominance + Distribution phase
+    // Bear Trap: Price falling + Accumulator active + Foreign flow in + Stealth Accumulation phase
+    const trapDetection = (() => {
+      const currentPhase = phaseTimeline[phaseTimeline.length - 1]?.phase || "";
+      const recentBrokers = bandarHeatmap[bandarHeatmap.length - 1]?.brokers || [];
+      const distributorCount = recentBrokers.filter((b: any) => b.role === "Distributor").length;
+      const accumulatorCount = recentBrokers.filter((b: any) => b.role === "Akumulator").length;
+      
+      // Mock: Check for Bull Trap conditions
+      const bullTrapConditions = 
+        (currentPhase === "Mark-Up" || currentPhase === "Distribusi") &&
+        distributorCount >= 2;
+      
+      // Mock: Check for Bear Trap conditions  
+      const bearTrapConditions = 
+        (currentPhase === "Akumulasi Senyap" || currentPhase === "Akumulasi Aktif") &&
+        accumulatorCount >= 2;
+      
+      if (bullTrapConditions) {
+        return {
+          type: "bull_trap",
+          detected: true,
+          confidence: distributorCount >= 3 ? "Tinggi" : "Sedang",
+          title: "Potensi Bull Trap Terdeteksi",
+          explanation: "Kenaikan harga saat ini terjadi bersamaan dengan peningkatan distribusi oleh broker besar. Stabilitas akumulasi menurun, menunjukkan bahwa kenaikan kemungkinan dimanfaatkan sebagai likuiditas keluar bagi pelaku besar. Pergerakan harga naik dapat menjadi jebakan bagi investor yang masuk terlambat."
+        };
+      }
+      
+      if (bearTrapConditions) {
+        return {
+          type: "bear_trap",
+          detected: true,
+          confidence: accumulatorCount >= 3 ? "Tinggi" : "Sedang",
+          title: "Potensi Bear Trap Terdeteksi",
+          explanation: "Penurunan harga terjadi di tengah peningkatan akumulasi oleh broker institusi. Hal ini sering terjadi saat pelaku besar menekan harga sementara untuk mengumpulkan saham sebelum fase kenaikan berikutnya. Tekanan jual mungkin bersifat sementara dan taktis."
+        };
+      }
+      
+      return {
+        type: "none",
+        detected: false,
+        confidence: "Rendah",
+        title: "Tidak Ada Jebakan Signifikan Terdeteksi",
+        explanation: "Saat ini tidak terdeteksi pola jebakan pasar yang signifikan. Perilaku aliran dana dan fase pasar menunjukkan pergerakan yang konsisten dengan fundamental."
+      };
+    })();
+
     // Structured analyst-style response without buy/sell signals
     res.json({
       flow_analysis: `Aktivitas institusional untuk ${payload.stock} menunjukkan ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} dengan reliabilitas ${payload.flow_signals.flow_reliability}. Posisi berbasis luas didukung oleh partisipasi tersinkronisasi dari sumber institusi domestik dan asing.`,
@@ -603,6 +651,7 @@ export async function registerRoutes(
       bandarHeatmap,
       phaseTimeline,
       bandarPhaseInterpretation,
+      trapDetection,
       event_analysis: {
         impact: "Sedang",
         relevance: "Struktural",
