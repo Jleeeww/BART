@@ -1451,14 +1451,17 @@ export default function StockDashboard() {
                                   data-testid={`trap-card-${aiData.trapDetection.type}`}
                                 >
                                   {/* Trap Icon and Title */}
-                                  <div className="flex items-start gap-3">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                                      aiData.trapDetection.type === "bull_trap"
-                                        ? "bg-red-500/20"
-                                        : aiData.trapDetection.type === "bear_trap"
-                                        ? "bg-blue-500/20"
-                                        : "bg-emerald-500/20"
-                                    }`}>
+                                  <div className="flex items-start gap-3" data-testid="trap-content-container">
+                                    <div 
+                                      className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                        aiData.trapDetection.type === "bull_trap"
+                                          ? "bg-red-500/20"
+                                          : aiData.trapDetection.type === "bear_trap"
+                                          ? "bg-blue-500/20"
+                                          : "bg-emerald-500/20"
+                                      }`}
+                                      data-testid={`trap-icon-${aiData.trapDetection.type}`}
+                                    >
                                       {aiData.trapDetection.type === "bull_trap" ? (
                                         <AlertOctagon className="w-5 h-5 text-red-500" />
                                       ) : aiData.trapDetection.type === "bear_trap" ? (
@@ -1480,9 +1483,9 @@ export default function StockDashboard() {
                                       
                                       {/* Confidence Meter */}
                                       <div className="flex items-center gap-2 mt-2" data-testid="confidence-meter">
-                                        <Gauge className="w-4 h-4 text-muted-foreground" />
-                                        <span className="text-xs text-muted-foreground">Keyakinan:</span>
-                                        <div className="flex gap-1">
+                                        <Gauge className="w-4 h-4 text-muted-foreground" data-testid="icon-confidence-gauge" />
+                                        <span className="text-xs text-muted-foreground" data-testid="text-confidence-label">Keyakinan:</span>
+                                        <div className="flex gap-1" data-testid="confidence-levels-container">
                                           {["Rendah", "Sedang", "Tinggi"].map((level) => (
                                             <span 
                                               key={level}
@@ -1519,16 +1522,22 @@ export default function StockDashboard() {
                                         ? "bg-red-500/20"
                                         : "bg-blue-500/20"
                                     }`} data-testid="trap-warning-box">
-                                      <AlertOctagon className={`w-4 h-4 ${
-                                        aiData.trapDetection.type === "bull_trap"
-                                          ? "text-red-600 dark:text-red-400"
-                                          : "text-blue-600 dark:text-blue-400"
-                                      }`} />
-                                      <p className={`text-xs font-medium ${
-                                        aiData.trapDetection.type === "bull_trap"
-                                          ? "text-red-700 dark:text-red-300"
-                                          : "text-blue-700 dark:text-blue-300"
-                                      }`}>
+                                      <AlertOctagon 
+                                        className={`w-4 h-4 ${
+                                          aiData.trapDetection.type === "bull_trap"
+                                            ? "text-red-600 dark:text-red-400"
+                                            : "text-blue-600 dark:text-blue-400"
+                                        }`} 
+                                        data-testid="icon-trap-warning"
+                                      />
+                                      <p 
+                                        className={`text-xs font-medium ${
+                                          aiData.trapDetection.type === "bull_trap"
+                                            ? "text-red-700 dark:text-red-300"
+                                            : "text-blue-700 dark:text-blue-300"
+                                        }`}
+                                        data-testid="text-trap-warning"
+                                      >
                                         {aiData.trapDetection.type === "bull_trap"
                                           ? "Waspada: Hindari mengejar kenaikan harga tanpa konfirmasi volume institusional."
                                           : "Perhatian: Jangan panik jual — institusi mungkin sedang mengumpulkan saham."
