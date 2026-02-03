@@ -30,13 +30,20 @@ interface StockCardData {
   readinessScore: number;
   marketRegime: string;
   actionGuidance: string;
-  actionColor: "green" | "yellow" | "red";
+  actionColor: "green" | "yellow" | "blue" | "red" | "black";
+  actionState: string;
+  homepageBucket: "siap_dipantau" | "watchlist_prioritas" | "hindari_dulu";
   aiSentence: string;
   isInWatchlist: boolean;
 }
 
 function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardData; onToggleWatchlist: (symbol: string, isAdding: boolean) => void; isToggling: boolean }) {
   const isPositive = parseFloat(stock.change) >= 0;
+  
+  // Map API colors to display colors (blue/black go to neutral/red)
+  const displayColor = stock.actionColor === "blue" ? "yellow" as const : 
+                       stock.actionColor === "black" ? "red" as const : 
+                       stock.actionColor as "green" | "yellow" | "red";
   
   const colorClasses = {
     green: "border-l-emerald-500 bg-emerald-500/5",
@@ -57,7 +64,7 @@ function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardD
       transition={{ duration: 0.2 }}
     >
       <Card 
-        className={`p-4 border-l-4 ${colorClasses[stock.actionColor]} hover-elevate transition-all`}
+        className={`p-4 border-l-4 ${colorClasses[displayColor]} hover-elevate transition-all`}
         data-testid={`card-stock-${stock.symbol}`}
       >
         <div className="flex items-start justify-between gap-3">
@@ -73,7 +80,7 @@ function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardD
               </Link>
               <Badge 
                 variant="outline" 
-                className={`text-xs ${badgeVariants[stock.actionColor]}`}
+                className={`text-xs ${badgeVariants[displayColor]}`}
                 data-testid={`badge-score-${stock.symbol}`}
               >
                 {stock.readinessScore}/100
@@ -101,7 +108,7 @@ function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardD
                 </Badge>
                 <Badge 
                   variant="outline" 
-                  className={`text-xs font-medium ${badgeVariants[stock.actionColor]}`}
+                  className={`text-xs font-medium ${badgeVariants[displayColor]}`}
                   data-testid={`badge-action-${stock.symbol}`}
                 >
                   {stock.actionGuidance}
@@ -241,9 +248,10 @@ export default function Homepage() {
     }
   };
 
-  const readyStocks = stocks?.filter(s => s.readinessScore >= 80) || [];
-  const watchlistStocks = stocks?.filter(s => s.readinessScore >= 60 && s.readinessScore < 80) || [];
-  const avoidStocks = stocks?.filter(s => s.readinessScore < 60) || [];
+  // Use homepageBucket for categorization (single source of truth from backend)
+  const readyStocks = stocks?.filter(s => s.homepageBucket === "siap_dipantau") || [];
+  const watchlistStocks = stocks?.filter(s => s.homepageBucket === "watchlist_prioritas") || [];
+  const avoidStocks = stocks?.filter(s => s.homepageBucket === "hindari_dulu") || [];
 
   return (
     <div className="min-h-screen bg-background">
