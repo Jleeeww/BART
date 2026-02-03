@@ -957,6 +957,141 @@ export async function registerRoutes(
     })();
 
     // ========================================
+    // ACTION GUIDANCE MODE
+    // Probabilistic decision layer based on existing engines
+    // NOT a trading signal - guided, defensible action framework
+    // ========================================
+    const actionGuidance = (() => {
+      // Get values from existing engines
+      const readinessScore = smartMoneyReadinessScore.score;
+      const regime = marketMode;
+      const riskLevel = simplifiedRisk.level;
+      const flowQuality = score; // Flow Quality Score
+      // Derive insider alignment score from status
+      const insiderStatus = insiderBandarAlignment.status;
+      const insiderAlignment = insiderStatus === "Selaras" ? 80 : insiderStatus === "Netral" ? 50 : 20;
+      
+      // Determine if regime is accumulation
+      const isAccumulationRegime = regime === "Stealth Accumulation" || regime === "Active Accumulation";
+      const isDistributionRegime = regime === "Distribution into Strength" || regime === "Passive Distribution" || regime === "Post-Distribution Vacuum";
+      const isHighRisk = riskLevel === "Tinggi" || riskLevel === "Sangat Tinggi";
+      
+      // ========================================
+      // ACTION GUIDANCE LOGIC (DETERMINISTIC)
+      // ========================================
+      let actionState: "BOLEH_AKUMULASI" | "TUNGGU_KONFIRMASI" | "RISIKO_TINGGI" | "TIDAK_ADA_SETUP";
+      let actionLabel: string;
+      let actionColor: "green" | "yellow" | "red" | "gray";
+      let shortSummary: string;
+      let whyAction: string[];
+      let mainRisk: string;
+      let failureTrigger: string;
+      
+      // Logic 1: BOLEH AKUMULASI BERTAHAP
+      if (readinessScore >= 75 && isAccumulationRegime && !isHighRisk) {
+        actionState = "BOLEH_AKUMULASI";
+        actionLabel = "Boleh Akumulasi Bertahap";
+        actionColor = "green";
+        shortSummary = "Struktur akumulasi masih berlangsung dengan kendali institusi yang relatif stabil. Risiko distribusi belum dominan, namun tetap perlu pemantauan berkelanjutan.";
+        whyAction = [
+          "Rezim pasar menunjukkan fase akumulasi dengan partisipasi institusi yang konsisten",
+          "Skor kesiapan struktural berada di level yang mendukung"
+        ];
+        mainRisk = "Perubahan rezim pasar secara tiba-tiba dapat mengubah dinamika akumulasi.";
+        failureTrigger = "Jika muncul sinyal distribusi dominan atau kendali institusi melemah secara signifikan.";
+      }
+      // Logic 2: RISIKO TINGGI UNTUK ENTRY BARU
+      else if (isHighRisk || isDistributionRegime) {
+        actionState = "RISIKO_TINGGI";
+        actionLabel = "Risiko Tinggi untuk Entry Baru";
+        actionColor = "red";
+        shortSummary = "Struktur saat ini menunjukkan karakteristik distribusi atau risiko yang meningkat. Entry baru pada fase ini memiliki probabilitas keberhasilan yang lebih rendah.";
+        whyAction = [
+          "Rezim pasar berada dalam fase distribusi atau tekanan jual meningkat",
+          "Indikator risiko menunjukkan tingkat kewaspadaan yang tinggi"
+        ];
+        mainRisk = "Potensi penurunan harga lebih lanjut sebelum stabilisasi.";
+        failureTrigger = "Jika distribusi berlanjut atau tidak ada tanda-tanda penyerapan institusional.";
+      }
+      // Logic 3: TUNGGU KONFIRMASI
+      else if (readinessScore >= 55 && readinessScore < 75) {
+        actionState = "TUNGGU_KONFIRMASI";
+        actionLabel = "Tunggu Konfirmasi";
+        actionColor = "yellow";
+        shortSummary = "Struktur sedang membaik namun belum sepenuhnya matang. Konfirmasi tambahan diperlukan sebelum mempertimbangkan aksi.";
+        whyAction = [
+          "Skor kesiapan berada di zona transisi yang memerlukan validasi",
+          "Rezim pasar belum menunjukkan konfirmasi penuh untuk akumulasi"
+        ];
+        mainRisk = "Struktur dapat berbalik arah jika konfirmasi tidak terjadi.";
+        failureTrigger = "Jika skor kesiapan turun di bawah 55 atau muncul sinyal distribusi.";
+      }
+      // Logic 4: TIDAK ADA SETUP MENARIK
+      else {
+        actionState = "TIDAK_ADA_SETUP";
+        actionLabel = "Tidak Ada Setup Menarik Saat Ini";
+        actionColor = "gray";
+        shortSummary = "Struktur pasar tidak menunjukkan pola yang jelas untuk aksi. Lebih baik menunggu hingga kondisi lebih mendukung.";
+        whyAction = [
+          "Skor kesiapan struktural berada di level rendah",
+          "Tidak ada indikasi akumulasi institusional yang kuat"
+        ];
+        mainRisk = "Pergerakan harga cenderung tidak terarah atau acak.";
+        failureTrigger = "Jika kondisi ini berlanjut tanpa perubahan fundamental.";
+      }
+      
+      // ========================================
+      // CONFIDENCE LAYER
+      // ========================================
+      let confidence: "Tinggi" | "Sedang" | "Rendah";
+      let confidenceReason: string;
+      
+      // Count how many signals are aligned
+      const signalAlignment = {
+        readinessHigh: readinessScore >= 70,
+        regimePositive: isAccumulationRegime,
+        riskLow: !isHighRisk,
+        flowStrong: flowQuality >= 60,
+        insiderAligned: insiderAlignment >= 60
+      };
+      
+      const alignedCount = Object.values(signalAlignment).filter(Boolean).length;
+      
+      // Check for contradictions
+      const hasContradiction = (signalAlignment.readinessHigh && isDistributionRegime) ||
+                               (signalAlignment.regimePositive && isHighRisk) ||
+                               (actionState === "BOLEH_AKUMULASI" && insiderAlignment < 40);
+      
+      if (hasContradiction) {
+        confidence = "Rendah";
+        confidenceReason = "Terdapat inkonsistensi antara sinyal-sinyal utama yang memerlukan kewaspadaan tambahan.";
+      } else if (alignedCount >= 4) {
+        confidence = "Tinggi";
+        confidenceReason = "Sebagian besar sinyal utama saling mendukung dan konsisten.";
+      } else if (alignedCount >= 2) {
+        confidence = "Sedang";
+        confidenceReason = "Beberapa sinyal mendukung namun belum sepenuhnya selaras.";
+      } else {
+        confidence = "Rendah";
+        confidenceReason = "Sinyal-sinyal utama belum menunjukkan konsistensi yang cukup.";
+      }
+      
+      return {
+        state: actionState,
+        label: actionLabel,
+        color: actionColor,
+        shortSummary,
+        confidence,
+        confidenceReason,
+        expandedExplanation: {
+          whyAction,
+          mainRisk,
+          failureTrigger
+        }
+      };
+    })();
+
+    // ========================================
     // SMART NEWS FILTER ENGINE
     // Classifies news into Fundamental, Sentiment, or Noise
     // ========================================
@@ -1170,6 +1305,9 @@ export async function registerRoutes(
       
       // Smart Money Readiness Score (Core Intelligence)
       smartMoneyReadinessScore,
+      
+      // Action Guidance Mode (Decision Layer)
+      actionGuidance,
       
       // Smart News Filter (Contextual Intelligence)
       smartNewsFilter,

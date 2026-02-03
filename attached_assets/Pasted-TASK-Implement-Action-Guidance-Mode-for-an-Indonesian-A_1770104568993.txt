@@ -1,0 +1,174 @@
+TASK:
+Implement Action Guidance Mode for an Indonesian AI-powered stock intelligence platform.
+
+Action Guidance is NOT a trading signal.
+It is a guided, probabilistic decision layer built on top of existing analysis engines.
+
+The goal:
+- Satisfy beginner investors who want instant direction
+- Preserve institutional-grade discipline and trust
+- Avoid hype, guarantees, or signal-style language
+
+========================================
+GLOBAL RULES (NON-NEGOTIABLE)
+========================================
+
+- Do NOT add new indicators
+- Use ONLY existing engines:
+  Market Regime, Readiness Score, Risk Engine, Flow Quality, Insider Alignment
+- NO buy/sell/target/stop-loss language
+- NO price levels
+- All text must be Bahasa Indonesia
+- Calm, professional, non-hype tone
+
+========================================
+PART 1 — ACTION GUIDANCE STATES (LOCKED)
+========================================
+
+Action Guidance must output ONLY ONE of these four states:
+
+1) 🟢 BOLEH AKUMULASI BERTAHAP
+2) 🟡 TUNGGU KONFIRMASI
+3) 🔴 RISIKO TINGGI UNTUK ENTRY BARU
+4) ⚪ TIDAK ADA SETUP MENARIK SAAT INI
+
+DO NOT create additional states.
+
+========================================
+PART 2 — ACTION GUIDANCE LOGIC
+========================================
+
+Derive Action Guidance from existing logic ONLY:
+
+- If Readiness Score ≥ 75
+  AND Market Regime = Akumulasi (Stealth / Aktif)
+  AND Distribution Risk ≠ Tinggi
+  → 🟢 BOLEH AKUMULASI BERTAHAP
+
+- If Readiness Score 55–74
+  OR Regime belum matang
+  → 🟡 TUNGGU KONFIRMASI
+
+- If Distribution Risk = Tinggi
+  OR Regime = Distribution
+  → 🔴 RISIKO TINGGI UNTUK ENTRY BARU
+
+- If Readiness Score < 35
+  OR struktur pasar acak / noise
+  → ⚪ TIDAK ADA SETUP MENARIK SAAT INI
+
+This logic must be deterministic and stable (not jumpy).
+
+========================================
+PART 3 — CONFIDENCE LAYER (MANDATORY)
+========================================
+
+Under every Action Guidance, display:
+
+"Keyakinan Struktur: Tinggi / Sedang / Rendah"
+
+Derived from:
+- Consistency of signals
+- Regime confidence
+- Flow stability
+
+If signals conflict, confidence MUST be "Rendah".
+
+========================================
+PART 4 — FRONTEND IMPLEMENTATION
+========================================
+
+LOCATION:
+- Tab: RINGKASAN (hero position, above all other content)
+
+UI STRUCTURE:
+
+Title:
+"🧭 Tindakan yang Paling Masuk Akal Saat Ini"
+
+Main Badge:
+[ ACTION GUIDANCE STATE ]
+
+Below Badge:
+"Keyakinan Struktur: [Tinggi / Sedang / Rendah]"
+
+Short AI Summary (2–3 lines max):
+Explain WHY this action is shown.
+No numbers. No jargon.
+
+Example:
+"Struktur akumulasi masih berlangsung dengan kendali institusi yang relatif stabil. Risiko distribusi belum dominan, namun tetap perlu konfirmasi lanjutan."
+
+CTA Button:
+"Lihat Alasan & Risiko"
+
+========================================
+PART 5 — EXPANDABLE EXPLANATION (VERY IMPORTANT)
+========================================
+
+When user clicks "Lihat Alasan & Risiko", show a compact panel:
+
+Sections (MAX):
+
+1) Kenapa Tindakan Ini?
+- 1–2 bullet points only
+
+2) Risiko Utama
+- 1 short sentence only
+
+3) Kapan Ini Bisa Gagal?
+- 1 failure trigger only
+
+DO NOT show:
+- Indicators
+- Scores
+- Broker tables
+- Historical charts
+
+========================================
+PART 6 — LANGUAGE & PSYCHOLOGY RULES
+========================================
+
+ALLOWED WORDS:
+- boleh
+- berisiko
+- perlu konfirmasi
+- selama struktur masih valid
+- probabilitas
+
+FORBIDDEN WORDS:
+- beli
+- jual
+- target
+- cuan
+- sinyal
+- pasti
+
+Tone:
+Professional Indonesian analyst, not Telegram admin.
+
+========================================
+PART 7 — CONSISTENCY CHECK
+========================================
+
+Before finishing, verify:
+
+- Action Guidance matches Readiness Score
+- Action Guidance matches Risk Tab conclusions
+- Action Guidance does NOT contradict Market Regime
+- If contradiction exists:
+  → downgrade confidence
+  → soften language
+
+========================================
+FINAL OUTPUT
+========================================
+
+A clean, dominant Action Guidance Mode that:
+- Feels instant and decisive for beginners
+- Is defensible and honest for advanced users
+- Cannot be confused with Telegram signals
+- Integrates seamlessly with the existing app brain
+
+If Action Guidance does not yet exist, IMPLEMENT IT.
+If partial logic exists, REFACTOR it to match this spec exactly.
