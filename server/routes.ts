@@ -605,6 +605,151 @@ export async function registerRoutes(
     res.json(stock);
   });
 
+  // Get all stocks for homepage with readiness data
+  app.get("/api/stocks", async (_req, res) => {
+    try {
+      const allStocks = await storage.getAllStocks();
+      const watchlistItems = await storage.getWatchlist();
+      const watchlistSymbols = new Set(watchlistItems.map(w => w.symbol));
+
+      // Calculate readiness score for each stock based on flow data
+      const stocksWithReadiness = allStocks.map(stock => {
+        let readinessScore = 50; // Base score
+        
+        // Parse flow data
+        const flowBias = stock.flowBias;
+        const flowIntensity = stock.flowIntensity;
+        const flowReliability = stock.flowReliability;
+        
+        // Flow Bias scoring
+        if (flowBias === "Akumulasi") readinessScore += 20;
+        else if (flowBias === "Distribusi") readinessScore -= 20;
+        
+        // Flow Intensity scoring
+        if (flowIntensity.includes("Besar") && flowBias === "Akumulasi") readinessScore += 15;
+        else if (flowIntensity.includes("Sedang") && flowBias === "Akumulasi") readinessScore += 8;
+        else if (flowIntensity.includes("Besar") && flowBias === "Distribusi") readinessScore -= 15;
+        else if (flowIntensity.includes("Sedang") && flowBias === "Distribusi") readinessScore -= 8;
+        
+        // Flow Reliability scoring
+        if (flowReliability === "Tinggi") readinessScore += 10;
+        else if (flowReliability === "Sedang") readinessScore += 5;
+        else if (flowReliability === "Rendah") readinessScore -= 5;
+        
+        // Growth factor
+        const growth = parseFloat(stock.growth);
+        if (growth > 10) readinessScore += 5;
+        else if (growth < 0) readinessScore -= 10;
+        
+        // Clamp score to 0-100
+        readinessScore = Math.max(0, Math.min(100, readinessScore));
+
+        // Determine market regime
+        let marketRegime = "Netral";
+        if (flowBias === "Akumulasi") {
+          if (flowIntensity.includes("Besar")) marketRegime = "Akumulasi Aktif";
+          else if (flowIntensity.includes("Sedang")) marketRegime = "Akumulasi Bertahap";
+          else marketRegime = "Akumulasi Awal";
+        } else if (flowBias === "Distribusi") {
+          if (flowIntensity.includes("Besar")) marketRegime = "Distribusi Aktif";
+          else if (flowIntensity.includes("Sedang")) marketRegime = "Distribusi Bertahap";
+          else marketRegime = "Distribusi Akhir Siklus";
+        }
+
+        // Determine action guidance and color
+        let actionGuidance = "";
+        let actionColor = "yellow"; // yellow, green, red
+        
+        if (readinessScore >= 80) {
+          actionGuidance = "Layak Akumulasi Bertahap";
+          actionColor = "green";
+        } else if (readinessScore >= 60) {
+          actionGuidance = "Tunggu Konfirmasi";
+          actionColor = "yellow";
+        } else {
+          actionGuidance = "Hindari Entry Baru";
+          actionColor = "red";
+        }
+
+        // Generate AI sentence based on readiness
+        let aiSentence = "";
+        if (readinessScore >= 80) {
+          aiSentence = `Struktur siap dengan ${marketRegime.toLowerCase()}, momentum mulai selaras.`;
+        } else if (readinessScore >= 60) {
+          if (flowBias === "Akumulasi") {
+            aiSentence = "Akumulasi belum konsisten, perlu konfirmasi lanjutan.";
+          } else {
+            aiSentence = "Volume belum sinkron dengan arah harga.";
+          }
+        } else {
+          if (flowBias === "Distribusi") {
+            aiSentence = "Distribusi aktif terdeteksi, risiko masih tinggi.";
+          } else {
+            aiSentence = "Flow tidak sehat, struktur belum mendukung.";
+          }
+        }
+
+        return {
+          symbol: stock.symbol,
+          name: stock.name,
+          price: stock.price,
+          change: stock.change,
+          changePercent: stock.changePercent,
+          sector: stock.sector,
+          sectorBadge: stock.sectorBadge,
+          readinessScore,
+          marketRegime,
+          actionGuidance,
+          actionColor,
+          aiSentence,
+          isInWatchlist: watchlistSymbols.has(stock.symbol),
+        };
+      });
+
+      res.json(stocksWithReadiness);
+    } catch (error) {
+      console.error("Error fetching stocks:", error);
+      res.status(500).json({ message: "Failed to fetch stocks" });
+    }
+  });
+
+  // Watchlist endpoints
+  app.get("/api/watchlist", async (_req, res) => {
+    try {
+      const watchlistItems = await storage.getWatchlist();
+      res.json(watchlistItems);
+    } catch (error) {
+      console.error("Error fetching watchlist:", error);
+      res.status(500).json({ message: "Failed to fetch watchlist" });
+    }
+  });
+
+  app.post("/api/watchlist/:symbol", async (req, res) => {
+    try {
+      const { symbol } = req.params;
+      const isInWatchlist = await storage.isInWatchlist(symbol);
+      if (isInWatchlist) {
+        return res.status(400).json({ message: "Already in watchlist" });
+      }
+      const watchlistItem = await storage.addToWatchlist({ symbol });
+      res.json(watchlistItem);
+    } catch (error) {
+      console.error("Error adding to watchlist:", error);
+      res.status(500).json({ message: "Failed to add to watchlist" });
+    }
+  });
+
+  app.delete("/api/watchlist/:symbol", async (req, res) => {
+    try {
+      const { symbol } = req.params;
+      await storage.removeFromWatchlist(symbol);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing from watchlist:", error);
+      res.status(500).json({ message: "Failed to remove from watchlist" });
+    }
+  });
+
   app.post("/api/ai", (req, res) => {
     const payload = req.body;
     
