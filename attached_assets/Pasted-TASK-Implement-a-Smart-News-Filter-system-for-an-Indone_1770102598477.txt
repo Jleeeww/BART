@@ -1,0 +1,223 @@
+TASK:
+Implement a Smart News Filter system for an Indonesian AI-powered stock intelligence platform.
+
+This system must NOT be a news feed.
+This system must classify, interpret, and FILTER news based on market impact.
+
+The goal is to help investors focus only on news that matters
+to performance, behavior, and risk — and ignore noise.
+
+========================================
+GLOBAL PRINCIPLES (MANDATORY)
+========================================
+
+- News NEVER generates buy/sell signals
+- News NEVER directly changes Readiness Score
+- News provides CONTEXT, not decisions
+- All explanations must be Bahasa Indonesia
+- Avoid hype, urgency, or sensational language
+- Assume Indonesian retail audience
+
+========================================
+CORE DESIGN QUESTION
+========================================
+
+"Apakah berita ini mengubah FUNDAMENTAL, SENTIMEN, atau tidak signifikan?"
+
+========================================
+PART 1 — NEWS CLASSIFICATION ENGINE
+========================================
+
+Every news item MUST be classified into ONE category only:
+
+----------------------------------------
+CATEGORY A — FUNDAMENTAL-CHANGING NEWS
+----------------------------------------
+
+Definition:
+News that can structurally affect valuation, earnings power,
+or long-term business prospects.
+
+Examples:
+- Laporan keuangan (miss / beat signifikan)
+- Right issue
+- Akuisisi / divestasi besar
+- Perubahan regulasi material
+- Restrukturisasi utang
+- Capex besar / perubahan strategi bisnis
+
+Label (UI):
+🔵 Berpengaruh ke Fundamental
+
+AI Explanation Template:
+"Berita ini berpotensi memengaruhi prospek jangka menengah hingga panjang
+karena berdampak langsung pada struktur keuangan, strategi bisnis,
+atau kemampuan menghasilkan laba."
+
+----------------------------------------
+CATEGORY B — SENTIMENT / FLOW NEWS
+----------------------------------------
+
+Definition:
+News that affects short–medium term market behavior,
+but does NOT change core business fundamentals.
+
+Examples:
+- Komentar manajemen
+- Rekomendasi analis
+- Rotasi sektor
+- Sentimen makro
+- Isu politik / kebijakan jangka pendek
+- Rumor yang sudah tersebar luas
+
+Label (UI):
+🟡 Mempengaruhi Sentimen Pasar
+
+AI Explanation Template:
+"Berita ini lebih berpengaruh terhadap sentimen dan psikologi pasar.
+Dampaknya cenderung bersifat sementara dan sangat bergantung pada respons pelaku besar."
+
+----------------------------------------
+CATEGORY C — NOISE (FILTERED)
+----------------------------------------
+
+Definition:
+News that does NOT materially affect price behavior,
+fundamentals, or institutional positioning.
+
+Examples:
+- Repeated old news
+- Generic PR statements
+- Optimistic wording tanpa data
+- Clickbait headlines
+- Social media speculation
+
+Label (UI):
+⚪ Informasi Tidak Signifikan
+
+AI Explanation Template:
+"Informasi ini tidak memiliki dampak struktural yang signifikan
+terhadap fundamental maupun perilaku institusi."
+
+DEFAULT BEHAVIOR:
+- Category C news is HIDDEN by default
+- User can toggle "Tampilkan Berita Tidak Signifikan"
+
+========================================
+PART 2 — FRONTEND STRUCTURE (CLEAN)
+========================================
+
+In TAB: BERITA
+
+----------------------------------------
+SECTION 1 — SMART NEWS SUMMARY (HERO)
+----------------------------------------
+
+Title:
+"Ringkasan Berita yang Relevan"
+
+Display:
+- Number of Fundamental news
+- Number of Sentiment news
+- Noise hidden count
+
+Example:
+"1 berita fundamental • 2 berita sentimen • 5 berita disaring"
+
+----------------------------------------
+SECTION 2 — FILTERED NEWS LIST
+----------------------------------------
+
+Show ONLY:
+- Category A
+- Category B
+
+Each news card must show:
+- Headline
+- Category label (🔵 / 🟡)
+- Date
+- Short AI interpretation (2–3 lines max)
+
+NO long articles.
+NO raw RSS dumps.
+
+----------------------------------------
+SECTION 3 — OPTIONAL NOISE TOGGLE
+----------------------------------------
+
+Collapsed by default:
+"Tampilkan berita tidak signifikan"
+
+========================================
+PART 3 — CONTEXTUAL INTELLIGENCE (KEY)
+========================================
+
+Each news item must include ONE contextual tag:
+
+Examples:
+- "Berpotensi memengaruhi valuasi"
+- "Dapat meningkatkan volatilitas jangka pendek"
+- "Tidak berdampak pada struktur kampanye bandar"
+
+This tag connects news to:
+- Market Regime
+- Flow behavior
+- Risk context
+
+----------------------------------------
+IMPORTANT:
+----------------------------------------
+
+News must NEVER override:
+- Market Regime
+- Flow analysis
+- Readiness Score
+
+If news contradicts flow:
+AI must say:
+"Respons pasar terhadap berita ini masih terbatas dan belum tercermin
+dalam perilaku bandar."
+
+========================================
+PART 4 — AI LANGUAGE RULES
+========================================
+
+ALLOWED:
+- "berpotensi"
+- "dapat memengaruhi"
+- "tergantung respons pasar"
+- "belum mengubah struktur"
+
+FORBIDDEN:
+- "positif untuk saham"
+- "katalis kuat"
+- "sinyal beli"
+- "akan mendorong harga"
+
+========================================
+PART 5 — FUTURE-PROOFING (DO NOT IMPLEMENT NOW)
+========================================
+
+Prepare architecture hooks for:
+- News vs Bandar Reaction analysis
+- News absorption tracking
+- News impact decay over time
+
+DO NOT activate these yet.
+
+========================================
+FINAL CHECK
+========================================
+
+Before completion, ensure:
+- News tab feels calm, not urgent
+- Noise is reduced, not amplified
+- Retail users are guided, not provoked
+- App remains behavior-first, not headline-driven
+
+If any news logic currently shows raw headlines without interpretation,
+REPLACE it with this Smart News Filter system.
+
+OUTPUT:
+A disciplined, intelligent Smart News Filter that protects users
+from noise while highlighting what actually matters.

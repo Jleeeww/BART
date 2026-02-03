@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
-import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp, EyeOff } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 // IDX Market Session Status based on WIB time
@@ -1197,151 +1197,122 @@ export default function StockDashboard() {
 
                   {/* News Tab */}
                   <TabsContent value="news" className="mt-0 focus-visible:outline-none space-y-6">
-                    {/* SECTION 1: AI News Overview */}
-                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Ringkasan AI Berita</h3>
-                      <p className="text-muted-foreground leading-relaxed mb-6">
-                        {aiLoading ? "Processing event data..." : (aiData?.event_analysis.thesis || stock.newsOverviewSummary)}
+                    {/* SECTION 1: Smart News Summary (Hero) */}
+                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5" data-testid="section-news-summary">
+                      <h3 className="text-lg font-bold font-display mb-3 text-foreground">Ringkasan Berita yang Relevan</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Sistem ini menyaring berita berdasarkan dampak terhadap fundamental dan sentimen pasar. 
+                        Berita yang tidak signifikan disaring secara otomatis.
                       </p>
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Dampak Berita</p>
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            stock.newsImpact === "High" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
-                            stock.newsImpact === "Medium" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
-                            "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
-                          }`}>
-                            {stock.newsImpact}
+                      {aiData?.smartNewsFilter && (
+                        <div className="flex flex-wrap items-center gap-3" data-testid="news-category-counts">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                            {aiData.smartNewsFilter.summary.fundamentalCount} berita fundamental
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                            {aiData.smartNewsFilter.summary.sentimentCount} berita sentimen
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                            <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                            {aiData.smartNewsFilter.summary.noiseCount} berita disaring
                           </span>
                         </div>
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Relevansi</p>
-                          <p className="text-base font-semibold text-foreground">{stock.newsRelevance}</p>
-                        </div>
-                      </div>
+                      )}
                     </Card>
 
-                    {/* SECTION 2: Event Analysis (Analyst Framework) */}
+                    {/* SECTION 2: Filtered News List (Fundamental + Sentiment only) */}
                     <div className="space-y-4">
-                      <h3 className="text-lg font-bold font-display text-foreground px-1">Analisis Peristiwa</h3>
-                      {(() => {
-                        try {
-                          const events = JSON.parse(stock.eventAnalysis);
-                          return events.map((event: any, index: number) => (
-                            <Card key={index} className="overflow-hidden border-border/50 shadow-sm">
-                              <div className="bg-muted/30 px-6 py-4 border-b border-border/50 flex items-center justify-between">
-                                <h4 className="font-bold text-foreground">{event.title}</h4>
-                                <span className={`text-xs font-bold px-2 py-1 rounded uppercase tracking-tighter ${
-                                  event.thesis.startsWith("Positive") ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" :
-                                  event.thesis.startsWith("Negative") ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" :
-                                  "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                                }`}>
-                                  Thesis: {event.thesis.split(".")[0]}
+                      <h3 className="text-lg font-bold font-display text-foreground px-1">Berita Relevan</h3>
+                      {aiData?.smartNewsFilter?.news
+                        .filter((item: any) => item.category !== "noise")
+                        .map((item: any, index: number) => (
+                          <Card key={item.id} className="overflow-hidden border-border/50 shadow-sm" data-testid={`card-news-${item.id}`}>
+                            <div className="p-5">
+                              <div className="flex items-start justify-between gap-4 mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                      item.category === "fundamental" 
+                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                    }`} data-testid={`badge-category-${item.id}`}>
+                                      <span className={`w-1.5 h-1.5 rounded-full ${item.category === "fundamental" ? "bg-blue-500" : "bg-amber-500"}`}></span>
+                                      {item.categoryLabel}
+                                    </span>
+                                    <span className="text-[10px] font-mono text-muted-foreground">{item.date}</span>
+                                  </div>
+                                  <h4 className="text-sm font-bold text-foreground leading-tight mb-1" data-testid={`text-headline-${item.id}`}>
+                                    {item.headline}
+                                  </h4>
+                                  <span className="text-xs text-muted-foreground">{item.source}</span>
+                                </div>
+                              </div>
+                              
+                              {/* AI Interpretation */}
+                              <div className="pt-3 border-t border-border/30">
+                                <p className="text-xs text-muted-foreground leading-relaxed mb-2" data-testid={`text-interpretation-${item.id}`}>
+                                  {item.aiInterpretation}
+                                </p>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/50 text-[10px] font-medium text-muted-foreground" data-testid={`tag-context-${item.id}`}>
+                                  <Activity className="w-3 h-3" />
+                                  {item.contextTag}
                                 </span>
                               </div>
-                              <div className="p-6 space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <div className="space-y-4">
-                                    <div>
-                                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                                        <Activity className="w-3 h-3" />
-                                        Apa yang Terjadi?
-                                      </p>
-                                      <p className="text-sm text-foreground leading-relaxed">{event.event}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                                        <TrendingUp className="w-3 h-3" />
-                                        Pemicu (Mengapa?)
-                                      </p>
-                                      <p className="text-sm text-foreground leading-relaxed">{event.why}</p>
-                                    </div>
-                                  </div>
-                                  <div className="space-y-4">
-                                    <div>
-                                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                                        <Activity className="w-3 h-3" />
-                                        Reaksi Pasar Langsung
-                                      </p>
-                                      <p className="text-sm text-foreground leading-relaxed">{event.immediate}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                                        <Activity className="w-3 h-3" />
-                                        Efek Lanjutan
-                                      </p>
-                                      <p className="text-sm text-foreground leading-relaxed">{event.secondOrder}</p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="pt-4 border-t border-border/30">
-                                  <div className="bg-primary/5 rounded-lg p-4 border border-primary/10">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <p className="text-xs font-bold text-primary uppercase tracking-widest flex items-center gap-1.5">
-                                        <AlertTriangle className="w-3 h-3" />
-                                        Kepercayaan Analis: {event.confidence}
-                                      </p>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground italic leading-relaxed">
-                                      <span className="font-bold not-italic text-foreground">Kondisi keberlanjutan:</span> {event.conditions}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </Card>
-                          ));
-                        } catch (e) {
-                          return null;
-                        }
-                      })()}
+                            </div>
+                          </Card>
+                        ))}
                     </div>
 
-                    {/* SECTION 3: News Feed */}
-                    <Card className="p-6 border-border/50 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Feed Aktivitas Terkini</h4>
-                      <div className="space-y-4">
-                        {(() => {
-                          try {
-                            const news = JSON.parse(stock.newsFeed);
-                            return news.map((item: any, index: number) => (
-                              <div key={index} className="flex gap-4 pb-4 border-b border-border/30 last:border-0 last:pb-0">
-                                <div className="flex-1">
-                                  <div className="flex justify-between items-start mb-1">
-                                    <h5 className="text-sm font-bold text-foreground leading-tight">{item.headline}</h5>
-                                    <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap ml-4">{item.date}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-muted-foreground">{item.source}</span>
-                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter ${
-                                      item.impact === "Structural" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
-                                      item.impact === "Temporary" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
-                                      "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-500"
-                                    }`}>
-                                      {item.impact}
-                                    </span>
+                    {/* SECTION 3: Noise Toggle (Hidden by default) */}
+                    <Collapsible className="border border-border/50 rounded-lg overflow-hidden">
+                      <CollapsibleTrigger className="flex items-center justify-between w-full px-5 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors group" data-testid="button-toggle-noise">
+                        <span className="flex items-center gap-2">
+                          <EyeOff className="w-4 h-4" />
+                          Tampilkan berita tidak signifikan ({aiData?.smartNewsFilter?.summary.noiseCount || 0})
+                        </span>
+                        <ChevronDown className="w-4 h-4 transition-transform group-data-[state=open]:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-5 pb-5 space-y-3 pt-2 border-t border-border/30">
+                          <p className="text-xs text-muted-foreground italic mb-3">
+                            Berita berikut dinilai tidak memiliki dampak signifikan terhadap fundamental atau perilaku institusi.
+                          </p>
+                          {aiData?.smartNewsFilter?.news
+                            .filter((item: any) => item.category === "noise")
+                            .map((item: any) => (
+                              <div key={item.id} className="p-3 rounded-lg bg-muted/30 border border-border/30" data-testid={`card-noise-${item.id}`}>
+                                <div className="flex items-start justify-between gap-3 mb-2">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500" data-testid={`badge-noise-${item.id}`}>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                        Tidak Signifikan
+                                      </span>
+                                      <span className="text-[10px] font-mono text-muted-foreground">{item.date}</span>
+                                    </div>
+                                    <h5 className="text-xs font-medium text-muted-foreground leading-tight">{item.headline}</h5>
                                   </div>
                                 </div>
+                                <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                                  {item.aiInterpretation}
+                                </p>
                               </div>
-                            ));
-                          } catch (e) {
-                            return null;
-                          }
-                        })()}
-                      </div>
-                    </Card>
+                            ))}
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
 
-                    {/* Corporate Action Summary */}
-                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Apa Arti Ini Bagi Investor</h3>
-                      <p className="text-muted-foreground leading-relaxed">
-                        {stock.investorInterpretation}
-                        {aiData?.flowQualityScore < 50 && " Current accumulation signals exhibit low conviction characteristics, suggesting potential narrative fatigue or false positioning."}
-                        {aiData?.flowQualityScore > 75 && " Institutional participation is high-quality, though the resulting consensus may limit immediate alpha capture without new fundamental surprises."}
-                        {aiData?.earlyDistributionFlag && " Signs of liquidity rotation are emerging. Investors are encouraged to prioritize downside protection as alpha-seeking attractiveness potentially diminishes."}
-                        {(aiData?.convictionPhase === "Crowding" || aiData?.convictionPhase === "Distribution") && " Elevated consensus suggests the current cycle may be entering a period of narrative saturation and increased rotation risk."}
+                    {/* Disclaimer */}
+                    <div className="p-4 rounded-lg bg-muted/30 border border-border/30" data-testid="news-disclaimer">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        <span className="font-semibold text-foreground">Catatan Penting:</span> Berita tidak menghasilkan sinyal beli atau jual. 
+                        Klasifikasi bersifat indikatif dan bukan rekomendasi investasi. 
+                        Berita tidak mengubah skor kesiapan, analisis aliran dana, atau penilaian rezim pasar. 
+                        Gunakan sebagai konteks tambahan dalam analisis menyeluruh, bukan sebagai satu-satunya dasar keputusan.
                       </p>
-                    </Card>
+                    </div>
                   </TabsContent>
 
                   {/* Risk Tab */}

@@ -73,7 +73,7 @@ export async function registerRoutes(
         newsRelevance: "Struktural",
         newsFeed: JSON.stringify([
           { headline: "BBCA Catat Pertumbuhan Laba Bersih 12% YoY di Q3 2025", date: "2025-12-22", source: "IDX News", impact: "Struktural" },
-          { headline: "Bank Indonesia Pertahankan Suku Bunga Acuan, Positif untuk Margin Perbankan", date: "2025-11-15", source: "Business Times", impact: "Struktural" },
+          { headline: "Bank Indonesia Pertahankan Suku Bunga Acuan di Level 5.75%", date: "2025-11-15", source: "Business Times", impact: "Struktural" },
           { headline: "Aplikasi Digital BBCA Capai 30 Juta Pengguna Aktif", date: "2025-12-05", source: "TechDaily", impact: "Sementara" }
         ]),
         corporateActions: JSON.stringify([
@@ -956,6 +956,182 @@ export async function registerRoutes(
       };
     })();
 
+    // ========================================
+    // SMART NEWS FILTER ENGINE
+    // Classifies news into Fundamental, Sentiment, or Noise
+    // ========================================
+    const smartNewsFilter = (() => {
+      // Sample news items to classify (in production, would come from news API)
+      const rawNews = [
+        {
+          id: "n1",
+          headline: "BBCA Catat Pertumbuhan Laba Bersih 12% YoY di Q3 2025",
+          date: "2025-12-22",
+          source: "IDX News"
+        },
+        {
+          id: "n2",
+          headline: "Bank Indonesia Pertahankan Suku Bunga Acuan di Level 5.75%",
+          date: "2025-11-15",
+          source: "Bisnis Indonesia"
+        },
+        {
+          id: "n3",
+          headline: "Aplikasi Digital BBCA Capai 30 Juta Pengguna Aktif",
+          date: "2025-12-05",
+          source: "TechDaily"
+        },
+        {
+          id: "n4",
+          headline: "Analis Goldman Sachs Pertahankan Rating Overweight untuk BBCA",
+          date: "2025-12-18",
+          source: "Bloomberg"
+        },
+        {
+          id: "n5",
+          headline: "BBCA Raih Penghargaan Bank Terbaik Versi Majalah Finance",
+          date: "2025-12-01",
+          source: "Kompas"
+        },
+        {
+          id: "n6",
+          headline: "Volume Transaksi Digital Banking Meningkat 40% di Q3",
+          date: "2025-12-10",
+          source: "Kontan"
+        },
+        {
+          id: "n7",
+          headline: "Rumor Akuisisi Fintech oleh BBCA Beredar di Pasar",
+          date: "2025-12-15",
+          source: "Media Sosial"
+        },
+        {
+          id: "n8",
+          headline: "BBCA Tetap Jadi Saham Favorit Investor Asing",
+          date: "2025-12-20",
+          source: "Investor Daily"
+        }
+      ];
+
+      // Classification function
+      const classifyNews = (headline: string): { 
+        category: "fundamental" | "sentiment" | "noise";
+        aiInterpretation: string;
+        contextTag: string;
+      } => {
+        const headlineLower = headline.toLowerCase();
+        
+        // Category A: Fundamental-Changing News
+        const fundamentalKeywords = [
+          "laba bersih", "laporan keuangan", "pendapatan", "right issue",
+          "akuisisi", "divestasi", "restrukturisasi", "regulasi baru",
+          "capex", "ekspansi", "merger", "obligasi", "utang", "kredit macet",
+          "npm", "nim", "roa", "roe", "car", "ldr"
+        ];
+        
+        if (fundamentalKeywords.some(kw => headlineLower.includes(kw))) {
+          return {
+            category: "fundamental",
+            aiInterpretation: "Berita ini berpotensi memengaruhi prospek jangka menengah hingga panjang karena berdampak langsung pada struktur keuangan atau kemampuan menghasilkan laba.",
+            contextTag: "Berpotensi memengaruhi valuasi"
+          };
+        }
+        
+        // Category B: Sentiment/Flow News
+        const sentimentKeywords = [
+          "rating", "rekomendasi", "analis", "suku bunga", "bank indonesia",
+          "makro", "sentimen", "asing", "rotasi", "sektor", "kebijakan",
+          "investor", "favorit", "volume", "transaksi"
+        ];
+        
+        if (sentimentKeywords.some(kw => headlineLower.includes(kw))) {
+          return {
+            category: "sentiment",
+            aiInterpretation: "Berita ini lebih berpengaruh terhadap sentimen dan psikologi pasar. Dampaknya cenderung bersifat sementara dan bergantung pada respons pelaku institusi.",
+            contextTag: "Dapat memengaruhi volatilitas jangka pendek"
+          };
+        }
+        
+        // Category C: Noise (filtered by default)
+        return {
+          category: "noise",
+          aiInterpretation: "Informasi ini tidak memiliki dampak struktural yang signifikan terhadap fundamental maupun perilaku institusi.",
+          contextTag: "Tidak berdampak pada struktur kampanye bandar"
+        };
+      };
+
+      // Classify all news
+      const classifiedNews = rawNews.map(news => {
+        const classification = classifyNews(news.headline);
+        
+        // Generate specific interpretation based on headline content
+        let specificInterpretation = classification.aiInterpretation;
+        let specificContextTag = classification.contextTag;
+        
+        // Customize interpretations for specific headlines
+        if (news.headline.includes("Laba Bersih")) {
+          specificInterpretation = "Pertumbuhan laba 12% YoY mengindikasikan keberlanjutan leverage operasional. Hasil ini dapat memengaruhi ekspektasi valuasi jangka menengah.";
+          specificContextTag = "Berpotensi memperkuat tesis valuasi";
+        } else if (news.headline.includes("Suku Bunga")) {
+          specificInterpretation = "Kebijakan suku bunga acuan dapat memengaruhi margin perbankan. Stabilitas suku bunga cenderung mendukung prediktabilitas pendapatan bunga bersih.";
+          specificContextTag = "Dapat memengaruhi ekspektasi NIM";
+        } else if (news.headline.includes("Analis Goldman")) {
+          specificInterpretation = "Rekomendasi analis internasional dapat memengaruhi aliran dana asing jangka pendek. Dampaknya bergantung pada respons pelaku institusi lainnya.";
+          specificContextTag = "Dapat memicu respons pelaku asing";
+        } else if (news.headline.includes("Digital Banking") || news.headline.includes("Aplikasi Digital")) {
+          specificInterpretation = "Pertumbuhan pengguna digital mencerminkan transformasi operasional, namun dampak ke profitabilitas memerlukan validasi lebih lanjut.";
+          specificContextTag = "Mendukung narasi transformasi digital";
+        } else if (news.headline.includes("Rumor")) {
+          specificInterpretation = "Informasi ini belum terkonfirmasi dan berasal dari sumber tidak resmi. Tidak direkomendasikan sebagai dasar analisis.";
+          specificContextTag = "Tidak dapat diverifikasi";
+        } else if (news.headline.includes("Penghargaan")) {
+          specificInterpretation = "Penghargaan bersifat simbolis dan tidak memiliki dampak langsung terhadap fundamental atau perilaku institusi.";
+          specificContextTag = "Tidak berdampak pada valuasi";
+        }
+        
+        // Check if news contradicts flow analysis
+        const flowContradictionNote = score < 40 && classification.category === "fundamental" 
+          ? " Respons pasar terhadap berita ini masih terbatas dan belum tercermin dalam perilaku bandar."
+          : "";
+        
+        return {
+          ...news,
+          category: classification.category,
+          categoryLabel: classification.category === "fundamental" 
+            ? "Berpengaruh ke Fundamental"
+            : classification.category === "sentiment"
+              ? "Mempengaruhi Sentimen Pasar"
+              : "Informasi Tidak Signifikan",
+          aiInterpretation: specificInterpretation + flowContradictionNote,
+          contextTag: specificContextTag
+        };
+      });
+
+      // Count by category
+      const fundamentalCount = classifiedNews.filter(n => n.category === "fundamental").length;
+      const sentimentCount = classifiedNews.filter(n => n.category === "sentiment").length;
+      const noiseCount = classifiedNews.filter(n => n.category === "noise").length;
+
+      // Summary text
+      const summaryText = `${fundamentalCount} berita fundamental • ${sentimentCount} berita sentimen • ${noiseCount} berita disaring`;
+
+      return {
+        summary: {
+          fundamentalCount,
+          sentimentCount,
+          noiseCount,
+          summaryText
+        },
+        news: classifiedNews,
+        // Architecture hooks for future features (not implemented yet)
+        _futureHooks: {
+          newsVsBandarReaction: null,
+          newsAbsorptionTracking: null,
+          newsImpactDecay: null
+        }
+      };
+    })();
+
     // Structured analyst-style response without buy/sell signals
     res.json({
       // Decision Engine (Part A)
@@ -994,6 +1170,9 @@ export async function registerRoutes(
       
       // Smart Money Readiness Score (Core Intelligence)
       smartMoneyReadinessScore,
+      
+      // Smart News Filter (Contextual Intelligence)
+      smartNewsFilter,
       
       event_analysis: {
         impact: "Sedang",
