@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
@@ -34,7 +35,7 @@ interface StockCardData {
   isInWatchlist: boolean;
 }
 
-function StockCard({ stock, onToggleWatchlist }: { stock: StockCardData; onToggleWatchlist: (symbol: string, isAdding: boolean) => void }) {
+function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardData; onToggleWatchlist: (symbol: string, isAdding: boolean) => void; isToggling: boolean }) {
   const isPositive = parseFloat(stock.change) >= 0;
   
   const colorClasses = {
@@ -117,6 +118,7 @@ function StockCard({ stock, onToggleWatchlist }: { stock: StockCardData; onToggl
               size="icon"
               variant="ghost"
               className="h-8 w-8"
+              disabled={isToggling}
               onClick={() => onToggleWatchlist(stock.symbol, !stock.isInWatchlist)}
               data-testid={`button-watchlist-${stock.symbol}`}
             >
@@ -169,6 +171,8 @@ function StockCardSkeleton() {
 }
 
 export default function Homepage() {
+  const [togglingSymbols, setTogglingSymbols] = useState<Set<string>>(new Set());
+  
   const { data: stocks, isLoading } = useQuery<StockCardData[]>({
     queryKey: ["/api/stocks"],
   });
@@ -177,7 +181,26 @@ export default function Homepage() {
     mutationFn: async (symbol: string) => {
       await apiRequest("POST", `/api/watchlist/${symbol}`);
     },
-    onSuccess: () => {
+    onMutate: async (symbol) => {
+      setTogglingSymbols(prev => new Set(prev).add(symbol));
+      await queryClient.cancelQueries({ queryKey: ["/api/stocks"] });
+      const previousStocks = queryClient.getQueryData<StockCardData[]>(["/api/stocks"]);
+      queryClient.setQueryData<StockCardData[]>(["/api/stocks"], (old) =>
+        old?.map((s) => (s.symbol === symbol ? { ...s, isInWatchlist: true } : s))
+      );
+      return { previousStocks };
+    },
+    onError: (_err, _symbol, context) => {
+      if (context?.previousStocks) {
+        queryClient.setQueryData(["/api/stocks"], context.previousStocks);
+      }
+    },
+    onSettled: (_data, _error, symbol) => {
+      setTogglingSymbols(prev => {
+        const next = new Set(prev);
+        next.delete(symbol);
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/stocks"] });
     },
   });
@@ -186,12 +209,32 @@ export default function Homepage() {
     mutationFn: async (symbol: string) => {
       await apiRequest("DELETE", `/api/watchlist/${symbol}`);
     },
-    onSuccess: () => {
+    onMutate: async (symbol) => {
+      setTogglingSymbols(prev => new Set(prev).add(symbol));
+      await queryClient.cancelQueries({ queryKey: ["/api/stocks"] });
+      const previousStocks = queryClient.getQueryData<StockCardData[]>(["/api/stocks"]);
+      queryClient.setQueryData<StockCardData[]>(["/api/stocks"], (old) =>
+        old?.map((s) => (s.symbol === symbol ? { ...s, isInWatchlist: false } : s))
+      );
+      return { previousStocks };
+    },
+    onError: (_err, _symbol, context) => {
+      if (context?.previousStocks) {
+        queryClient.setQueryData(["/api/stocks"], context.previousStocks);
+      }
+    },
+    onSettled: (_data, _error, symbol) => {
+      setTogglingSymbols(prev => {
+        const next = new Set(prev);
+        next.delete(symbol);
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/stocks"] });
     },
   });
 
   const handleToggleWatchlist = (symbol: string, isAdding: boolean) => {
+    if (togglingSymbols.has(symbol)) return;
     if (isAdding) {
       addToWatchlistMutation.mutate(symbol);
     } else {
@@ -267,6 +310,7 @@ export default function Homepage() {
                   key={stock.symbol} 
                   stock={stock} 
                   onToggleWatchlist={handleToggleWatchlist}
+                  isToggling={togglingSymbols.has(stock.symbol)}
                 />
               ))
             )}
@@ -294,6 +338,7 @@ export default function Homepage() {
                   key={stock.symbol} 
                   stock={stock} 
                   onToggleWatchlist={handleToggleWatchlist}
+                  isToggling={togglingSymbols.has(stock.symbol)}
                 />
               ))
             )}
@@ -321,6 +366,7 @@ export default function Homepage() {
                   key={stock.symbol} 
                   stock={stock} 
                   onToggleWatchlist={handleToggleWatchlist}
+                  isToggling={togglingSymbols.has(stock.symbol)}
                 />
               ))
             )}
