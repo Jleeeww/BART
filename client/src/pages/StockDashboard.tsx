@@ -347,7 +347,7 @@ export default function StockDashboard() {
                           <div className="pt-4 border-t border-border/30">
                             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Alasan Utama</p>
                             <ul className="space-y-2" data-testid="list-main-reasons">
-                              {aiData.decisionEngine.reasons.map((reason: string, idx: number) => (
+                              {aiData.decisionEngine.reasons.slice(0, 3).map((reason: string, idx: number) => (
                                 <li key={idx} className="flex items-start gap-2 text-sm text-foreground" data-testid={`reason-${idx}`}>
                                   <div className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${
                                     aiData.decisionEngine.status === "Layak Dikoleksi Bertahap" 
@@ -1285,7 +1285,7 @@ export default function StockDashboard() {
                                 Kapan Analisis Ini Bisa Salah
                               </h3>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {aiData.simplifiedRisk.failureTriggers.map((trigger: string, idx: number) => (
+                                {aiData.simplifiedRisk.failureTriggers.slice(0, 3).map((trigger: string, idx: number) => (
                                   <div key={idx} className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20" data-testid={`failure-trigger-${idx}`}>
                                     <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
                                     <p className="text-xs font-medium text-amber-700 dark:text-amber-400 leading-tight">
@@ -1420,69 +1420,8 @@ export default function StockDashboard() {
                                 </div>
                               </Card>
                             )}
-
-                            <Card className="p-6 border-border/50 shadow-sm">
-                              <h4 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4">Pembatalan Tesis</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {risk.invalidation.map((cond: string, idx: number) => (
-                                  <div key={idx} className="flex items-start gap-2 p-3 rounded-lg bg-red-500/5 border border-red-500/10">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0" />
-                                    <p className="text-xs font-medium text-red-700 dark:text-red-400 leading-tight">
-                                      {cond}
-                                    </p>
-                                  </div>
-                                ))}
-                              </div>
-                            </Card>
-
-                            {/* Indonesia-Specific Risk Factors */}
-                            {stock.localRiskFactors && (
-                              <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-orange-500/5 to-red-500/5 dark:from-orange-500/10 dark:to-red-500/10" data-testid="card-local-risks">
-                                <h4 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
-                                  <Shield className="w-4 h-4 text-orange-500" />
-                                  Faktor Risiko Lokal Indonesia
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                  {JSON.parse(stock.localRiskFactors).map((risk: { type: string; text: string }, idx: number) => (
-                                    <div key={idx} className="p-4 rounded-lg bg-background border border-border/50">
-                                      <p className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase tracking-widest mb-2">
-                                        {risk.type}
-                                      </p>
-                                      <p className="text-sm text-muted-foreground leading-relaxed">
-                                        {risk.text}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </Card>
-                            )}
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-                                  <TrendingUp className="w-4 h-4" />
-                                  Cocok Untuk
-                                </h4>
-                                <p className="text-xs text-muted-foreground leading-relaxed">{risk.investorFit.suitable}</p>
-                              </div>
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-bold text-red-700 dark:text-red-400 uppercase tracking-widest flex items-center gap-2">
-                                  <AlertTriangle className="w-4 h-4" />
-                                  Tidak Cocok Untuk
-                                </h4>
-                                <p className="text-xs text-muted-foreground leading-relaxed">{risk.investorFit.unsuitable}</p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      } catch (e) {
-                        return (
-                          <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
-                            <h3 className="text-lg font-bold mb-2 text-foreground">Gagal Memuat Data Risiko</h3>
-                            <p className="text-muted-foreground">Tidak dapat memproses framework risiko analis.</p>
-                          </Card>
-                        );
-                      }
+                        </div>
+                      );
                     })()}
                   </TabsContent>
 
@@ -1502,12 +1441,67 @@ export default function StockDashboard() {
                         }
                         return (
                           <div className="space-y-6">
+                            {/* HERO STATUS: INSIDER VS BANDAR ALIGNMENT */}
+                            {aiData?.insiderBandarAlignment && (
+                              <Card className={`p-6 border-2 shadow-md ${
+                                aiData.insiderBandarAlignment.status === "Selaras" 
+                                  ? "border-emerald-300 dark:border-emerald-700 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5" 
+                                  : aiData.insiderBandarAlignment.status === "Bertentangan"
+                                    ? "border-red-300 dark:border-red-700 bg-gradient-to-br from-red-500/10 to-red-500/5"
+                                    : "border-slate-300 dark:border-slate-700 bg-gradient-to-br from-slate-500/10 to-slate-500/5"
+                              }`} data-testid="card-insider-bandar-alignment">
+                                <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                                  <div>
+                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Insider vs Bandar</p>
+                                    <h2 className={`text-xl font-bold font-display ${
+                                      aiData.insiderBandarAlignment.status === "Selaras" 
+                                        ? "text-emerald-700 dark:text-emerald-400" 
+                                        : aiData.insiderBandarAlignment.status === "Bertentangan"
+                                          ? "text-red-700 dark:text-red-400"
+                                          : "text-foreground"
+                                    }`} data-testid="text-alignment-status">
+                                      {aiData.insiderBandarAlignment.status}
+                                    </h2>
+                                  </div>
+                                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                                    aiData.insiderBandarAlignment.status === "Selaras" 
+                                      ? "bg-emerald-100 dark:bg-emerald-900/40" 
+                                      : aiData.insiderBandarAlignment.status === "Bertentangan"
+                                        ? "bg-red-100 dark:bg-red-900/40"
+                                        : "bg-slate-100 dark:bg-slate-800/40"
+                                  }`}>
+                                    <UserCheck className={`w-6 h-6 ${
+                                      aiData.insiderBandarAlignment.status === "Selaras" 
+                                        ? "text-emerald-600 dark:text-emerald-400" 
+                                        : aiData.insiderBandarAlignment.status === "Bertentangan"
+                                          ? "text-red-600 dark:text-red-400"
+                                          : "text-slate-600 dark:text-slate-400"
+                                    }`} />
+                                  </div>
+                                </div>
+                                <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-alignment-interpretation">
+                                  {aiData.insiderBandarAlignment.interpretation}
+                                </p>
+                                
+                                {/* Context with Market Regime */}
+                                {aiData?.marketMode && (
+                                  <div className="mt-4 p-3 rounded-lg bg-background/50 border border-border/30">
+                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Konteks Rezim Pasar</p>
+                                    <p className="text-xs text-muted-foreground" data-testid="text-regime-context">
+                                      Analisis ini dilakukan dalam konteks rezim pasar <span className="font-semibold text-foreground">{aiData.marketMode}</span>. 
+                                      {aiData.marketMode.includes("Akumulasi") && " Keselarasan positif dalam fase akumulasi memperkuat tesis konstruktif."}
+                                      {aiData.marketMode.includes("Distribusi") && " Perhatikan potensi divergensi jika insider mulai menjual saat distribusi berlangsung."}
+                                    </p>
+                                  </div>
+                                )}
+                              </Card>
+                            )}
+                            
                             {/* Insider Overview */}
-                            <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
+                            <Card className="p-6 border-border/50 shadow-sm">
                               <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold font-display text-foreground">Aktivitas Insider</h3>
+                                <h3 className="text-base font-bold font-display text-foreground">Skor Keselarasan Insider</h3>
                                 <div className="text-right">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Skor Keselarasan</p>
                                   <p className={`text-2xl font-bold ${
                                     insider.alignmentScore >= 70 ? 'text-emerald-600 dark:text-emerald-400' :
                                     insider.alignmentScore >= 40 ? 'text-amber-600 dark:text-amber-400' :
