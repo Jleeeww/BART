@@ -1,0 +1,187 @@
+You are the lead product architect and senior engineer for an Indonesian
+AI-powered stock intelligence platform focused on bandarmology and behavioral analysis.
+
+TASK:
+Implement a Readiness-based Homepage and an integrated Watchlist Mode.
+Ensure all logic is consistent with the existing app brain:
+Market Regime → Readiness → Action Guidance.
+
+This is NOT a signal platform.
+This is a decision intelligence system for Indonesian retail investors.
+
+================================================
+GLOBAL NON-NEGOTIABLE RULES
+================================================
+
+1. Do NOT introduce buy/sell signals, price targets, or guarantees.
+2. Do NOT remove or weaken existing engines (market regime, flow, risk, insider).
+3. Use Smart Money Readiness Score as the primary sorting logic.
+4. Action Guidance must remain authoritative for execution.
+5. ALL UI text, AI explanations, and labels MUST be in Bahasa Indonesia.
+6. UX must feel simple, fast, and locally built for Indonesian users.
+
+================================================
+PART 1 — HOMEPAGE: READINESS MARKET MAP
+================================================
+
+Create a new Homepage section titled:
+
+"Peta Kesiapan Saham Hari Ini"
+
+Subtext:
+"Disusun berdasarkan perilaku bandar, struktur pasar, dan risiko distribusi.
+Bukan sinyal, melainkan panduan kesiapan."
+
+------------------------------------------------
+HOMEPAGE MUST CONTAIN 3 TABS ONLY
+------------------------------------------------
+
+TAB 1 — "Siap Dipantau"
+Criteria:
+- Smart Money Readiness Score ≥ 80
+
+Visual:
+- Green accent / badge
+- Icon: 🟢 or 🔥
+
+For EACH stock card, show:
+- Kode saham
+- Smart Money Readiness Score (e.g. 91 / 100)
+- Market Regime (e.g. Akumulasi Aktif)
+- Action Guidance (GREEN state only)
+- 1 short AI sentence explaining WHY it is ready
+
+Action Guidance examples:
+- "Layak Akumulasi Bertahap"
+- "Struktur Siap, Momentum Mulai Selaras"
+
+------------------------------------------------
+
+TAB 2 — "Watchlist Prioritas"
+Criteria:
+- Smart Money Readiness Score between 60–79
+
+Visual:
+- Yellow accent / badge
+- Icon: 👀
+
+For EACH stock card, show:
+- Kode saham
+- Readiness Score
+- What is still missing (ONLY 1 reason):
+  e.g. "Volume belum sinkron"
+  e.g. "Akumulasi belum konsisten"
+- Action Guidance (YELLOW state):
+  "Tunggu Konfirmasi"
+
+This tab must feel like:
+"Saham ini sedang dipersiapkan, tapi belum waktunya masuk."
+
+------------------------------------------------
+
+TAB 3 — "Hindari Dulu"
+Criteria:
+- Smart Money Readiness Score < 60
+
+Visual:
+- Red accent / badge
+- Icon: ⚠️
+
+For EACH stock card, show:
+- Kode saham
+- Readiness Score
+- 1 clear reason to avoid:
+  e.g. "Distribusi aktif"
+  e.g. "Flow tidak sehat"
+- Action Guidance (RED state):
+  "Risiko Tinggi untuk Entry Baru"
+
+IMPORTANT:
+This tab must PROTECT users from traps.
+Do not soften language unnecessarily.
+
+------------------------------------------------
+GENERAL HOMEPAGE RULES
+------------------------------------------------
+
+- Homepage shows SHORTLISTS, not deep analysis.
+- Clicking a stock navigates to full stock detail page.
+- Homepage must feel fast, decisive, and calming (not hype).
+
+================================================
+PART 2 — WATCHLIST MODE (INTEGRATED)
+================================================
+
+Implement a Watchlist Mode that is AUTOMATIC and MANUAL.
+
+----------------------------------------
+AUTOMATIC WATCHLIST MODE
+----------------------------------------
+
+A stock automatically enters "Watchlist Prioritas" when:
+- Readiness Score ≥ 75
+- Action Guidance ≠ Buy / Akumulasi
+
+Label:
+"🟦 Watchlist Prioritas"
+
+Explanation text:
+"Saham ini sedang dipersiapkan oleh pelaku besar,
+namun belum ada jendela eksekusi yang optimal."
+
+----------------------------------------
+MANUAL WATCHLIST MODE
+----------------------------------------
+
+Allow users to:
+- Add / remove stocks to Watchlist manually (star or bookmark icon)
+- Watchlisted stocks appear:
+  - On Homepage (highlighted)
+  - In a dedicated Watchlist page (future-ready)
+
+----------------------------------------
+WATCHLIST BEHAVIOR
+----------------------------------------
+
+For watchlisted stocks:
+- Highlight changes in:
+  - Action Guidance
+  - Market Regime
+- Prepare architecture for alerts:
+  "Tindakan berubah dari Tunggu → Akumulasi"
+
+Do NOT implement alerts yet.
+Just ensure architecture supports it.
+
+================================================
+PART 3 — CONSISTENCY & UX SAFETY CHECK
+================================================
+
+Before completing, verify:
+
+1. A stock with:
+   - High Readiness + Action WAIT
+   clearly explains:
+   "Struktur siap, tapi belum waktu eksekusi"
+
+2. A stock with:
+   - High Readiness + Action BUY
+   feels like a natural transition, not a contradiction
+
+3. Homepage categories NEVER contradict
+   the stock detail page Action Guidance
+
+4. No English explanation remains anywhere in the UI.
+
+================================================
+FINAL OUTPUT
+================================================
+
+Deliver a Homepage that:
+- Instantly answers "Hari ini fokus ke mana?"
+- Feels simple for beginners
+- Feels intelligent for advanced users
+- Is clearly superior to Stockbit, RTI, and Telegram groups
+
+If any part of this Homepage or Watchlist Mode does not exist yet,
+IMPLEMENT it fully and integrate it cleanly with existing logic.

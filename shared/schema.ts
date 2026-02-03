@@ -81,3 +81,17 @@ export const insertStockSchema = createInsertSchema(stocks).omit({
 
 export type Stock = typeof stocks.$inferSelect;
 export type InsertStock = z.infer<typeof insertStockSchema>;
+
+export const watchlist = pgTable("watchlist", {
+  id: serial("id").primaryKey(),
+  symbol: text("symbol").notNull(),
+  addedAt: timestamp("added_at").defaultNow(),
+});
+
+export const insertWatchlistSchema = createInsertSchema(watchlist).omit({
+  id: true,
+  addedAt: true,
+});
+
+export type WatchlistItem = typeof watchlist.$inferSelect;
+export type InsertWatchlistItem = z.infer<typeof insertWatchlistSchema>;
