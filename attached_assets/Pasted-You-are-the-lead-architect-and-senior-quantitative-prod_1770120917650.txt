@@ -1,0 +1,153 @@
+You are the lead architect and senior quantitative product engineer for an Indonesian stock intelligence platform focused on institutional behavior (bandarmology).
+
+GOAL:
+Unify Action Guidance, Smart Money Readiness Score, and Market Regime into ONE consistent, explainable, and contradiction-free decision system that feels intelligent, local, and trustworthy for Indonesian retail investors.
+
+CRITICAL PRINCIPLES (DO NOT VIOLATE):
+1. The app is NOT a signal provider. It is a decision intelligence system.
+2. All explanations, labels, AI narratives, warnings, and UI text MUST be in Bahasa Indonesia.
+3. The system must support multiple valid outcomes without confusion.
+4. UX must feel like ONE brain, not disconnected indicators.
+5. Do NOT remove existing bandarmology logic (market regime, broker roles, flow quality, etc).
+
+--------------------------------------------------
+CORE COGNITIVE MODEL (MANDATORY)
+--------------------------------------------------
+
+The system must always follow this hierarchy:
+
+STRUCTURE → READINESS → ACTION
+
+1) STRUCTURE (slow, institutional)
+   - Market Regime (Akumulasi, Distribusi, dll)
+   - Bandar behavior
+   - Broker Control & Stability
+   - Flow Quality
+
+2) READINESS (probabilistic, mid-term)
+   - Smart Money Readiness Score (0–100)
+   - Conviction Lifecycle
+   - Structural alignment
+
+3) ACTION (execution guidance, short-term)
+   - Layak Akumulasi / Tunggu / Hindari / Kurangi
+   - Risk context
+   - Failure conditions
+
+Action Guidance ALWAYS has final authority.
+Readiness Score NEVER overrides Action Guidance.
+
+--------------------------------------------------
+ACTION vs READINESS LOGIC (MUST IMPLEMENT)
+--------------------------------------------------
+
+Support ALL valid combinations:
+
+A) Readiness HIGH + Action TUNGGU
+   → Status: Watchlist Prioritas
+   → Explanation: Struktur siap, namun belum ada jendela eksekusi optimal
+
+B) Readiness HIGH + Action BELI
+   → Status: Layak Akumulasi Bertahap
+   → Explanation: Struktur + momentum selaras
+
+C) Readiness MEDIUM + Action BELI
+   → Status: Spekulatif Terkontrol
+   → Explanation: Struktur awal, risiko masih ada
+
+D) Readiness HIGH + Action HINDARI / KURANGI
+   → Status: Distribusi / Akhir Siklus
+   → Explanation: Skor mencerminkan struktur masa lalu, bukan kondisi distribusi saat ini
+
+E) Readiness LOW + Action TUNGGU / HINDARI
+   → Status: Tidak Ada Setup Menarik
+
+NO COMBINATION should feel like a bug or contradiction.
+
+--------------------------------------------------
+SMART MONEY READINESS PANEL (REDESIGN)
+--------------------------------------------------
+
+1) Default View:
+   - "Smart Money Readiness: XX / 100"
+   - Subtitle: "Penilaian kesiapan struktural (bukan sinyal beli)"
+   - CTA: "Bagaimana skor ini dihitung?"
+
+2) Expandable Explanation Panel:
+   - Apa itu Readiness Score
+   - Komponen Penilaian:
+       • Rezim Pasar
+       • Kualitas Aliran Dana
+       • Stabilitas Broker
+       • Risiko Distribusi
+       • Sinkronisasi Asing–Domestik
+   - Kenapa skor tinggi belum tentu beli
+   - Kapan skor menjadi aktif
+
+--------------------------------------------------
+ACTION GUIDANCE PANEL (MANDATORY)
+--------------------------------------------------
+
+Create a clear “Tindakan Paling Masuk Akal Saat Ini” panel that includes:
+
+- Primary Action (Buy / Tunggu / Hindari / Kurangi)
+- Confidence level
+- Why this action is chosen
+- Risiko utama
+- Kapan tesis ini gagal
+
+DISCLAIMER (small text):
+"Panduan ini bersifat probabilistik, bukan sinyal transaksi."
+
+--------------------------------------------------
+WATCHLIST MODE (CRITICAL)
+--------------------------------------------------
+
+Automatically activate Watchlist Mode when:
+- Readiness Score ≥ 75
+- Action ≠ Buy
+
+UI Requirements:
+- Label: "Watchlist Prioritas"
+- Explanation:
+  "Saham sedang dipersiapkan oleh pelaku besar, namun belum waktunya masuk."
+- Highlight stock in homepage / scans
+- Enable alert when Action changes
+
+--------------------------------------------------
+LOCALIZATION REQUIREMENTS
+--------------------------------------------------
+
+Ensure ALL AI-generated content is in Bahasa Indonesia, including:
+- AI Summary
+- Flow explanations
+- Market regime descriptions
+- Risk analysis
+- Insider analysis
+- Action guidance
+- Warnings and tooltips
+
+NO English explanations should remain.
+
+--------------------------------------------------
+QUALITY REQUIREMENTS
+--------------------------------------------------
+
+- No duplicated indicators with the same meaning
+- Remove or merge overlapping panels if redundant
+- Ensure logical consistency across tabs (Ringkasan, Aliran Dana, Risiko, Insider)
+- App must compile with ZERO TypeScript errors
+- Do NOT remove existing features
+- If a feature described above does not exist yet, IMPLEMENT it
+
+--------------------------------------------------
+FINAL OUTPUT
+--------------------------------------------------
+
+Modify frontend and backend code directly so that:
+- The app behaves as one coherent intelligence system
+- UX feels intentional, premium, and locally built for Indonesian investors
+- All explanations are clear even for beginner retail investors
+- The system is explainable, defensible, and trustworthy
+
+Proceed with implementation now.

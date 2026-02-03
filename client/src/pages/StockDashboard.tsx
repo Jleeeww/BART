@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
-import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp, EyeOff } from "lucide-react";
+import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp, EyeOff, Eye, HelpCircle, BarChart3 } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 // IDX Market Session Status based on WIB time
@@ -312,58 +312,81 @@ export default function StockDashboard() {
                     {/* ACTION GUIDANCE MODE - HERO POSITION */}
                     {!aiLoading && aiData?.actionGuidance && (
                       <Card className={`p-6 border-2 shadow-lg ${
-                        aiData.actionGuidance.color === "green" 
+                        aiData.actionGuidance.statusColor === "green" 
                           ? "border-emerald-400 dark:border-emerald-600 bg-gradient-to-br from-emerald-500/15 to-emerald-500/5" 
-                          : aiData.actionGuidance.color === "yellow"
+                          : aiData.actionGuidance.statusColor === "yellow"
                             ? "border-amber-400 dark:border-amber-600 bg-gradient-to-br from-amber-500/15 to-amber-500/5"
-                            : aiData.actionGuidance.color === "red"
-                              ? "border-red-400 dark:border-red-600 bg-gradient-to-br from-red-500/15 to-red-500/5"
-                              : "border-slate-400 dark:border-slate-600 bg-gradient-to-br from-slate-500/15 to-slate-500/5"
+                            : aiData.actionGuidance.statusColor === "orange"
+                              ? "border-orange-400 dark:border-orange-600 bg-gradient-to-br from-orange-500/15 to-orange-500/5"
+                              : aiData.actionGuidance.statusColor === "red"
+                                ? "border-red-400 dark:border-red-600 bg-gradient-to-br from-red-500/15 to-red-500/5"
+                                : "border-slate-400 dark:border-slate-600 bg-gradient-to-br from-slate-500/15 to-slate-500/5"
                       }`} data-testid="card-action-guidance">
                         <div className="flex flex-col gap-4">
                           {/* Title */}
                           <div className="flex items-center gap-2">
                             <Target className="w-5 h-5 text-primary" />
                             <h2 className="text-base font-bold font-display text-foreground">
-                              Tindakan yang Paling Masuk Akal Saat Ini
+                              Tindakan Paling Masuk Akal Saat Ini
                             </h2>
                           </div>
                           
-                          {/* Main Action Badge */}
+                          {/* Combined Status Badge (Primary) */}
                           <div className="flex flex-wrap items-center gap-3">
                             <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wide ${
-                              aiData.actionGuidance.color === "green" 
+                              aiData.actionGuidance.statusColor === "green" 
                                 ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300" 
-                                : aiData.actionGuidance.color === "yellow"
+                                : aiData.actionGuidance.statusColor === "yellow"
                                   ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
-                                  : aiData.actionGuidance.color === "red"
-                                    ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
-                                    : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                            }`} data-testid="badge-action-state">
+                                  : aiData.actionGuidance.statusColor === "orange"
+                                    ? "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300"
+                                    : aiData.actionGuidance.statusColor === "red"
+                                      ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
+                                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                            }`} data-testid="badge-combined-status">
                               <span className={`w-2.5 h-2.5 rounded-full ${
-                                aiData.actionGuidance.color === "green" ? "bg-emerald-500" 
-                                  : aiData.actionGuidance.color === "yellow" ? "bg-amber-500"
-                                    : aiData.actionGuidance.color === "red" ? "bg-red-500"
-                                      : "bg-slate-400"
+                                aiData.actionGuidance.statusColor === "green" ? "bg-emerald-500" 
+                                  : aiData.actionGuidance.statusColor === "yellow" ? "bg-amber-500"
+                                    : aiData.actionGuidance.statusColor === "orange" ? "bg-orange-500"
+                                      : aiData.actionGuidance.statusColor === "red" ? "bg-red-500"
+                                        : "bg-slate-400"
                               }`}></span>
-                              {aiData.actionGuidance.label}
+                              {aiData.actionGuidance.statusLabel}
                             </span>
+                            
+                            {/* Watchlist Priority Tag */}
+                            {aiData.actionGuidance.isWatchlistPriority && (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300" data-testid="badge-watchlist-priority">
+                                <Eye className="w-3.5 h-3.5" />
+                                Pantau Prioritas
+                              </span>
+                            )}
                           </div>
                           
-                          {/* Confidence Layer */}
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                              Keyakinan Struktur:
-                            </span>
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                              aiData.actionGuidance.confidence === "Tinggi" 
-                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                                : aiData.actionGuidance.confidence === "Sedang"
-                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                                  : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
-                            }`} data-testid="badge-confidence">
-                              {aiData.actionGuidance.confidence}
-                            </span>
+                          {/* Primary Action & Confidence */}
+                          <div className="flex flex-wrap items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                                Aksi:
+                              </span>
+                              <span className="text-sm font-medium text-foreground" data-testid="text-primary-action">
+                                {aiData.actionGuidance.primaryActionLabel}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                                Keyakinan:
+                              </span>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded ${
+                                aiData.actionGuidance.confidence === "Tinggi" 
+                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                                  : aiData.actionGuidance.confidence === "Sedang"
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                    : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                              }`} data-testid="badge-confidence">
+                                {aiData.actionGuidance.confidence}
+                              </span>
+                            </div>
                           </div>
                           
                           {/* Short AI Summary */}
@@ -538,7 +561,7 @@ export default function StockDashboard() {
                                       ? "bg-amber-100 dark:bg-amber-900/40"
                                       : "bg-red-100 dark:bg-red-900/40"
                               }`}>
-                                <Target className={`w-7 h-7 ${
+                                <BarChart3 className={`w-7 h-7 ${
                                   aiData.smartMoneyReadinessScore.score >= 75 
                                     ? "text-emerald-600 dark:text-emerald-400" 
                                     : aiData.smartMoneyReadinessScore.score >= 55
@@ -549,7 +572,8 @@ export default function StockDashboard() {
                                 }`} />
                               </div>
                               <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Smart Money Readiness</p>
+                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Kesiapan Smart Money</p>
+                                <p className="text-[10px] text-muted-foreground/70 mb-1">Penilaian kesiapan struktural (bukan sinyal beli)</p>
                                 <div className="flex items-baseline gap-2">
                                   <span className={`text-3xl font-bold font-display ${
                                     aiData.smartMoneyReadinessScore.score >= 75 
@@ -598,42 +622,74 @@ export default function StockDashboard() {
                           
                           {/* Expandable Detail Section */}
                           <Collapsible className="pt-2 border-t border-border/30">
-                            <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group" data-testid="button-expand-grading">
-                              <span>Bagaimana Skor Ini Dinilai?</span>
-                              <ChevronDown className="w-4 h-4 group-data-[state=open]:hidden" />
-                              <ChevronUp className="w-4 h-4 hidden group-data-[state=open]:block" />
+                            <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors group" data-testid="button-expand-grading">
+                              <span className="flex items-center gap-1.5">
+                                <HelpCircle className="w-4 h-4" />
+                                Bagaimana skor ini dihitung?
+                              </span>
+                              <ChevronDown className="w-4 h-4 transition-transform group-data-[state=open]:rotate-180" />
                             </CollapsibleTrigger>
                             <CollapsibleContent className="pt-3 space-y-4" data-testid="section-grading-detail">
+                              {/* What is Readiness Score */}
+                              <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                                <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-widest mb-1">Apa itu Skor Kesiapan?</p>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  Skor Kesiapan mengukur kesiapan struktural saham berdasarkan perilaku institusional. 
+                                  Skor tinggi menunjukkan fondasi yang kuat, namun bukan berarti saham harus dibeli sekarang.
+                                </p>
+                              </div>
+                              
                               {/* Component Breakdown Table */}
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="border-b border-border/50">
-                                      <th className="text-left py-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">Komponen</th>
-                                      <th className="text-center py-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">Bobot</th>
-                                      <th className="text-right py-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">Kondisi Saat Ini</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {aiData.smartMoneyReadinessScore.components.map((comp: { name: string; weight: string; condition: string }, idx: number) => (
-                                      <tr key={idx} className="border-b border-border/30 last:border-b-0" data-testid={`row-component-${idx}`}>
-                                        <td className="py-2 text-foreground font-medium">{comp.name}</td>
-                                        <td className="py-2 text-center text-muted-foreground">{comp.weight}</td>
-                                        <td className="py-2 text-right">
-                                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                                            comp.condition.includes("Aktif") || comp.condition.includes("Kuat") || comp.condition.includes("Konsisten") || comp.condition.includes("Selaras") || comp.condition.includes("Rendah")
-                                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                              : comp.condition.includes("Rapuh") || comp.condition.includes("Parsial") || comp.condition.includes("Netral") || comp.condition.includes("Sedang") || comp.condition.includes("Tersembunyi")
-                                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                                                : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                                          }`}>
-                                            {comp.condition}
-                                          </span>
-                                        </td>
+                              <div>
+                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Komponen Penilaian</p>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-border/50">
+                                        <th className="text-left py-2 text-xs font-semibold text-muted-foreground">Komponen</th>
+                                        <th className="text-center py-2 text-xs font-semibold text-muted-foreground">Bobot</th>
+                                        <th className="text-right py-2 text-xs font-semibold text-muted-foreground">Kondisi</th>
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                                    </thead>
+                                    <tbody>
+                                      {aiData.smartMoneyReadinessScore.components.map((comp: { name: string; weight: string; condition: string }, idx: number) => (
+                                        <tr key={idx} className="border-b border-border/30 last:border-b-0" data-testid={`row-component-${idx}`}>
+                                          <td className="py-2 text-foreground font-medium">{comp.name}</td>
+                                          <td className="py-2 text-center text-muted-foreground">{comp.weight}</td>
+                                          <td className="py-2 text-right">
+                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                                              comp.condition.includes("Aktif") || comp.condition.includes("Kuat") || comp.condition.includes("Konsisten") || comp.condition.includes("Selaras") || comp.condition.includes("Rendah")
+                                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                                : comp.condition.includes("Rapuh") || comp.condition.includes("Parsial") || comp.condition.includes("Netral") || comp.condition.includes("Sedang") || comp.condition.includes("Tersembunyi")
+                                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                                                  : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                                            }`}>
+                                              {comp.condition}
+                                            </span>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                              
+                              {/* Why high score doesn't mean buy */}
+                              <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                                <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-1">Kenapa skor tinggi belum tentu beli?</p>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  Skor tinggi mencerminkan struktur yang siap, namun momentum eksekusi (jendela masuk) ditentukan oleh Action Guidance di atas.
+                                  Skor dapat tinggi saat distribusi berlangsung karena mencerminkan struktur masa lalu.
+                                </p>
+                              </div>
+                              
+                              {/* When score becomes active */}
+                              <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest mb-1">Kapan skor menjadi aktif?</p>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                  Skor menjadi aktif ketika Action Guidance menunjukkan "Layak Akumulasi" atau "Spekulatif Terkontrol".
+                                  Pada status "Watchlist Prioritas", skor sudah tinggi namun belum ada jendela eksekusi optimal.
+                                </p>
                               </div>
                               
                               {/* AI Grading Explanation */}

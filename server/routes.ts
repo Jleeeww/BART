@@ -971,70 +971,130 @@ export async function registerRoutes(
       const insiderStatus = insiderBandarAlignment.status;
       const insiderAlignment = insiderStatus === "Selaras" ? 80 : insiderStatus === "Netral" ? 50 : 20;
       
-      // Determine if regime is accumulation
+      // Determine regime categories
       const isAccumulationRegime = regime === "Stealth Accumulation" || regime === "Active Accumulation";
       const isDistributionRegime = regime === "Distribution into Strength" || regime === "Passive Distribution" || regime === "Post-Distribution Vacuum";
       const isHighRisk = riskLevel === "Tinggi" || riskLevel === "Sangat Tinggi";
       
       // ========================================
-      // ACTION GUIDANCE LOGIC (DETERMINISTIC)
+      // UNIFIED ACTION GUIDANCE LOGIC
+      // Hierarchy: STRUCTURE → READINESS → ACTION
+      // Action Guidance ALWAYS has final authority
       // ========================================
-      let actionState: "BOLEH_AKUMULASI" | "TUNGGU_KONFIRMASI" | "RISIKO_TINGGI" | "TIDAK_ADA_SETUP";
-      let actionLabel: string;
-      let actionColor: "green" | "yellow" | "red" | "gray";
+      
+      // Step 1: Determine Primary Action (BELI / TUNGGU / HINDARI / KURANGI)
+      type PrimaryAction = "BELI" | "TUNGGU" | "HINDARI" | "KURANGI";
+      let primaryAction: PrimaryAction;
+      
+      if (isDistributionRegime && readinessScore >= 60) {
+        // High readiness but distribution = sell cycle ending
+        primaryAction = "KURANGI";
+      } else if (isHighRisk || isDistributionRegime) {
+        // High risk or distribution = avoid
+        primaryAction = "HINDARI";
+      } else if (isAccumulationRegime && !isHighRisk && flowQuality >= 50) {
+        // Accumulation regime with good flow = can buy
+        primaryAction = "BELI";
+      } else {
+        // Otherwise wait for confirmation
+        primaryAction = "TUNGGU";
+      }
+      
+      // Step 2: Determine Combined Status based on Action + Readiness
+      // Support ALL valid combinations per spec:
+      // A) Readiness HIGH + Action TUNGGU → Watchlist Prioritas
+      // B) Readiness HIGH + Action BELI → Layak Akumulasi Bertahap
+      // C) Readiness MEDIUM + Action BELI → Spekulatif Terkontrol
+      // D) Readiness HIGH + Action HINDARI/KURANGI → Distribusi / Akhir Siklus
+      // E) Readiness LOW + Action TUNGGU/HINDARI → Tidak Ada Setup Menarik
+      
+      type CombinedStatus = 
+        | "LAYAK_AKUMULASI" 
+        | "WATCHLIST_PRIORITAS" 
+        | "SPEKULATIF_TERKONTROL" 
+        | "DISTRIBUSI_AKHIR_SIKLUS" 
+        | "TIDAK_ADA_SETUP";
+      
+      let combinedStatus: CombinedStatus;
+      let statusLabel: string;
+      let statusColor: "green" | "yellow" | "orange" | "red" | "gray";
       let shortSummary: string;
       let whyAction: string[];
       let mainRisk: string;
       let failureTrigger: string;
+      let isWatchlistPriority = false;
       
-      // Logic 1: BOLEH AKUMULASI BERTAHAP
-      if (readinessScore >= 75 && isAccumulationRegime && !isHighRisk) {
-        actionState = "BOLEH_AKUMULASI";
-        actionLabel = "Boleh Akumulasi Bertahap";
-        actionColor = "green";
-        shortSummary = "Struktur akumulasi masih berlangsung dengan kendali institusi yang relatif stabil. Risiko distribusi belum dominan, namun tetap perlu pemantauan berkelanjutan.";
+      const isReadinessHigh = readinessScore >= 75;
+      const isReadinessMedium = readinessScore >= 50 && readinessScore < 75;
+      const isReadinessLow = readinessScore < 50;
+      
+      // Combination B: Readiness HIGH + Action BELI → Layak Akumulasi Bertahap
+      if (isReadinessHigh && primaryAction === "BELI") {
+        combinedStatus = "LAYAK_AKUMULASI";
+        statusLabel = "Layak Akumulasi Bertahap";
+        statusColor = "green";
+        shortSummary = "Struktur dan momentum selaras. Kondisi mendukung akumulasi bertahap dengan manajemen risiko yang tepat.";
         whyAction = [
-          "Rezim pasar menunjukkan fase akumulasi dengan partisipasi institusi yang konsisten",
-          "Skor kesiapan struktural berada di level yang mendukung"
+          "Rezim pasar dalam fase akumulasi dengan partisipasi institusi yang konsisten",
+          "Skor kesiapan struktural tinggi menunjukkan fondasi yang kuat",
+          "Kualitas aliran dana mendukung tesis akumulasi"
         ];
         mainRisk = "Perubahan rezim pasar secara tiba-tiba dapat mengubah dinamika akumulasi.";
         failureTrigger = "Jika muncul sinyal distribusi dominan atau kendali institusi melemah secara signifikan.";
       }
-      // Logic 2: RISIKO TINGGI UNTUK ENTRY BARU
-      else if (isHighRisk || isDistributionRegime) {
-        actionState = "RISIKO_TINGGI";
-        actionLabel = "Risiko Tinggi untuk Entry Baru";
-        actionColor = "red";
-        shortSummary = "Struktur saat ini menunjukkan karakteristik distribusi atau risiko yang meningkat. Entry baru pada fase ini memiliki probabilitas keberhasilan yang lebih rendah.";
+      // Combination A: Readiness HIGH + Action TUNGGU → Watchlist Prioritas
+      else if (isReadinessHigh && primaryAction === "TUNGGU") {
+        combinedStatus = "WATCHLIST_PRIORITAS";
+        statusLabel = "Watchlist Prioritas";
+        statusColor = "yellow";
+        isWatchlistPriority = true;
+        shortSummary = "Struktur siap, namun belum ada jendela eksekusi optimal. Saham sedang dipersiapkan oleh pelaku besar, namun belum waktunya masuk.";
         whyAction = [
-          "Rezim pasar berada dalam fase distribusi atau tekanan jual meningkat",
-          "Indikator risiko menunjukkan tingkat kewaspadaan yang tinggi"
+          "Skor kesiapan struktural tinggi menunjukkan persiapan institusional",
+          "Rezim pasar belum memberikan konfirmasi penuh untuk aksi",
+          "Menunggu momentum eksekusi yang lebih jelas"
         ];
-        mainRisk = "Potensi penurunan harga lebih lanjut sebelum stabilisasi.";
-        failureTrigger = "Jika distribusi berlanjut atau tidak ada tanda-tanda penyerapan institusional.";
+        mainRisk = "Kesempatan dapat hilang jika terlalu lama menunggu konfirmasi.";
+        failureTrigger = "Jika struktur melemah atau rezim bergeser ke distribusi sebelum jendela eksekusi terbuka.";
       }
-      // Logic 3: TUNGGU KONFIRMASI
-      else if (readinessScore >= 55 && readinessScore < 75) {
-        actionState = "TUNGGU_KONFIRMASI";
-        actionLabel = "Tunggu Konfirmasi";
-        actionColor = "yellow";
-        shortSummary = "Struktur sedang membaik namun belum sepenuhnya matang. Konfirmasi tambahan diperlukan sebelum mempertimbangkan aksi.";
+      // Combination C: Readiness MEDIUM + Action BELI → Spekulatif Terkontrol
+      else if (isReadinessMedium && primaryAction === "BELI") {
+        combinedStatus = "SPEKULATIF_TERKONTROL";
+        statusLabel = "Spekulatif Terkontrol";
+        statusColor = "orange";
+        shortSummary = "Struktur awal terbentuk dengan risiko yang masih ada. Aksi dimungkinkan dengan sizing yang lebih konservatif.";
         whyAction = [
-          "Skor kesiapan berada di zona transisi yang memerlukan validasi",
-          "Rezim pasar belum menunjukkan konfirmasi penuh untuk akumulasi"
+          "Rezim pasar menunjukkan fase akumulasi awal",
+          "Skor kesiapan berada di zona transisi dengan potensi perbaikan",
+          "Risiko terukur namun belum sepenuhnya terkendali"
         ];
         mainRisk = "Struktur dapat berbalik arah jika konfirmasi tidak terjadi.";
-        failureTrigger = "Jika skor kesiapan turun di bawah 55 atau muncul sinyal distribusi.";
+        failureTrigger = "Jika skor kesiapan turun di bawah 50 atau muncul sinyal distribusi.";
       }
-      // Logic 4: TIDAK ADA SETUP MENARIK
+      // Combination D: Readiness HIGH + Action HINDARI/KURANGI → Distribusi / Akhir Siklus
+      else if (isReadinessHigh && (primaryAction === "HINDARI" || primaryAction === "KURANGI")) {
+        combinedStatus = "DISTRIBUSI_AKHIR_SIKLUS";
+        statusLabel = "Distribusi / Akhir Siklus";
+        statusColor = "red";
+        shortSummary = "Skor mencerminkan struktur masa lalu, bukan kondisi distribusi saat ini. Fase distribusi sedang berlangsung atau mendekati akhir siklus.";
+        whyAction = [
+          "Rezim pasar menunjukkan fase distribusi aktif",
+          "Skor kesiapan tinggi adalah warisan dari akumulasi sebelumnya",
+          "Institusi mulai mengurangi posisi secara bertahap"
+        ];
+        mainRisk = "Potensi penurunan harga lebih lanjut sebelum siklus baru dimulai.";
+        failureTrigger = "Jika distribusi berlanjut tanpa tanda-tanda penyerapan baru.";
+      }
+      // Combination E & Default: Readiness LOW/MEDIUM + Action TUNGGU/HINDARI → Tidak Ada Setup Menarik
       else {
-        actionState = "TIDAK_ADA_SETUP";
-        actionLabel = "Tidak Ada Setup Menarik Saat Ini";
-        actionColor = "gray";
+        combinedStatus = "TIDAK_ADA_SETUP";
+        statusLabel = "Tidak Ada Setup Menarik";
+        statusColor = "gray";
         shortSummary = "Struktur pasar tidak menunjukkan pola yang jelas untuk aksi. Lebih baik menunggu hingga kondisi lebih mendukung.";
         whyAction = [
-          "Skor kesiapan struktural berada di level rendah",
-          "Tidak ada indikasi akumulasi institusional yang kuat"
+          "Skor kesiapan struktural berada di level yang tidak mendukung",
+          "Tidak ada indikasi akumulasi institusional yang kuat",
+          "Rezim pasar tidak memberikan sinyal yang jelas"
         ];
         mainRisk = "Pergerakan harga cenderung tidak terarah atau acak.";
         failureTrigger = "Jika kondisi ini berlanjut tanpa perubahan fundamental.";
@@ -1060,7 +1120,7 @@ export async function registerRoutes(
       // Check for contradictions
       const hasContradiction = (signalAlignment.readinessHigh && isDistributionRegime) ||
                                (signalAlignment.regimePositive && isHighRisk) ||
-                               (actionState === "BOLEH_AKUMULASI" && insiderAlignment < 40);
+                               (combinedStatus === "LAYAK_AKUMULASI" && insiderAlignment < 40);
       
       if (hasContradiction) {
         confidence = "Rendah";
@@ -1076,10 +1136,25 @@ export async function registerRoutes(
         confidenceReason = "Sinyal-sinyal utama belum menunjukkan konsistensi yang cukup.";
       }
       
+      // Primary action label in Bahasa
+      const primaryActionLabel = {
+        BELI: "Layak Akumulasi",
+        TUNGGU: "Tunggu Konfirmasi", 
+        HINDARI: "Hindari Entry Baru",
+        KURANGI: "Kurangi Eksposur"
+      }[primaryAction];
+      
       return {
-        state: actionState,
-        label: actionLabel,
-        color: actionColor,
+        // Primary action for the decision
+        primaryAction,
+        primaryActionLabel,
+        // Combined status (Action + Readiness)
+        combinedStatus,
+        statusLabel,
+        statusColor,
+        // Watchlist flag
+        isWatchlistPriority,
+        // Content
         shortSummary,
         confidence,
         confidenceReason,
@@ -1087,6 +1162,15 @@ export async function registerRoutes(
           whyAction,
           mainRisk,
           failureTrigger
+        },
+        // Debug info for transparency
+        _debug: {
+          readinessScore,
+          regime,
+          riskLevel,
+          flowQuality,
+          primaryAction,
+          combinedStatus
         }
       };
     })();
