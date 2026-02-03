@@ -3,6 +3,217 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 
+// ========================================
+// UNIFIED ACTION GUIDANCE ENGINE (LOCKED)
+// Single source of truth for all action guidance
+// 5 States: AKUMULASI_BERTAHAP, WATCHLIST_PRIORITAS, PANTAU_SAJA, HINDARI_DULU, KURANGI_EXIT
+// ========================================
+
+type ActionGuidanceState = 
+  | "AKUMULASI_BERTAHAP"
+  | "WATCHLIST_PRIORITAS"
+  | "PANTAU_SAJA"
+  | "HINDARI_DULU"
+  | "KURANGI_EXIT";
+
+type ActionGuidanceColor = "green" | "yellow" | "blue" | "red" | "black";
+
+interface ActionGuidanceInput {
+  readinessScore: number;
+  marketRegime: string;
+  flowReliability: string;
+  isDistributionActive: boolean;
+  isVolatilityUnhealthy: boolean;
+  isEntryValid: boolean;
+}
+
+interface ActionGuidanceResult {
+  state: ActionGuidanceState;
+  label: string;
+  color: ActionGuidanceColor;
+  shortSummary: string;
+  whyAction: string[];
+  mainRisk: string;
+  failureTrigger: string;
+  homepageBucket: "siap_dipantau" | "watchlist_prioritas" | "hindari_dulu";
+}
+
+function computeUnifiedActionGuidance(input: ActionGuidanceInput): ActionGuidanceResult {
+  const { 
+    readinessScore, 
+    marketRegime, 
+    flowReliability, 
+    isDistributionActive, 
+    isVolatilityUnhealthy,
+    isEntryValid
+  } = input;
+
+  // Check regime conditions
+  const isAccumulationRegime = marketRegime.includes("Akumulasi") || 
+    marketRegime === "Stealth Accumulation" || 
+    marketRegime === "Active Accumulation";
+  
+  const isDistributionRegime = marketRegime.includes("Distribusi") ||
+    marketRegime === "Distribution into Strength" || 
+    marketRegime === "Passive Distribution" || 
+    marketRegime === "Post-Distribution Vacuum";
+
+  const isFlowReliable = flowReliability === "Tinggi" || flowReliability === "High";
+
+  // ========================================
+  // STATE 5: KURANGI / EXIT (FOR HOLDERS ONLY)
+  // Distribusi institusi terdeteksi + readiness turun tajam
+  // ========================================
+  if (isDistributionActive && readinessScore >= 60) {
+    return {
+      state: "KURANGI_EXIT",
+      label: "Kurangi / Exit",
+      color: "black",
+      shortSummary: "Untuk investor yang sudah memiliki saham: distribusi institusi terdeteksi, pertimbangkan untuk mengurangi posisi.",
+      whyAction: [
+        "Distribusi institusi terdeteksi pada aliran dana",
+        "Perubahan peran broker dominan menunjukkan exit",
+        "Siklus akumulasi sudah berakhir"
+      ],
+      mainRisk: "Penurunan harga lebih lanjut jika distribusi berlanjut.",
+      failureTrigger: "Jika distribusi berhenti dan muncul sinyal akumulasi baru.",
+      homepageBucket: "hindari_dulu"
+    };
+  }
+
+  // ========================================
+  // STATE 4: HINDARI DULU (DO NOT BUY)
+  // Readiness < 40 OR Distribution regime OR Unhealthy volatility
+  // ========================================
+  if (readinessScore < 40 || isDistributionRegime || isVolatilityUnhealthy) {
+    return {
+      state: "HINDARI_DULU",
+      label: "Hindari Dulu",
+      color: "red",
+      shortSummary: "Risiko lebih besar daripada potensi. Hindari entry baru pada kondisi saat ini.",
+      whyAction: [
+        isDistributionRegime ? "Rezim pasar dalam fase distribusi" : "Skor kesiapan struktural rendah",
+        isVolatilityUnhealthy ? "Volatilitas tidak sehat terdeteksi" : "Tidak ada dominasi institusi yang mendukung",
+        "Risiko penurunan lebih tinggi daripada potensi kenaikan"
+      ],
+      mainRisk: "Potensi penurunan harga signifikan jika kondisi memburuk.",
+      failureTrigger: "Jika muncul sinyal akumulasi baru dan struktur membaik.",
+      homepageBucket: "hindari_dulu"
+    };
+  }
+
+  // ========================================
+  // STATE 3: PANTAU SAJA (NEUTRAL)
+  // Readiness 40-59, no clear edge
+  // ========================================
+  if (readinessScore >= 40 && readinessScore < 60) {
+    return {
+      state: "PANTAU_SAJA",
+      label: "Pantau Saja",
+      color: "blue",
+      shortSummary: "Tidak ada edge struktural saat ini. Tunggu hingga kondisi lebih jelas.",
+      whyAction: [
+        "Skor kesiapan berada di zona netral",
+        "Rezim pasar dalam transisi atau tidak jelas",
+        "Tidak ada dominasi institusi yang kuat"
+      ],
+      mainRisk: "Pergerakan harga cenderung tidak terarah.",
+      failureTrigger: "Jika kondisi ini berlanjut tanpa perbaikan fundamental.",
+      homepageBucket: "hindari_dulu" // Pantau Saja goes to Hindari bucket on homepage (not actionable)
+    };
+  }
+
+  // ========================================
+  // STATE 2: WATCHLIST PRIORITAS (PREPARE)
+  // Readiness 60-79 OR Readiness ≥80 but entry not valid
+  // ========================================
+  if (readinessScore >= 60 && readinessScore < 80) {
+    return {
+      state: "WATCHLIST_PRIORITAS",
+      label: "Watchlist Prioritas",
+      color: "yellow",
+      shortSummary: "Saham menarik, tetapi belum boleh dibeli. Struktur sedang dipersiapkan pelaku besar.",
+      whyAction: [
+        "Skor kesiapan struktural menunjukkan persiapan institusional",
+        "Struktur sedang dipersiapkan oleh pelaku besar",
+        "Menunggu konfirmasi entry yang lebih jelas"
+      ],
+      mainRisk: "Kesempatan dapat hilang jika terlalu lama menunggu.",
+      failureTrigger: "Jika struktur melemah atau rezim bergeser ke distribusi.",
+      homepageBucket: "watchlist_prioritas"
+    };
+  }
+
+  // Readiness ≥80 but entry not valid yet
+  if (readinessScore >= 80 && !isEntryValid) {
+    return {
+      state: "WATCHLIST_PRIORITAS",
+      label: "Watchlist Prioritas",
+      color: "yellow",
+      shortSummary: "Struktur siap, namun belum ada jendela eksekusi optimal. Saham sedang dipersiapkan, belum waktunya masuk.",
+      whyAction: [
+        "Skor kesiapan struktural tinggi menunjukkan fondasi kuat",
+        "Jendela eksekusi belum optimal",
+        "Menunggu momentum entry yang lebih jelas"
+      ],
+      mainRisk: "Kesempatan dapat hilang jika terlalu lama menunggu konfirmasi.",
+      failureTrigger: "Jika struktur melemah sebelum jendela eksekusi terbuka.",
+      homepageBucket: "siap_dipantau" // High readiness goes to Siap Dipantau
+    };
+  }
+
+  // ========================================
+  // STATE 1: AKUMULASI BERTAHAP (BUY - CONTROLLED)
+  // Readiness ≥80 + entry valid + all conditions met
+  // ========================================
+  if (readinessScore >= 80 && isEntryValid && isAccumulationRegime && isFlowReliable && !isDistributionActive) {
+    return {
+      state: "AKUMULASI_BERTAHAP",
+      label: "Akumulasi Bertahap",
+      color: "green",
+      shortSummary: "Saham boleh dibeli sekarang secara bertahap dan disiplin. Struktur dan momentum selaras.",
+      whyAction: [
+        "Rezim pasar dalam fase akumulasi dengan partisipasi institusi konsisten",
+        "Skor kesiapan struktural tinggi menunjukkan fondasi kuat",
+        "Kualitas aliran dana mendukung tesis akumulasi"
+      ],
+      mainRisk: "Perubahan rezim pasar secara tiba-tiba dapat mengubah dinamika.",
+      failureTrigger: "Jika muncul sinyal distribusi dominan atau kendali institusi melemah.",
+      homepageBucket: "siap_dipantau"
+    };
+  }
+
+  // Readiness ≥80 but some condition fails → downgrade to WATCHLIST PRIORITAS
+  if (readinessScore >= 80) {
+    return {
+      state: "WATCHLIST_PRIORITAS",
+      label: "Watchlist Prioritas",
+      color: "yellow",
+      shortSummary: "Struktur siap, namun beberapa kondisi belum terpenuhi. Pantau untuk jendela entry optimal.",
+      whyAction: [
+        "Skor kesiapan tinggi namun belum semua kondisi terpenuhi",
+        !isAccumulationRegime ? "Rezim pasar belum dalam fase akumulasi aktif" : "Menunggu konfirmasi tambahan",
+        !isFlowReliable ? "Reliabilitas aliran dana belum optimal" : "Kondisi entry sedang dievaluasi"
+      ],
+      mainRisk: "Kesempatan dapat terlewat jika terlalu lama menunggu.",
+      failureTrigger: "Jika kondisi memburuk sebelum entry terkonfirmasi.",
+      homepageBucket: "siap_dipantau"
+    };
+  }
+
+  // Fallback (should not reach here)
+  return {
+    state: "PANTAU_SAJA",
+    label: "Pantau Saja",
+    color: "blue",
+    shortSummary: "Tidak ada edge struktural saat ini.",
+    whyAction: ["Kondisi pasar tidak jelas", "Menunggu sinyal yang lebih kuat"],
+    mainRisk: "Pergerakan harga tidak terarah.",
+    failureTrigger: "Jika kondisi ini berlanjut.",
+    homepageBucket: "hindari_dulu"
+  };
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -606,6 +817,7 @@ export async function registerRoutes(
   });
 
   // Get all stocks for homepage with readiness data
+  // Uses UNIFIED ACTION GUIDANCE ENGINE for consistency
   app.get("/api/stocks", async (_req, res) => {
     try {
       const allStocks = await storage.getAllStocks();
@@ -619,7 +831,7 @@ export async function registerRoutes(
         // Parse flow data
         const flowBias = stock.flowBias;
         const flowIntensity = stock.flowIntensity;
-        const flowReliability = stock.flowReliability;
+        const flowReliability = stock.flowReliability || "Sedang";
         
         // Flow Bias scoring
         if (flowBias === "Akumulasi") readinessScore += 20;
@@ -656,38 +868,29 @@ export async function registerRoutes(
           else marketRegime = "Distribusi Akhir Siklus";
         }
 
-        // Determine action guidance and color
-        let actionGuidance = "";
-        let actionColor = "yellow"; // yellow, green, red
+        // Determine if distribution is active
+        const isDistributionActive = flowBias === "Distribusi" && flowIntensity.includes("Besar");
         
-        if (readinessScore >= 80) {
-          actionGuidance = "Layak Akumulasi Bertahap";
-          actionColor = "green";
-        } else if (readinessScore >= 60) {
-          actionGuidance = "Tunggu Konfirmasi";
-          actionColor = "yellow";
-        } else {
-          actionGuidance = "Hindari Entry Baru";
-          actionColor = "red";
-        }
+        // Determine if volatility is unhealthy (simplified check)
+        const isVolatilityUnhealthy = flowBias === "Distribusi" && flowIntensity.includes("Besar");
+        
+        // Determine entry validity based on accumulation regime and flow quality
+        const isAccumulationRegime = flowBias === "Akumulasi";
+        const isFlowReliable = flowReliability === "Tinggi";
+        const isEntryValid = isAccumulationRegime && isFlowReliable && readinessScore >= 80;
 
-        // Generate AI sentence based on readiness
-        let aiSentence = "";
-        if (readinessScore >= 80) {
-          aiSentence = `Struktur siap dengan ${marketRegime.toLowerCase()}, momentum mulai selaras.`;
-        } else if (readinessScore >= 60) {
-          if (flowBias === "Akumulasi") {
-            aiSentence = "Akumulasi belum konsisten, perlu konfirmasi lanjutan.";
-          } else {
-            aiSentence = "Volume belum sinkron dengan arah harga.";
-          }
-        } else {
-          if (flowBias === "Distribusi") {
-            aiSentence = "Distribusi aktif terdeteksi, risiko masih tinggi.";
-          } else {
-            aiSentence = "Flow tidak sehat, struktur belum mendukung.";
-          }
-        }
+        // USE UNIFIED ACTION GUIDANCE ENGINE
+        const actionGuidanceResult = computeUnifiedActionGuidance({
+          readinessScore,
+          marketRegime,
+          flowReliability,
+          isDistributionActive,
+          isVolatilityUnhealthy,
+          isEntryValid
+        });
+
+        // Generate AI sentence based on action guidance
+        const aiSentence = actionGuidanceResult.shortSummary;
 
         return {
           symbol: stock.symbol,
@@ -699,8 +902,11 @@ export async function registerRoutes(
           sectorBadge: stock.sectorBadge,
           readinessScore,
           marketRegime,
-          actionGuidance,
-          actionColor,
+          // Unified Action Guidance
+          actionGuidance: actionGuidanceResult.label,
+          actionColor: actionGuidanceResult.color,
+          actionState: actionGuidanceResult.state,
+          homepageBucket: actionGuidanceResult.homepageBucket,
           aiSentence,
           isInWatchlist: watchlistSymbols.has(stock.symbol),
         };
