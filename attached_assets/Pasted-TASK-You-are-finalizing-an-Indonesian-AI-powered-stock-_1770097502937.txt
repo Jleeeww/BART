@@ -1,0 +1,182 @@
+TASK:
+You are finalizing an Indonesian AI-powered stock intelligence platform.
+
+Implement a Smart Money Readiness Score system and audit the app to ensure
+all logic, UI, and AI explanations align with the agreed institutional design.
+
+This is NOT a trading signal system.
+This is a probabilistic readiness & timing intelligence system.
+
+========================================
+GLOBAL RULES (MANDATORY)
+========================================
+
+- Do NOT add new indicators
+- Use ONLY existing engines:
+  Market Regime, Flow Quality, Control, Stability, Risk Engine, Insider Alignment
+- Backend can be complex, frontend must be simple
+- All AI explanations MUST be Bahasa Indonesia
+- No hype, no certainty, no buy/sell language
+
+========================================
+PART 1 — SMART MONEY READINESS SCORE (CORE)
+========================================
+
+Create a computed score:
+Name: Smart Money Readiness Score
+Range: 0–100
+
+This score answers:
+"Seberapa siap saham ini untuk masuk fase kenaikan berbasis perilaku bandar?"
+
+----------------------------------------
+SCORING COMPONENTS (LOCKED)
+----------------------------------------
+
+1) MARKET REGIME (30%)
+Source: Market Regime Engine
+
+- Stealth Accumulation → 22–26
+- Active Accumulation → 26–30
+- Early Distribution → 10–15
+- Passive Distribution → 5–10
+- Post-Distribution Vacuum → 0–5
+
+2) KUALITAS KENDALI BANDAR (25%)
+Source: Combined Control + Stability + Flow Quality
+
+- Kendali kuat & stabil → 20–25
+- Kendali ada tapi rapuh → 12–19
+- Fragmented / noise → 5–11
+- Distribusi dominan → 0–4
+
+3) ABSORPTION vs PRESSURE (20%)
+Source: Flow vs Price behavior
+
+- Absorpsi konsisten → 16–20
+- Absorpsi parsial → 9–15
+- Tekanan jual dominan → 0–8
+
+4) DISTRIBUTION RISK (15%) [PENALTY]
+Source: Risk Engine
+
+- Risiko Rendah → 12–15
+- Risiko Sedang → 6–11
+- Risiko Tinggi → 0–5
+
+5) INSIDER ALIGNMENT (10%)
+Source: Insider Tab
+
+- Selaras → 8–10
+- Netral → 4–7
+- Bertentangan → 0–3
+
+----------------------------------------
+FINAL SCORE INTERPRETATION (UI TEXT)
+----------------------------------------
+
+75–100:
+"Siap Fase Awal Kenaikan"
+
+55–74:
+"Struktur Membaik, Perlu Konfirmasi"
+
+35–54:
+"Belum Siap, Risiko Masih Tinggi"
+
+0–34:
+"Fase Tidak Menarik / Distribusi"
+
+========================================
+PART 2 — FRONTEND PRESENTATION (CLEAN)
+========================================
+
+In TAB: RINGKASAN
+
+Display:
+
+🎯 Smart Money Readiness: 72 / 100
+Status: Struktur Membaik, Perlu Konfirmasi
+
+Below the score, show ONE short explanation sentence:
+"Struktur aliran dana mendukung, namun fase kampanye belum sepenuhnya matang."
+
+----------------------------------------
+EXPANDABLE DETAIL (VERY IMPORTANT)
+----------------------------------------
+
+Add a clickable / expandable section:
+
+Label:
+"Bagaimana Skor Ini Dinilai?"
+
+When opened, show a SIMPLE breakdown table:
+
+| Komponen | Bobot | Kondisi Saat Ini |
+|--------|-------|------------------|
+| Rezim Pasar | 30% | Akumulasi Aktif |
+| Kendali Bandar | 25% | Kuat & Stabil |
+| Absorpsi | 20% | Parsial |
+| Risiko Distribusi | 15% | Sedang |
+| Insider | 10% | Selaras |
+
+Below table, add AI explanation in Bahasa Indonesia:
+
+"Skor ini dihitung berdasarkan kombinasi fase pasar, kualitas kendali bandar,
+kemampuan pasar menyerap tekanan jual, tingkat risiko distribusi,
+serta keselarasan perilaku insider. Skor tidak bersifat prediktif,
+namun mencerminkan kesiapan struktural saat ini."
+
+IMPORTANT:
+- Do NOT show raw numbers per component
+- Do NOT expose formulas
+- This is for transparency & trust, not reverse engineering
+
+========================================
+PART 3 — INTEGRATION WITH EXISTING TABS
+========================================
+
+- Readiness Score must be CONSISTENT with:
+  Market Regime (Flow tab)
+  Risk Level (Risk tab)
+  Insider Alignment (Insider tab)
+
+If inconsistency is detected:
+- Reduce score
+- Add warning sentence:
+  "Beberapa sinyal belum sepenuhnya selaras."
+
+========================================
+PART 4 — AI LANGUAGE QUALITY AUDIT
+========================================
+
+Audit all AI-generated text and ensure:
+
+GOOD:
+"meningkatkan probabilitas"
+"struktur masih valid selama"
+"perlu konfirmasi lanjutan"
+
+BAD:
+"pasti naik"
+"sinyal beli kuat"
+"target harga"
+
+Replace any BAD patterns.
+
+========================================
+FINAL CHECK
+========================================
+
+Before completing:
+- Ensure no UI clutter added
+- Ensure Readiness Score summarizes, not duplicates indicators
+- Ensure expandable grading explanation exists
+- Ensure tone is calm, professional, Indonesian analyst-style
+
+If any part is missing, IMPLEMENT IT.
+If any part is redundant, SIMPLIFY IT.
+
+OUTPUT:
+A clean, trustworthy Smart Money Readiness Score system that improves
+performance understanding without overwhelming retail users.

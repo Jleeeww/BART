@@ -791,6 +791,171 @@ export async function registerRoutes(
       return { level, explanation, failureTriggers };
     })();
 
+    // ─── SMART MONEY READINESS SCORE (CORE INTELLIGENCE) ───
+    // Answers: "Seberapa siap saham ini untuk masuk fase kenaikan berbasis perilaku bandar?"
+    const smartMoneyReadinessScore = (() => {
+      // 1) MARKET REGIME (30%)
+      let regimeScore = 0;
+      let regimeCondition = "";
+      switch (marketMode) {
+        case "Akumulasi Tersembunyi":
+          regimeScore = 24; // 22-26 range, midpoint
+          regimeCondition = "Akumulasi Tersembunyi";
+          break;
+        case "Akumulasi Aktif":
+          regimeScore = 28; // 26-30 range
+          regimeCondition = "Akumulasi Aktif";
+          break;
+        case "Distribusi Saat Menguat":
+          regimeScore = 12; // 10-15 range
+          regimeCondition = "Distribusi Awal";
+          break;
+        case "Distribusi Pasif":
+          regimeScore = 7; // 5-10 range
+          regimeCondition = "Distribusi Pasif";
+          break;
+        case "Vakum Pasca-Distribusi":
+          regimeScore = 3; // 0-5 range
+          regimeCondition = "Pasca-Distribusi";
+          break;
+        default:
+          regimeScore = 15;
+          regimeCondition = "Transisi";
+      }
+
+      // 2) KUALITAS KENDALI BANDAR (25%)
+      let controlScore = 0;
+      let controlCondition = "";
+      const combinedControl = controlQualityScore.score;
+      if (combinedControl >= 70 && brokerStabilityScore.level === "Tinggi") {
+        controlScore = 23; // 20-25 range
+        controlCondition = "Kuat & Stabil";
+      } else if (combinedControl >= 50 && brokerStabilityScore.level !== "Rendah") {
+        controlScore = 16; // 12-19 range
+        controlCondition = "Ada, Tapi Rapuh";
+      } else if (combinedControl >= 30) {
+        controlScore = 8; // 5-11 range
+        controlCondition = "Terfragmentasi";
+      } else {
+        controlScore = 2; // 0-4 range
+        controlCondition = "Distribusi Dominan";
+      }
+
+      // 3) ABSORPTION vs PRESSURE (20%)
+      let absorptionScore = 0;
+      let absorptionCondition = "";
+      const flowBias = payload.flow_signals.flow_bias;
+      const flowReliability = payload.flow_signals.flow_reliability;
+      if (flowBias === "Akumulasi" && flowReliability === "Tinggi") {
+        absorptionScore = 18; // 16-20 range
+        absorptionCondition = "Konsisten";
+      } else if (flowBias === "Akumulasi") {
+        absorptionScore = 12; // 9-15 range
+        absorptionCondition = "Parsial";
+      } else {
+        absorptionScore = 4; // 0-8 range
+        absorptionCondition = "Tekanan Jual";
+      }
+
+      // 4) DISTRIBUTION RISK (15%) - PENALTY
+      let riskScore = 0;
+      let riskCondition = "";
+      if (simplifiedRisk.level === "Rendah") {
+        riskScore = 13; // 12-15 range
+        riskCondition = "Rendah";
+      } else if (simplifiedRisk.level === "Sedang") {
+        riskScore = 8; // 6-11 range
+        riskCondition = "Sedang";
+      } else {
+        riskScore = 3; // 0-5 range
+        riskCondition = "Tinggi";
+      }
+
+      // 5) INSIDER ALIGNMENT (10%)
+      let insiderScore = 0;
+      let insiderCondition = "";
+      if (insiderBandarAlignment.status === "Selaras") {
+        insiderScore = 9; // 8-10 range
+        insiderCondition = "Selaras";
+      } else if (insiderBandarAlignment.status === "Netral") {
+        insiderScore = 5; // 4-7 range
+        insiderCondition = "Netral";
+      } else {
+        insiderScore = 2; // 0-3 range
+        insiderCondition = "Bertentangan";
+      }
+
+      // Calculate total score
+      const totalScore = regimeScore + controlScore + absorptionScore + riskScore + insiderScore;
+
+      // Check for inconsistencies between signals
+      let hasInconsistency = false;
+      let inconsistencyNote = "";
+      
+      // Check if regime says accumulation but risk is high
+      if (marketMode.includes("Akumulasi") && simplifiedRisk.level === "Tinggi") {
+        hasInconsistency = true;
+      }
+      // Check if insider is misaligned with accumulation phase
+      if (marketMode.includes("Akumulasi") && insiderBandarAlignment.status === "Bertentangan") {
+        hasInconsistency = true;
+      }
+      // Check if control is strong but distribution detected
+      if (controlQualityScore.level === "Tinggi" && earlyDistributionFlag) {
+        hasInconsistency = true;
+      }
+
+      if (hasInconsistency) {
+        inconsistencyNote = "Beberapa sinyal belum sepenuhnya selaras.";
+      }
+
+      // Apply penalty for inconsistency (reduce by 5-10 points)
+      const adjustedScore = hasInconsistency ? Math.max(0, totalScore - 7) : totalScore;
+
+      // Determine status label and explanation
+      // NOTE: All labels are probabilistic/indicative, not predictive
+      let statusLabel = "";
+      let shortExplanation = "";
+      
+      if (adjustedScore >= 75) {
+        statusLabel = "Struktur Mendukung Kesiapan Kenaikan";
+        shortExplanation = "Indikasi struktural menunjukkan probabilitas lebih tinggi untuk potensi fase kenaikan. Ini bukan sinyal waktu masuk, melainkan penilaian kesiapan berdasarkan perilaku institusi.";
+      } else if (adjustedScore >= 55) {
+        statusLabel = "Struktur Membaik, Perlu Konfirmasi";
+        shortExplanation = "Struktur aliran dana mendukung, namun fase kampanye belum sepenuhnya matang. Perlu validasi lanjutan dari perilaku institusi.";
+      } else if (adjustedScore >= 35) {
+        statusLabel = "Belum Siap, Risiko Masih Tinggi";
+        shortExplanation = "Fondasi institusional belum cukup kuat. Diperlukan perbaikan struktural sebelum kondisi mendukung potensi kenaikan.";
+      } else {
+        statusLabel = "Struktur Tidak Mendukung";
+        shortExplanation = "Kondisi struktural saat ini tidak mengindikasikan kesiapan untuk fase kenaikan. Fokus pada pemantauan perubahan rezim pasar.";
+      }
+
+      // Add inconsistency note to explanation if applicable
+      if (hasInconsistency) {
+        shortExplanation += " " + inconsistencyNote;
+      }
+
+      // AI explanation for expandable section
+      const gradingExplanation = "Skor ini merupakan indikator kesiapan struktural, bukan sinyal beli atau prediksi pergerakan harga. Perhitungan mencakup kombinasi fase pasar, kualitas kendali bandar, kemampuan pasar menyerap tekanan jual, tingkat risiko distribusi, serta keselarasan perilaku insider. Gunakan sebagai salah satu pertimbangan dalam analisis menyeluruh, bukan sebagai satu-satunya dasar keputusan investasi.";
+
+      return {
+        score: adjustedScore,
+        statusLabel,
+        shortExplanation,
+        gradingExplanation,
+        hasInconsistency,
+        inconsistencyNote,
+        components: [
+          { name: "Rezim Pasar", weight: "30%", condition: regimeCondition },
+          { name: "Kendali Bandar", weight: "25%", condition: controlCondition },
+          { name: "Absorpsi", weight: "20%", condition: absorptionCondition },
+          { name: "Risiko Distribusi", weight: "15%", condition: riskCondition },
+          { name: "Insider", weight: "10%", condition: insiderCondition }
+        ]
+      };
+    })();
+
     // Structured analyst-style response without buy/sell signals
     res.json({
       // Decision Engine (Part A)
@@ -826,6 +991,9 @@ export async function registerRoutes(
       
       // Insider-Bandar Alignment (Part D)
       insiderBandarAlignment,
+      
+      // Smart Money Readiness Score (Core Intelligence)
+      smartMoneyReadinessScore,
       
       event_analysis: {
         impact: "Sedang",

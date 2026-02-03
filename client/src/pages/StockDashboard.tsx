@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
-import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge } from "lucide-react";
+import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 // IDX Market Session Status based on WIB time
 function getIDXSessionStatus(): { label: string; color: "green" | "yellow" | "red" } {
@@ -395,6 +396,132 @@ export default function StockDashboard() {
                           <div className="h-4 bg-muted rounded w-full" />
                           <div className="h-4 bg-muted rounded w-5/6" />
                           <div className="h-4 bg-muted rounded w-4/6" />
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* SMART MONEY READINESS SCORE */}
+                    {!aiLoading && aiData?.smartMoneyReadinessScore && (
+                      <Card className="p-6 border-border/50 shadow-sm" data-testid="card-smart-money-readiness">
+                        <div className="flex flex-col gap-4">
+                          {/* Score Display */}
+                          <div className="flex items-center justify-between flex-wrap gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                                aiData.smartMoneyReadinessScore.score >= 75 
+                                  ? "bg-emerald-100 dark:bg-emerald-900/40" 
+                                  : aiData.smartMoneyReadinessScore.score >= 55
+                                    ? "bg-blue-100 dark:bg-blue-900/40"
+                                    : aiData.smartMoneyReadinessScore.score >= 35
+                                      ? "bg-amber-100 dark:bg-amber-900/40"
+                                      : "bg-red-100 dark:bg-red-900/40"
+                              }`}>
+                                <Target className={`w-7 h-7 ${
+                                  aiData.smartMoneyReadinessScore.score >= 75 
+                                    ? "text-emerald-600 dark:text-emerald-400" 
+                                    : aiData.smartMoneyReadinessScore.score >= 55
+                                      ? "text-blue-600 dark:text-blue-400"
+                                      : aiData.smartMoneyReadinessScore.score >= 35
+                                        ? "text-amber-600 dark:text-amber-400"
+                                        : "text-red-600 dark:text-red-400"
+                                }`} />
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Smart Money Readiness</p>
+                                <div className="flex items-baseline gap-2">
+                                  <span className={`text-3xl font-bold font-display ${
+                                    aiData.smartMoneyReadinessScore.score >= 75 
+                                      ? "text-emerald-700 dark:text-emerald-400" 
+                                      : aiData.smartMoneyReadinessScore.score >= 55
+                                        ? "text-blue-700 dark:text-blue-400"
+                                        : aiData.smartMoneyReadinessScore.score >= 35
+                                          ? "text-amber-700 dark:text-amber-400"
+                                          : "text-red-700 dark:text-red-400"
+                                  }`} data-testid="text-readiness-score">
+                                    {aiData.smartMoneyReadinessScore.score}
+                                  </span>
+                                  <span className="text-lg text-muted-foreground font-medium">/ 100</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Status Label */}
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${
+                              aiData.smartMoneyReadinessScore.score >= 75 
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" 
+                                : aiData.smartMoneyReadinessScore.score >= 55
+                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                                  : aiData.smartMoneyReadinessScore.score >= 35
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                                    : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                            }`} data-testid="badge-readiness-status">
+                              {aiData.smartMoneyReadinessScore.statusLabel}
+                            </span>
+                          </div>
+                          
+                          {/* Short Explanation */}
+                          <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-readiness-explanation">
+                            {aiData.smartMoneyReadinessScore.shortExplanation}
+                          </p>
+                          
+                          {/* Inconsistency Warning */}
+                          {aiData.smartMoneyReadinessScore.hasInconsistency && (
+                            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20" data-testid="warning-inconsistency">
+                              <AlertOctagon className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                                {aiData.smartMoneyReadinessScore.inconsistencyNote}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {/* Expandable Detail Section */}
+                          <Collapsible className="pt-2 border-t border-border/30">
+                            <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group" data-testid="button-expand-grading">
+                              <span>Bagaimana Skor Ini Dinilai?</span>
+                              <ChevronDown className="w-4 h-4 group-data-[state=open]:hidden" />
+                              <ChevronUp className="w-4 h-4 hidden group-data-[state=open]:block" />
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="pt-3 space-y-4" data-testid="section-grading-detail">
+                              {/* Component Breakdown Table */}
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b border-border/50">
+                                      <th className="text-left py-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">Komponen</th>
+                                      <th className="text-center py-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">Bobot</th>
+                                      <th className="text-right py-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">Kondisi Saat Ini</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {aiData.smartMoneyReadinessScore.components.map((comp: { name: string; weight: string; condition: string }, idx: number) => (
+                                      <tr key={idx} className="border-b border-border/30 last:border-b-0" data-testid={`row-component-${idx}`}>
+                                        <td className="py-2 text-foreground font-medium">{comp.name}</td>
+                                        <td className="py-2 text-center text-muted-foreground">{comp.weight}</td>
+                                        <td className="py-2 text-right">
+                                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                                            comp.condition.includes("Aktif") || comp.condition.includes("Kuat") || comp.condition.includes("Konsisten") || comp.condition.includes("Selaras") || comp.condition.includes("Rendah")
+                                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                                              : comp.condition.includes("Rapuh") || comp.condition.includes("Parsial") || comp.condition.includes("Netral") || comp.condition.includes("Sedang") || comp.condition.includes("Tersembunyi")
+                                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                                                : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                                          }`}>
+                                            {comp.condition}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                              
+                              {/* AI Grading Explanation */}
+                              <div className="p-3 rounded-lg bg-muted/50 border border-border/30">
+                                <p className="text-xs text-muted-foreground leading-relaxed" data-testid="text-grading-explanation">
+                                  {aiData.smartMoneyReadinessScore.gradingExplanation}
+                                </p>
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
                         </div>
                       </Card>
                     )}
