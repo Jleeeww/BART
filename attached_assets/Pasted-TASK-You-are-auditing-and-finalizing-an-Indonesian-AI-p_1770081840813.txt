@@ -1,0 +1,192 @@
+TASK:
+You are auditing and finalizing an Indonesian AI-powered stock intelligence platform.
+
+Your job is to:
+1) Ensure ALL previously discussed A–B–C implementations are fully present
+2) Implement anything missing
+3) Refactor UI + logic to match the agreed design
+4) Ensure AI analysis quality, consistency, and Bahasa Indonesia usage
+5) Ensure the app behaves like a professional institutional intelligence tool
+
+DO NOT:
+- Add new indicators unless explicitly required
+- Change the core architecture unnecessarily
+- Introduce trading signals or predictions
+
+========================================
+GLOBAL PRINCIPLES (MANDATORY)
+========================================
+
+- This is NOT a signal or tips app
+- This is a behavioral intelligence & performance-support system
+- Complexity stays in the backend, clarity on the frontend
+- Every tab answers ONE main question only
+- AI language must be professional Bahasa Indonesia
+- Avoid hype words (cuan, pasti naik, multibagger, dll)
+
+========================================
+PART A — TAB RINGKASAN (DECISION ENGINE)
+========================================
+
+Ensure the Ringkasan tab follows this EXACT structure:
+
+1) HERO DECISION BLOCK
+Title:
+"Status Saham: [Layak Dikoleksi Bertahap / Perlu Waspada / Hindari Sementara]"
+
+Sub-badge (ONLY ONE):
+- Akumulasi Sehat
+- Akumulasi Rapuh
+- Distribusi Awal
+- Spekulatif
+
+2) ALASAN UTAMA (MAX 3 BULLET)
+Short, non-technical, no numbers.
+Example:
+- Aliran dana institusi konsisten
+- Struktur harga terkontrol
+- Risiko distribusi masih terbatas
+
+3) RISIKO UTAMA (ONLY ONE)
+Explain when the thesis can fail.
+
+4) COCOK UNTUK SIAPA
+Investor type guidance (defensif / menengah / agresif).
+
+REMOVE:
+- Any duplicate indicators
+- Any raw broker metrics
+- Any long explanations
+
+========================================
+PART B — TAB ALIRAN DANA (CONTROL & REGIME)
+========================================
+
+This tab answers:
+"Siapa yang mengendalikan harga, dan seberapa aman ikut?"
+
+MANDATORY COMPONENTS:
+
+1) MARKET REGIME (CORE ENGINE)
+Display clearly:
+"Rezim Pasar: [Akumulasi Aktif / Distribusi ke Kenaikan / dll]"
+
+Include:
+- Regime confidence (Tinggi / Sedang / Rendah)
+- Operational guidance (bukan buy/sell)
+
+2) KUALITAS KENDALI BANDAR (0–100)
+This MUST combine:
+- Flow quality
+- Flow reliability
+- Broker stability
+
+REMOVE any separate cards for those metrics.
+
+3) BANDAR HEATMAP (VISUAL HERO)
+- Accumulation = green
+- Distribution = DARK RED (#8B0000 or similar)
+- Include legend
+- Tooltip explanations
+
+4) KONSENTRASI KENDALI
+Broker Control Score with 1-line interpretation.
+
+5) BUKTI AKTIVITAS (COLLAPSIBLE)
+Broker table is secondary, not primary.
+
+REMOVE:
+- Flow bias card
+- Redundant flow descriptors
+- Overlapping explanations
+
+========================================
+PART C — TAB RISIKO (FAILURE ENGINE)
+========================================
+
+This tab answers:
+"Dalam kondisi apa analisis ini SALAH?"
+
+Structure:
+
+1) TINGKAT RISIKO SAAT INI
+- Rendah / Sedang / Tinggi
+- No numeric probabilities
+
+2) PENJELASAN SINGKAT (1 PARAGRAF)
+
+3) FAILURE TRIGGERS (MAX 3)
+Examples:
+- Distribusi mendadak oleh broker dominan
+- Pergeseran regime ke distribusi
+- Hilangnya stabilitas kendali
+
+4) DETEKSI JEBakan PASAR
+Show ONLY ONE:
+- Potensi Bull Trap
+- Potensi Bear Trap
+- Tidak ada jebakan signifikan
+
+REMOVE:
+- Generic macro risk lists
+- Long risk catalogs
+
+========================================
+PART C (FINAL) — TAB INSIDER (CONFIRMATION ENGINE)
+========================================
+
+This tab answers:
+"Apakah insider SEJALAN atau MELAWAN bandar?"
+
+MANDATORY:
+
+1) HERO STATUS:
+"Insider vs Bandar: Selaras / Netral / Bertentangan"
+
+2) AI INTERPRETATION:
+Explain what it means for investors (Bahasa Indonesia).
+
+3) SKOR SINKRONISASI INSIDER (0–100)
+Simple thresholds only.
+
+4) POLA INSIDER 12 BULAN
+Visual buy vs sell pattern.
+
+5) DETAIL TRANSAKSI (COLLAPSIBLE)
+
+IMPORTANT:
+- Insider is NEVER an entry signal
+- Always contextualize with Market Regime
+
+========================================
+AI LANGUAGE & BRAIN QUALITY
+========================================
+
+Audit ALL AI-generated text and ensure:
+- 100% Bahasa Indonesia
+- Calm, professional, analyst-style tone
+- No certainty claims
+- Uses probabilistic and conditional language
+
+BAD:
+"Pasti naik", "sinyal kuat beli"
+
+GOOD:
+"Pola ini meningkatkan probabilitas"
+"Struktur masih valid selama..."
+
+========================================
+FINAL CHECK
+========================================
+
+Before finishing, ensure:
+- No tab feels overcrowded
+- Each tab answers only ONE question
+- UI feels decisive, not noisy
+- App feels meaningfully different from Stockbit / RTI
+
+If any part of A–B–C is missing, IMPLEMENT IT.
+If any part is duplicated, SIMPLIFY IT.
+
+OUTPUT:
+A clean, professional Indonesian stock intelligence dashboard with a strong, trustworthy app brain.

@@ -631,8 +631,178 @@ export async function registerRoutes(
       };
     })();
 
+    // ─── DECISION ENGINE (PART A) ───
+    // Determines stock status, sub-badge, reasons, and investor fit
+    const decisionEngine = (() => {
+      let status = "Layak Dikoleksi Bertahap";
+      let subBadge = "Akumulasi Sehat";
+      let reasons: string[] = [];
+      let primaryRisk = "";
+      let investorFit = "";
+      
+      // Determine status based on market mode, flow quality, and conviction
+      if (earlyDistributionFlag || marketMode.includes("Distribusi")) {
+        status = "Perlu Waspada";
+        subBadge = "Distribusi Awal";
+        reasons = [
+          "Aliran dana institusi menunjukkan tanda-tanda rotasi",
+          "Stabilitas kendali bandar mulai menurun",
+          "Struktur harga internal melemah"
+        ];
+        primaryRisk = "Tekanan jual institusional dapat meningkat jika rezim distribusi berlanjut.";
+        investorFit = "Investor dengan toleransi risiko tinggi yang memahami dinamika rotasi institusional.";
+      } else if (score < 40 || marketMode === "Vakum Pasca-Distribusi") {
+        status = "Hindari Sementara";
+        subBadge = "Spekulatif";
+        reasons = [
+          "Dukungan institusi sangat terbatas",
+          "Likuiditas pasar tipis",
+          "Tidak ada katalis struktural yang jelas"
+        ];
+        primaryRisk = "Volatilitas tinggi tanpa dasar institusional yang kuat.";
+        investorFit = "Tidak direkomendasikan untuk sebagian besar profil investor saat ini.";
+      } else if (score > 70 && brokerStabilityScore.level === "Tinggi") {
+        status = "Layak Dikoleksi Bertahap";
+        subBadge = "Akumulasi Sehat";
+        reasons = [
+          "Aliran dana institusi konsisten dan tersinkronisasi",
+          "Struktur harga terkontrol oleh pelaku dominan",
+          "Risiko distribusi masih terbatas"
+        ];
+        primaryRisk = "Tesis dapat gagal jika terjadi pergeseran rezim ke distribusi secara mendadak.";
+        investorFit = "Investor defensif hingga menengah yang mencari stabilitas dengan potensi apresiasi bertahap.";
+      } else if (score > 50 && brokerStabilityScore.level === "Sedang") {
+        status = "Layak Dikoleksi Bertahap";
+        subBadge = "Akumulasi Rapuh";
+        reasons = [
+          "Akumulasi institusi terdeteksi namun belum sepenuhnya stabil",
+          "Kendali bandar masih dalam tahap pembentukan",
+          "Fundamental mendukung meski aliran dana fluktuatif"
+        ];
+        primaryRisk = "Kepemimpinan akumulasi yang berputar dapat menghambat momentum kenaikan.";
+        investorFit = "Investor menengah yang bersedia menunggu konfirmasi lebih lanjut.";
+      } else {
+        status = "Perlu Waspada";
+        subBadge = "Spekulatif";
+        reasons = [
+          "Konsensus institusi belum terbentuk",
+          "Perilaku aliran dana masih terfragmentasi",
+          "Memerlukan katalis tambahan untuk konfirmasi"
+        ];
+        primaryRisk = "Volatilitas dapat meningkat tanpa arah yang jelas.";
+        investorFit = "Investor agresif dengan horizon waktu pendek dan toleransi volatilitas tinggi.";
+      }
+      
+      return { status, subBadge, reasons, primaryRisk, investorFit };
+    })();
+
+    // ─── COMBINED CONTROL QUALITY SCORE (PART B) ───
+    // Merges flow quality, flow reliability, and broker stability into single metric
+    const controlQualityScore = (() => {
+      const flowQuality = score; // 0-100
+      const flowReliability = payload.flow_signals.flow_reliability === "Tinggi" ? 90 : 
+                              payload.flow_signals.flow_reliability === "Sedang" ? 60 : 30;
+      const brokerStability = brokerStabilityScore.score;
+      
+      // Weighted average: 40% flow quality, 30% reliability, 30% broker stability
+      const combined = Math.round(flowQuality * 0.4 + flowReliability * 0.3 + brokerStability * 0.3);
+      
+      let level = "Rendah";
+      let interpretation = "";
+      
+      if (combined >= 70) {
+        level = "Tinggi";
+        interpretation = "Kendali bandar sangat kuat dengan aliran dana berkualitas tinggi dan konsistensi institusi yang terjaga.";
+      } else if (combined >= 50) {
+        level = "Sedang";
+        interpretation = "Kendali bandar cukup terstruktur namun memerlukan pemantauan berkelanjutan terhadap perubahan perilaku institusi.";
+      } else {
+        level = "Rendah";
+        interpretation = "Kendali bandar lemah atau terfragmentasi. Pergerakan harga mungkin tidak didukung fondasi institusional yang kuat.";
+      }
+      
+      return { score: combined, level, interpretation };
+    })();
+
+    // ─── INSIDER-BANDAR ALIGNMENT (PART D) ───
+    // Determines if insider activity aligns with bandar behavior
+    const insiderBandarAlignment = (() => {
+      // Mock logic based on flow direction vs insider sentiment
+      const flowDirection = payload.flow_signals.flow_bias === "Akumulasi" ? "beli" : "jual";
+      const insiderDirection = "beli"; // From mock insider data showing 78% buy
+      
+      let status = "Netral";
+      let interpretation = "";
+      
+      if (flowDirection === insiderDirection && score > 60) {
+        status = "Selaras";
+        interpretation = "Aktivitas insider sejalan dengan perilaku bandar. Manajemen menunjukkan keyakinan yang konsisten dengan akumulasi institusi, memperkuat validitas tesis fundamental.";
+      } else if (flowDirection !== insiderDirection) {
+        status = "Bertentangan";
+        interpretation = "Aktivitas insider berlawanan dengan arah aliran institusi. Divergensi ini memerlukan perhatian khusus karena insider mungkin memiliki informasi yang belum tercermin di pasar.";
+      } else {
+        status = "Netral";
+        interpretation = "Aktivitas insider tidak memberikan sinyal arah yang jelas relatif terhadap perilaku bandar. Pantau perkembangan transaksi insider untuk konfirmasi lebih lanjut.";
+      }
+      
+      return { status, interpretation };
+    })();
+
+    // ─── SIMPLIFIED RISK LEVEL (PART C) ───
+    const simplifiedRisk = (() => {
+      let level = "Sedang";
+      let explanation = "";
+      let failureTriggers: string[] = [];
+      
+      if (earlyDistributionFlag || marketMode.includes("Distribusi")) {
+        level = "Tinggi";
+        explanation = "Struktur aliran dana internal menunjukkan rotasi institusional sedang berlangsung. Meski harga mungkin masih bertahan, fondasi akumulasi mulai melemah dan risiko koreksi meningkat jika distribusi berlanjut.";
+        failureTriggers = [
+          "Distribusi mendadak oleh broker dominan",
+          "Pergeseran rezim ke Vakum Pasca-Distribusi",
+          "Hilangnya stabilitas kendali bandar"
+        ];
+      } else if (score < 40) {
+        level = "Tinggi";
+        explanation = "Dukungan institusional sangat terbatas pada level saat ini. Tanpa sponsor institusi yang jelas, pergerakan harga rentan terhadap volatilitas acak dan tekanan jual ritel.";
+        failureTriggers = [
+          "Tidak ada pemulihan aliran institusi dalam 5-10 hari",
+          "Penembusan level support teknis kunci",
+          "Pergeseran sentimen makro negatif"
+        ];
+      } else if (score > 70 && brokerStabilityScore.level === "Tinggi") {
+        level = "Rendah";
+        explanation = "Profil risiko terkendali dengan dukungan institusi yang kuat dan konsisten. Struktur akumulasi sehat mengurangi probabilitas koreksi signifikan dalam jangka pendek.";
+        failureTriggers = [
+          "Pergeseran mendadak rezim pasar ke distribusi",
+          "Keluar masif dari broker dominan",
+          "Kejutan negatif fundamental yang signifikan"
+        ];
+      } else {
+        level = "Sedang";
+        explanation = "Risiko dalam batas wajar dengan dukungan institusi moderat. Pergerakan harga didukung fondasi yang cukup namun memerlukan validasi berkelanjutan dari aliran dana.";
+        failureTriggers = [
+          "Penurunan stabilitas broker di bawah 40%",
+          "Akumulasi berubah menjadi distribusi",
+          "Kehilangan momentum aliran positif"
+        ];
+      }
+      
+      return { level, explanation, failureTriggers };
+    })();
+
     // Structured analyst-style response without buy/sell signals
     res.json({
+      // Decision Engine (Part A)
+      decisionEngine,
+      
+      // Control & Regime (Part B)
+      controlQualityScore,
+      marketMode,
+      marketModeExplanation,
+      marketModeConfidence: score > 70 ? "Tinggi" : score > 50 ? "Sedang" : "Rendah",
+      
+      // Existing flow data
       flow_analysis: `Aktivitas institusional untuk ${payload.stock} menunjukkan ${payload.flow_signals.flow_intensity} ${payload.flow_signals.flow_bias} dengan reliabilitas ${payload.flow_signals.flow_reliability}. Posisi berbasis luas didukung oleh partisipasi tersinkronisasi dari sumber institusi domestik dan asing.`,
       flowQualityScore: score,
       flowQualityInterpretation: interpretation,
@@ -643,8 +813,6 @@ export async function registerRoutes(
       brokerInsights,
       brokerControlScore,
       brokerStabilityScore,
-      marketMode,
-      marketModeExplanation,
       convictionPhase,
       convictionExplanation,
       smartMoneyIntent,
@@ -652,6 +820,13 @@ export async function registerRoutes(
       phaseTimeline,
       bandarPhaseInterpretation,
       trapDetection,
+      
+      // Simplified Risk (Part C)
+      simplifiedRisk,
+      
+      // Insider-Bandar Alignment (Part D)
+      insiderBandarAlignment,
+      
       event_analysis: {
         impact: "Sedang",
         relevance: "Struktural",

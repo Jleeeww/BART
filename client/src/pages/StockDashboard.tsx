@@ -308,161 +308,114 @@ export default function StockDashboard() {
                 
                 <div className="mt-6">
                   <TabsContent value="overview" className="mt-0 focus-visible:outline-none space-y-6">
-                    <Card className="p-6 border-border/50 shadow-sm">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-bold font-display">Profil Perusahaan</h3>
-                        {!aiLoading && aiData?.marketMode && (
-                          <span className="text-xs font-bold px-2 py-1 rounded bg-secondary text-foreground uppercase">
-                            Mode: {aiData.marketMode}
-                          </span>
-                        )}
-                      </div>
-                      {!aiLoading && aiData && (
-                        <div className="mb-6 space-y-4">
-                          <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
-                          <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
-                            <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Rezim Pasar</p>
-                            <p className="text-sm text-muted-foreground leading-relaxed">{aiData.marketModeExplanation}</p>
+                    {/* HERO DECISION BLOCK */}
+                    {!aiLoading && aiData?.decisionEngine && (
+                      <Card className={`p-6 border-2 shadow-md ${
+                        aiData.decisionEngine.status === "Layak Dikoleksi Bertahap" 
+                          ? "border-emerald-300 dark:border-emerald-700 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5" 
+                          : aiData.decisionEngine.status === "Perlu Waspada"
+                            ? "border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-500/10 to-amber-500/5"
+                            : "border-red-300 dark:border-red-700 bg-gradient-to-br from-red-500/10 to-red-500/5"
+                      }`} data-testid="card-hero-decision">
+                        <div className="flex flex-col gap-4">
+                          {/* Status Title */}
+                          <div className="flex items-center justify-between flex-wrap gap-3">
+                            <h2 className={`text-xl font-bold font-display ${
+                              aiData.decisionEngine.status === "Layak Dikoleksi Bertahap" 
+                                ? "text-emerald-700 dark:text-emerald-400" 
+                                : aiData.decisionEngine.status === "Perlu Waspada"
+                                  ? "text-amber-700 dark:text-amber-400"
+                                  : "text-red-700 dark:text-red-400"
+                            }`} data-testid="text-decision-status">
+                              Status Saham: {aiData.decisionEngine.status}
+                            </h2>
+                            {/* Sub-badge */}
+                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wide ${
+                              aiData.decisionEngine.subBadge === "Akumulasi Sehat" 
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" 
+                                : aiData.decisionEngine.subBadge === "Akumulasi Rapuh"
+                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                                  : aiData.decisionEngine.subBadge === "Distribusi Awal"
+                                    ? "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"
+                                    : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                            }`} data-testid="badge-decision-subbadge">
+                              {aiData.decisionEngine.subBadge}
+                            </span>
+                          </div>
+                          
+                          {/* ALASAN UTAMA - Max 3 bullets */}
+                          <div className="pt-4 border-t border-border/30">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Alasan Utama</p>
+                            <ul className="space-y-2" data-testid="list-main-reasons">
+                              {aiData.decisionEngine.reasons.map((reason: string, idx: number) => (
+                                <li key={idx} className="flex items-start gap-2 text-sm text-foreground" data-testid={`reason-${idx}`}>
+                                  <div className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${
+                                    aiData.decisionEngine.status === "Layak Dikoleksi Bertahap" 
+                                      ? "bg-emerald-500" 
+                                      : aiData.decisionEngine.status === "Perlu Waspada"
+                                        ? "bg-amber-500"
+                                        : "bg-red-500"
+                                  }`} />
+                                  {reason}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                          
+                          {/* RISIKO UTAMA - Only 1 */}
+                          <div className="pt-4 border-t border-border/30">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                              <AlertTriangle className="w-3 h-3 text-amber-500" />
+                              Risiko Utama
+                            </p>
+                            <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-primary-risk">
+                              {aiData.decisionEngine.primaryRisk}
+                            </p>
+                          </div>
+                          
+                          {/* COCOK UNTUK SIAPA */}
+                          <div className="pt-4 border-t border-border/30">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                              <Users className="w-3 h-3 text-primary" />
+                              Cocok untuk Siapa
+                            </p>
+                            <p className="text-sm text-foreground font-medium" data-testid="text-investor-fit">
+                              {aiData.decisionEngine.investorFit}
+                            </p>
                           </div>
                         </div>
-                      )}
-                      <p className="text-muted-foreground leading-relaxed mb-6">
+                      </Card>
+                    )}
+                    
+                    {/* Loading state for decision engine */}
+                    {aiLoading && (
+                      <Card className="p-6 border-border/50 shadow-sm animate-pulse">
+                        <div className="h-8 bg-muted rounded w-3/4 mb-4" />
+                        <div className="space-y-2">
+                          <div className="h-4 bg-muted rounded w-full" />
+                          <div className="h-4 bg-muted rounded w-5/6" />
+                          <div className="h-4 bg-muted rounded w-4/6" />
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* Company Profile - Simplified */}
+                    <Card className="p-6 border-border/50 shadow-sm">
+                      <h3 className="text-lg font-bold font-display mb-4">Profil Perusahaan</h3>
+                      <p className="text-muted-foreground leading-relaxed mb-4">
                         {stock.description}
                       </p>
-                      
-                      <div className="grid grid-cols-2 gap-6 mb-8">
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Sektor</p>
-                          <p className="text-lg font-semibold text-foreground">{stock.sector}</p>
+                          <p className="text-base font-semibold text-foreground">{stock.sector}</p>
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Subsektor</p>
-                          <p className="text-lg font-semibold text-foreground">{stock.subsector}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="pt-6 border-t border-border/50">
-                        <h4 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">Metrik Utama</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <MetricCard 
-                            label="Rasio P/E" 
-                            value={parseFloat(stock.peRatio).toFixed(2)} 
-                            trend="neutral"
-                          />
-                          <MetricCard 
-                            label="ROE" 
-                            value={`${parseFloat(stock.roe).toFixed(1)}%`}
-                            trend="up"
-                          />
-                          <MetricCard 
-                            label="Margin Bersih" 
-                            value={`${parseFloat(stock.netMargin).toFixed(1)}%`}
-                            trend="neutral"
-                          />
-                          <MetricCard 
-                            label="Pertumbuhan YoY" 
-                            value={`${parseFloat(stock.growth).toFixed(1)}%`}
-                            trend="up"
-                          />
+                          <p className="text-base font-semibold text-foreground">{stock.subsector}</p>
                         </div>
                       </div>
                     </Card>
-
-                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Bagaimana investor melihat saham ini</h3>
-                      <p className="text-muted-foreground leading-relaxed">
-                        {stock.investorView}
-                        {aiData?.flowQualityScore < 50 && " Konsensus institusi tampak terfragmentasi pada level saat ini; pelaku pasar perlu memantau potensi divergensi antara harga dan kualitas aliran."}
-                        {aiData?.flowQualityScore > 75 && " Meski keyakinan institusi tetap tinggi, profil risiko-imbal hasil bergeser karena posisi semakin padat."}
-                      </p>
-                    </Card>
-
-                    {aiData?.smartMoneyIntent && (
-                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2">
-                            <Activity className="w-5 h-5 text-indigo-500" />
-                            Intensi Dana Besar
-                          </h3>
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${
-                            aiData.smartMoneyIntent.confidence === "High" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" :
-                            aiData.smartMoneyIntent.confidence === "Medium" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" :
-                            "bg-slate-100 text-slate-600 dark:bg-slate-800/30 dark:text-slate-400"
-                          }`}>
-                            Kepercayaan {aiData.smartMoneyIntent.confidence === "High" ? "Tinggi" : aiData.smartMoneyIntent.confidence === "Medium" ? "Sedang" : "Rendah"}
-                          </span>
-                        </div>
-                        <div className="mb-4">
-                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Tujuan Utama</p>
-                          <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{aiData.smartMoneyIntent.primaryIntent}</p>
-                          {aiData.smartMoneyIntent.secondaryIntent && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Sekunder: <span className="font-semibold">{aiData.smartMoneyIntent.secondaryIntent}</span>
-                            </p>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {aiData.smartMoneyIntent.explanation}
-                        </p>
-                      </Card>
-                    )}
-
-                    {/* Stock Personality (Karakter Pergerakan Saham) */}
-                    {stock.stockCharacter && (
-                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-violet-500/5 to-fuchsia-500/5 dark:from-violet-500/10 dark:to-fuchsia-500/10" data-testid="card-stock-character">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2">
-                            <Sparkles className="w-5 h-5 text-violet-500" />
-                            Karakter Pergerakan Saham
-                          </h3>
-                          <span className="text-xs font-bold px-2 py-1 rounded bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 uppercase">
-                            {stock.stockCharacter}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {stock.stockCharacterDesc}
-                        </p>
-                      </Card>
-                    )}
-
-                    {/* Retail Sentiment Interpretation */}
-                    {stock.retailSentiment && (
-                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-amber-500/5 to-orange-500/5 dark:from-amber-500/10 dark:to-orange-500/10" data-testid="card-retail-sentiment">
-                        <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2 mb-4">
-                          <Users className="w-5 h-5 text-amber-500" />
-                          Sentimen Investor Ritel
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {stock.retailSentiment}
-                        </p>
-                      </Card>
-                    )}
-
-                    {/* Foreign vs Domestic Flow Interpretation */}
-                    {stock.foreignDomesticInterpretation && (
-                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-cyan-500/5 to-sky-500/5 dark:from-cyan-500/10 dark:to-sky-500/10" data-testid="card-foreign-domestic">
-                        <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2 mb-4">
-                          <Target className="w-5 h-5 text-cyan-500" />
-                          Aliran Asing vs Domestik
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {stock.foreignDomesticInterpretation}
-                        </p>
-                      </Card>
-                    )}
-
-                    {/* Retail Investor Summary (Ringkasan untuk Investor Ritel) */}
-                    {stock.retailSummary && (
-                      <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-emerald-500/5 to-teal-500/5 dark:from-emerald-500/10 dark:to-teal-500/10 border-2 border-emerald-200 dark:border-emerald-800/30" data-testid="card-retail-summary">
-                        <h3 className="text-lg font-bold font-display text-foreground flex items-center gap-2 mb-4">
-                          <Shield className="w-5 h-5 text-emerald-500" />
-                          Ringkasan untuk Investor Ritel
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          {stock.retailSummary}
-                        </p>
-                      </Card>
-                    )}
                   </TabsContent>
                   
                   {/* Financials Tab */}
@@ -572,112 +525,132 @@ export default function StockDashboard() {
 
                   {/* Flow Tab */}
                   <TabsContent value="flow" className="mt-0 focus-visible:outline-none space-y-6">
-                    {/* SECTION 1: AI Flow Overview */}
-                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-bold font-display text-foreground">Ringkasan AI Aliran Dana</h3>
-                        {!aiLoading && aiData && (
-                          <div className="text-right">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Kualitas Aliran</p>
-                            <p className="text-2xl font-bold text-primary">{aiData.flowQualityScore}/100</p>
+                    {/* SECTION 1: MARKET REGIME (CORE ENGINE) */}
+                    {!aiLoading && aiData?.marketMode && (
+                      <Card className={`p-6 border-2 shadow-md ${
+                        aiData.marketMode.includes("Akumulasi") 
+                          ? "border-emerald-300 dark:border-emerald-700 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5" 
+                          : aiData.marketMode.includes("Distribusi")
+                            ? "border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-500/10 to-amber-500/5"
+                            : "border-slate-300 dark:border-slate-700 bg-gradient-to-br from-slate-500/10 to-slate-500/5"
+                      }`} data-testid="card-market-regime">
+                        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                          <div>
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Rezim Pasar</p>
+                            <h2 className={`text-xl font-bold font-display ${
+                              aiData.marketMode.includes("Akumulasi") 
+                                ? "text-emerald-700 dark:text-emerald-400" 
+                                : aiData.marketMode.includes("Distribusi")
+                                  ? "text-amber-700 dark:text-amber-400"
+                                  : "text-foreground"
+                            }`} data-testid="text-market-regime">
+                              {aiData.marketMode}
+                            </h2>
                           </div>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed mb-6">
-                        {aiLoading ? "Analyzing market flow..." : (aiData?.flow_analysis || stock.flowOverviewSummary)}
-                      </p>
-                      
-                      {!aiLoading && aiData?.flowQualityInterpretation && (
-                        <div className="mb-6 space-y-4">
-                          <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
-                          <div className="p-4 bg-background/50 rounded-lg border border-border/30">
-                            <p className="text-sm font-medium text-foreground">{aiData.flowQualityInterpretation}</p>
-                          </div>
-                          {aiData.earlyDistributionFlag && (
-                            <div className="mt-3 pt-3 border-t border-border/20">
-                              <p className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
-                                <AlertTriangle className="w-3 h-3" />
-                                Risiko Distribusi Awal Terdeteksi
-                              </p>
-                              <p className="text-sm text-muted-foreground italic">{aiData.earlyDistributionExplanation}</p>
-                            </div>
-                          )}
-                          {aiData.tapeControlFlag && (
-                            <div className="mt-3 pt-3 border-t border-border/20">
-                              <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
-                                <Activity className="w-3 h-3" />
-                                Perilaku Kontrol Tape Terdeteksi
-                              </p>
-                              <p className="text-sm text-muted-foreground italic">{aiData.tapeControlExplanation}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Flow Intensity Gradient Bar */}
-                      <div className="mb-6">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Intensitas Aliran</p>
-                        <div className="space-y-2">
-                          <div className="relative h-8 rounded-md border border-border/30 overflow-hidden flex items-center">
-                            <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-neutral-400 to-emerald-500 dark:from-red-600 dark:via-neutral-500 dark:to-emerald-600" />
-                            {(() => {
-                              const intensityValues: Record<string, number> = {
-                                "Big Distribution": 10,
-                                "Moderate Distribution": 30,
-                                "Neutral": 50,
-                                "Moderate Accumulation": 70,
-                                "Big Accumulation": 90,
-                              };
-                              const position = intensityValues[stock.flowIntensity] || 50;
-                              return (
-                                <div
-                                  className="absolute w-0.5 h-10 bg-foreground shadow-lg rounded-full -top-1 transition-all"
-                                  style={{ left: `${position}%` }}
-                                />
-                              );
-                            })()}
-                          </div>
-                          <div className="flex justify-between text-xs text-muted-foreground px-1">
-                            <span>Distribusi Besar</span>
-                            <span>Akumulasi Besar</span>
-                          </div>
-                        </div>
-                        <p className="text-sm font-semibold text-foreground mt-3">{stock.flowIntensity}</p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-6">
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Bias Aliran</p>
-                          <p className="text-base font-semibold text-foreground">{stock.flowBias === "Accumulation" ? "Akumulasi" : stock.flowBias === "Distribution" ? "Distribusi" : stock.flowBias}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Reliabilitas Aliran</p>
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
-                            {stock.flowReliability}
+                          <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase ${
+                            aiData.marketModeConfidence === "Tinggi" 
+                              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" 
+                              : aiData.marketModeConfidence === "Sedang"
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                                : "bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300"
+                          }`} data-testid="badge-regime-confidence">
+                            Keyakinan {aiData.marketModeConfidence}
                           </span>
                         </div>
-                      </div>
-                    </Card>
+                        <p className="text-sm text-muted-foreground leading-relaxed mb-4" data-testid="text-regime-explanation">
+                          {aiData.marketModeExplanation}
+                        </p>
+                        {/* Operational Guidance */}
+                        <div className="p-3 rounded-lg bg-background/50 border border-border/30">
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Panduan Operasional</p>
+                          <p className="text-sm text-foreground" data-testid="text-operational-guidance">
+                            {aiData.marketMode.includes("Akumulasi Aktif") && "Fase ini mendukung strategi akumulasi bertahap. Pantau konfirmasi dari aliran dana yang konsisten."}
+                            {aiData.marketMode.includes("Akumulasi Tersembunyi") && "Fase diam-diam membangun posisi. Hindari mengejar harga, fokus pada deteksi akumulasi institusional."}
+                            {aiData.marketMode.includes("Distribusi Saat Menguat") && "Kenaikan harga mungkin menyembunyikan rotasi. Pertimbangkan untuk mengurangi eksposur pada penguatan."}
+                            {aiData.marketMode.includes("Distribusi Pasif") && "Fase likuidasi bertahap. Hindari akumulasi baru hingga ada tanda stabilisasi."}
+                            {aiData.marketMode === "Vakum Pasca-Distribusi" && "Fase pencarian level baru. Tunggu konfirmasi dukungan institusional sebelum mempertimbangkan posisi."}
+                          </p>
+                        </div>
+                      </Card>
+                    )}
+                    
+                    {/* Loading state */}
+                    {aiLoading && (
+                      <Card className="p-6 border-border/50 shadow-sm animate-pulse">
+                        <div className="h-6 bg-muted rounded w-1/3 mb-4" />
+                        <div className="h-8 bg-muted rounded w-2/3 mb-4" />
+                        <div className="h-4 bg-muted rounded w-full" />
+                      </Card>
+                    )}
 
-                    {/* Broker Control Score Card */}
-                    {!aiLoading && aiData?.brokerControlScore && (
-                      <Card className="p-6 border-border/50 shadow-sm" data-testid="card-broker-control-score">
+                    {/* SECTION 2: KUALITAS KENDALI BANDAR (Combined Score) */}
+                    {!aiLoading && aiData?.controlQualityScore && (
+                      <Card className="p-6 border-border/50 shadow-sm" data-testid="card-control-quality">
                         <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-base font-bold font-display text-foreground">Skor Kontrol Broker</h4>
+                          <div>
+                            <h3 className="text-lg font-bold font-display text-foreground">Kualitas Kendali Bandar</h3>
+                            <p className="text-xs text-muted-foreground">Kombinasi: Kualitas Aliran + Reliabilitas + Stabilitas Broker</p>
+                          </div>
                           <div className="text-right">
-                            <p className={`text-2xl font-bold ${
-                              aiData.brokerControlScore.score >= 70 
-                                ? 'text-red-600 dark:text-red-400' 
-                                : aiData.brokerControlScore.score >= 40 
+                            <p className={`text-3xl font-bold ${
+                              aiData.controlQualityScore.level === "Tinggi" 
+                                ? 'text-emerald-600 dark:text-emerald-400' 
+                                : aiData.controlQualityScore.level === "Sedang" 
                                   ? 'text-amber-600 dark:text-amber-400' 
-                                  : 'text-emerald-600 dark:text-emerald-400'
-                            }`} data-testid="text-broker-control-score-value">
-                              {aiData.brokerControlScore.score}%
+                                  : 'text-red-600 dark:text-red-400'
+                            }`} data-testid="text-control-quality-score">
+                              {aiData.controlQualityScore.score}
                             </p>
+                            <p className="text-xs text-muted-foreground">/100</p>
                           </div>
                         </div>
+                        
+                        {/* Score Bar */}
+                        <div className="mb-4">
+                          <div className="h-3 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full transition-all ${
+                                aiData.controlQualityScore.level === "Tinggi" 
+                                  ? 'bg-emerald-500' 
+                                  : aiData.controlQualityScore.level === "Sedang" 
+                                    ? 'bg-amber-500' 
+                                    : 'bg-red-500'
+                              }`}
+                              style={{ width: `${aiData.controlQualityScore.score}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+                            <span>Lemah</span>
+                            <span>Kuat</span>
+                          </div>
+                        </div>
+                        
                         <div className="mb-4">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                            aiData.controlQualityScore.level === "Tinggi" 
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                              : aiData.controlQualityScore.level === "Sedang" 
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' 
+                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          }`} data-testid="badge-control-quality-level">
+                            Kendali {aiData.controlQualityScore.level}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-control-quality-interpretation">
+                          {aiData.controlQualityScore.interpretation}
+                        </p>
+                      </Card>
+                    )}
+
+                    {/* SECTION 3: KONSENTRASI KENDALI (Broker Control Score) */}
+                    {!aiLoading && aiData?.brokerControlScore && (
+                      <Card className="p-4 border-border/50 shadow-sm" data-testid="card-broker-control-score">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-sm font-bold text-foreground">Konsentrasi Kendali</h4>
+                            <p className="text-xs text-muted-foreground">Top 3 broker menguasai {aiData.brokerControlScore.score}% akumulasi</p>
+                          </div>
+                          <span className={`text-xs font-bold px-2 py-1 rounded ${
                             aiData.brokerControlScore.score >= 70 
                               ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
                               : aiData.brokerControlScore.score >= 40 
@@ -687,46 +660,6 @@ export default function StockDashboard() {
                             {aiData.brokerControlScore.level}
                           </span>
                         </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-broker-control-interpretation">
-                          {aiData.brokerControlScore.interpretation}
-                        </p>
-                      </Card>
-                    )}
-
-                    {/* Broker Stability Score Card */}
-                    {!aiLoading && aiData?.brokerStabilityScore && (
-                      <Card className="p-6 border-border/50 shadow-sm" data-testid="card-broker-stability-score">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="text-base font-bold font-display text-foreground">Stabilitas Broker</h4>
-                            <p className="text-xs text-muted-foreground">Mengukur apakah institusi yang sama secara konsisten mengendalikan akumulasi</p>
-                          </div>
-                          <div className="text-right">
-                            <p className={`text-2xl font-bold ${
-                              aiData.brokerStabilityScore.level === "High" 
-                                ? 'text-emerald-600 dark:text-emerald-400' 
-                                : aiData.brokerStabilityScore.level === "Moderate" 
-                                  ? 'text-amber-600 dark:text-amber-400' 
-                                  : 'text-muted-foreground'
-                            }`} data-testid="text-broker-stability-score-value">
-                              {aiData.brokerStabilityScore.score}%
-                            </p>
-                          </div>
-                        </div>
-                        <div className="mb-4">
-                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            aiData.brokerStabilityScore.level === "High" 
-                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                              : aiData.brokerStabilityScore.level === "Moderate" 
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' 
-                                : 'bg-muted text-muted-foreground'
-                          }`} data-testid="badge-broker-stability-level">
-                            Stabilitas {aiData.brokerStabilityScore.level === "High" ? "Tinggi" : aiData.brokerStabilityScore.level === "Moderate" ? "Sedang" : "Rendah"}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-broker-stability-interpretation">
-                          {aiData.brokerStabilityScore.interpretation}
-                        </p>
                       </Card>
                     )}
 
@@ -1287,145 +1220,84 @@ export default function StockDashboard() {
                   {/* Risk Tab */}
                   <TabsContent value="risk" className="mt-0 focus-visible:outline-none space-y-6">
                     {(() => {
-                      try {
-                        const risk = JSON.parse(stock.riskData);
-                        return (
-                          <div className="space-y-6">
-                            {/* SECTION 1: AI Risk Overview */}
-                            <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                              <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold font-display text-foreground uppercase tracking-tight">Analisis Risiko AI</h3>
-                                {!aiLoading && aiData && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/10 text-primary uppercase">
-                                    Cycle: {aiData.convictionPhase}
-                                  </span>
-                                )}
+                      return (
+                        <div className="space-y-6">
+                          {/* SECTION 1: TINGKAT RISIKO SAAT INI */}
+                          {!aiLoading && aiData?.simplifiedRisk && (
+                            <Card className={`p-6 border-2 shadow-md ${
+                              aiData.simplifiedRisk.level === "Rendah" 
+                                ? "border-emerald-300 dark:border-emerald-700 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5" 
+                                : aiData.simplifiedRisk.level === "Sedang"
+                                  ? "border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-500/10 to-amber-500/5"
+                                  : "border-red-300 dark:border-red-700 bg-gradient-to-br from-red-500/10 to-red-500/5"
+                            }`} data-testid="card-risk-level">
+                              <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                                <div>
+                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Tingkat Risiko Saat Ini</p>
+                                  <h2 className={`text-2xl font-bold font-display ${
+                                    aiData.simplifiedRisk.level === "Rendah" 
+                                      ? "text-emerald-700 dark:text-emerald-400" 
+                                      : aiData.simplifiedRisk.level === "Sedang"
+                                        ? "text-amber-700 dark:text-amber-400"
+                                        : "text-red-700 dark:text-red-400"
+                                  }`} data-testid="text-risk-level">
+                                    {aiData.simplifiedRisk.level}
+                                  </h2>
+                                </div>
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                                  aiData.simplifiedRisk.level === "Rendah" 
+                                    ? "bg-emerald-100 dark:bg-emerald-900/40" 
+                                    : aiData.simplifiedRisk.level === "Sedang"
+                                      ? "bg-amber-100 dark:bg-amber-900/40"
+                                      : "bg-red-100 dark:bg-red-900/40"
+                                }`}>
+                                  <Shield className={`w-6 h-6 ${
+                                    aiData.simplifiedRisk.level === "Rendah" 
+                                      ? "text-emerald-600 dark:text-emerald-400" 
+                                      : aiData.simplifiedRisk.level === "Sedang"
+                                        ? "text-amber-600 dark:text-amber-400"
+                                        : "text-red-600 dark:text-red-400"
+                                  }`} />
+                                </div>
                               </div>
-                              {aiData && (
-                                <div className="mb-6">
-                                  <ConvictionTimeline phase={aiData.convictionPhase} explanation={aiData.convictionExplanation} />
-                                </div>
-                              )}
-                              {aiData?.marketMode && (
-                                <div className="mb-4 p-3 bg-secondary/50 rounded-lg border border-border/30">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Rezim Pasar</p>
-                                  <p className="text-sm font-semibold text-foreground">{aiData.marketMode}</p>
-                                  <p className="text-xs text-muted-foreground mt-1">{aiData.marketModeExplanation}</p>
-                                </div>
-                              )}
-                              <p className="text-muted-foreground leading-relaxed mb-6">
-                                {aiLoading ? "Mengevaluasi faktor risiko..." : (aiData?.risk_analysis || stock.riskAnalystView)}
-                                {aiData?.flowQualityScore < 50 && " Kualitas aliran terfragmentasi meningkatkan probabilitas de-rating struktural jika konsensus pasar bergeser."}
-                                {aiData?.flowQualityScore > 75 && " Konsensus tinggi menciptakan risiko kepadatan inheren; kegagalan memenuhi ekspektasi tinggi dapat menyebabkan respons harga yang tidak proporsional."}
-                                {aiData?.earlyDistributionFlag && " Dinamika internal menunjukkan partisipan institusional mengurangi eksposur meski ketahanan volume headline."}
-                                {(aiData?.marketMode?.includes("Distribusi") || aiData?.marketMode === "Vakum Pasca-Distribusi") && " Rezim pasar saat ini menunjukkan daya tarik alpha-seeking berkurang. Kekuatan harga perlu dipantau untuk potensi jebakan likuiditas."}
+                              
+                              {/* PENJELASAN SINGKAT (1 Paragraph) */}
+                              <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-risk-explanation">
+                                {aiData.simplifiedRisk.explanation}
                               </p>
-                              <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Tingkat Risiko Keseluruhan</p>
-                                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
-                                    risk.level === 'Low' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                                    risk.level === 'Moderate' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
-                                    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                                  }`}>
-                                    {risk.level}
-                                  </span>
-                                </div>
-                                <div>
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Kecenderungan Analis</p>
-                                  <p className="text-base font-bold text-foreground">{risk.skew}</p>
-                                </div>
+                            </Card>
+                          )}
+                          
+                          {/* Loading state */}
+                          {aiLoading && (
+                            <Card className="p-6 border-border/50 shadow-sm animate-pulse">
+                              <div className="h-6 bg-muted rounded w-1/3 mb-4" />
+                              <div className="h-8 bg-muted rounded w-1/4 mb-4" />
+                              <div className="h-4 bg-muted rounded w-full" />
+                            </Card>
+                          )}
+
+                          {/* SECTION 2: FAILURE TRIGGERS (MAX 3) */}
+                          {!aiLoading && aiData?.simplifiedRisk?.failureTriggers && (
+                            <Card className="p-6 border-border/50 shadow-sm" data-testid="card-failure-triggers">
+                              <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                                Kapan Analisis Ini Bisa Salah
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                {aiData.simplifiedRisk.failureTriggers.map((trigger: string, idx: number) => (
+                                  <div key={idx} className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20" data-testid={`failure-trigger-${idx}`}>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5 shrink-0" />
+                                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400 leading-tight">
+                                      {trigger}
+                                    </p>
+                                  </div>
+                                ))}
                               </div>
                             </Card>
+                          )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <div className="space-y-4">
-                                <h4 className="text-sm font-bold text-foreground uppercase tracking-widest px-1">Risiko Pasar Utama</h4>
-                                {risk.primaryRisks.map((r: any, idx: number) => (
-                                  <Card key={idx} className="p-4 border-border/50 hover-elevate transition-all">
-                                    <div className="flex justify-between items-start mb-2">
-                                      <h5 className="font-bold text-sm">{r.title}</h5>
-                                      <div className="flex gap-1.5">
-                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 uppercase">
-                                          L: {r.likelihood}
-                                        </span>
-                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 uppercase">
-                                          I: {r.impact}
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed">{r.why}</p>
-                                  </Card>
-                                ))}
-                              </div>
-
-                              <div className="space-y-4">
-                                <h4 className="text-sm font-bold text-foreground uppercase tracking-widest px-1 flex items-center gap-2">
-                                  <AlertTriangle className="w-4 h-4 text-amber-500" />
-                                  Risiko Kontrarian
-                                </h4>
-                                {risk.contrarianRisks.map((r: any, idx: number) => (
-                                  <div key={idx} className="p-5 border border-amber-500/20 bg-amber-500/5 rounded-xl space-y-3">
-                                    <h5 className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2 text-sm">
-                                      {r.title}
-                                    </h5>
-                                    <p className="text-sm text-muted-foreground leading-relaxed italic">
-                                      "{r.why}"
-                                    </p>
-                                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-amber-500/10">
-                                      <div>
-                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mb-1">Kapan relevan:</p>
-                                        <p className="text-xs text-foreground font-medium">{r.material}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter mb-1">Siapa yang terpengaruh:</p>
-                                        <p className="text-xs text-foreground font-medium">{r.affected}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                                {aiData?.earlyDistributionFlag && (
-                                  <div className="p-5 border border-amber-500/20 bg-amber-500/5 rounded-xl space-y-3">
-                                    <h5 className="font-bold text-amber-700 dark:text-amber-400 flex items-center gap-2 text-sm">
-                                      <AlertTriangle className="w-4 h-4" />
-                                      Risiko Distribusi Awal
-                                    </h5>
-                                    <p className="text-sm text-muted-foreground leading-relaxed italic">
-                                      "{aiData.earlyDistributionExplanation}"
-                                    </p>
-                                  </div>
-                                )}
-                                {aiData?.tapeControlFlag && (
-                                  <div className="p-5 border border-blue-500/20 bg-blue-500/5 rounded-xl space-y-3">
-                                    <h5 className="font-bold text-blue-700 dark:text-blue-400 flex items-center gap-2 text-sm">
-                                      <Activity className="w-4 h-4" />
-                                      Risiko Kontrol Tape
-                                    </h5>
-                                    <p className="text-sm text-muted-foreground leading-relaxed italic">
-                                      "{aiData.tapeControlExplanation}"
-                                    </p>
-                                  </div>
-                                )}
-                                {(aiData?.smartMoneyIntent?.primaryIntent === "Inventory Exit" || aiData?.smartMoneyIntent?.primaryIntent === "Liquidity Harvesting") && (
-                                  <div className="p-5 border border-red-500/20 bg-red-500/5 rounded-xl space-y-3">
-                                    <h5 className="font-bold text-red-700 dark:text-red-400 flex items-center gap-2 text-sm">
-                                      <AlertTriangle className="w-4 h-4" />
-                                      Peringatan Intensi Dana Besar
-                                    </h5>
-                                    <p className="text-sm text-muted-foreground leading-relaxed italic">
-                                      Pola perilaku institusional saat ini menunjukkan "{aiData.smartMoneyIntent.primaryIntent}". 
-                                      {aiData.smartMoneyIntent.primaryIntent === "Keluar Inventori" && " Pelaku dominan tampak mengurangi eksposur melalui likuidasi teratur. Ketahanan harga mungkin menyembunyikan rotasi yang mendasari."}
-                                      {aiData.smartMoneyIntent.primaryIntent === "Pemanenan Likuiditas" && " Aktivitas taktis tinggi di sekitar level kunci mungkin mengindikasikan perilaku stop-run atau pola tembus palsu. Kemajuan arah bersih mungkin terbatas meski volume terlihat."}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground/70 mt-2">
-                                      Kepercayaan: {aiData.smartMoneyIntent.confidence}
-                                    </p>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Smart Trap Detection Panel */}
+                          {/* SECTION 3: DETEKSI JEBAKAN PASAR (Smart Trap Detection Panel) */}
                             {aiData?.trapDetection && (
                               <Card className="p-6 border-border/50 shadow-sm" data-testid="card-trap-detection">
                                 <div className="mb-4">
