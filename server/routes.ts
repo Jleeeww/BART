@@ -956,8 +956,12 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/ai", (req, res) => {
+  app.post("/api/ai", async (req, res) => {
     const payload = req.body;
+    
+    // Look up stock to get consistent readinessScore and actionGuidance
+    const stockSymbol = payload.stock as string;
+    const stockData = await storage.getStockBySymbol(stockSymbol);
     
     // Calculate Flow Quality Score based on payload
     // broker concentration, buy avg vs close, foreign vs domestic alignment
@@ -1750,31 +1754,81 @@ export async function registerRoutes(
     // Single source of truth across homepage and detail page
     // ========================================
     const actionGuidance = (() => {
-      // Get values from existing engines
-      const readinessScore = smartMoneyReadinessScore.score;
-      const regime = marketMode;
-      const riskLevel = simplifiedRisk.level;
-      const flowQuality = score; // Flow Quality Score
+      // CRITICAL: Use same readinessScore calculation as /api/stocks endpoint
+      // This ensures homepage and detail page show IDENTICAL action guidance
+      let readinessScore = 50; // Base score
+      
+      // Get stock-specific values (prefer from stored stock data, fallback to payload)
+      const flowBias = stockData?.flowBias || payload.flow_signals.flow_bias || "Netral";
+      const flowIntensity = stockData?.flowIntensity || payload.flow_signals.flow_intensity || "";
+      const flowReliabilityValue = stockData?.flowReliability || payload.flow_signals.flow_reliability || "Sedang";
+      const growthValue = stockData?.growth ? parseFloat(stockData.growth) : 
+                          (payload.fundamentals?.yoy_profit_growth_pct || 0);
+      
+      // Apply EXACT same algorithm as /api/stocks endpoint
+      if (flowBias === "Akumulasi") readinessScore += 20;
+      else if (flowBias === "Distribusi") readinessScore -= 20;
+      
+      if (flowIntensity.includes("Besar") && flowBias === "Akumulasi") readinessScore += 15;
+      else if (flowIntensity.includes("Sedang") && flowBias === "Akumulasi") readinessScore += 8;
+      else if (flowIntensity.includes("Besar") && flowBias === "Distribusi") readinessScore -= 15;
+      else if (flowIntensity.includes("Sedang") && flowBias === "Distribusi") readinessScore -= 8;
+      
+      if (flowReliabilityValue === "Tinggi" || flowReliabilityValue === "High") readinessScore += 10;
+      else if (flowReliabilityValue === "Sedang" || flowReliabilityValue === "Medium") readinessScore += 5;
+      else if (flowReliabilityValue === "Rendah" || flowReliabilityValue === "Low") readinessScore -= 5;
+      
+      if (growthValue > 10) readinessScore += 5;
+      else if (growthValue < 0) readinessScore -= 10;
+      
+      readinessScore = Math.max(0, Math.min(100, readinessScore));
+      
+      // Determine regime from flow characteristics (consistent with /api/stocks)
+      const isAccumulationFlow = flowBias === "Akumulasi";
+      const isDistributionFlow = flowBias === "Distribusi" || flowBias === "Distribution";
+      
+      // Build market regime string (consistent with /api/stocks)
+      let regime = "Transisi";
+      if (isAccumulationFlow && readinessScore >= 80) {
+        regime = flowIntensity.includes("Aktif") || flowIntensity.includes("Besar") ? 
+                 "Active Accumulation" : "Stealth Accumulation";
+      } else if (isAccumulationFlow && readinessScore >= 60) {
+        regime = "Akumulasi Awal";
+      } else if (isDistributionFlow) {
+        regime = "Distribution into Strength";
+      } else if (readinessScore < 40) {
+        regime = "Post-Distribution Vacuum";
+      }
+      
       // Derive insider alignment score from status
       const insiderStatus = insiderBandarAlignment.status;
       const insiderAlignment = insiderStatus === "Selaras" ? 80 : insiderStatus === "Netral" ? 50 : 20;
       
       // Determine regime categories
-      const isAccumulationRegime = regime === "Stealth Accumulation" || regime === "Active Accumulation";
-      const isDistributionRegime = regime === "Distribution into Strength" || regime === "Passive Distribution" || regime === "Post-Distribution Vacuum";
-      const isHighRisk = riskLevel === "Tinggi" || riskLevel === "Sangat Tinggi";
+      const isAccumulationRegime = regime === "Stealth Accumulation" || regime === "Active Accumulation" ||
+                                   regime.includes("Akumulasi");
+      const isDistributionRegime = regime === "Distribution into Strength" || regime === "Passive Distribution" || 
+                                   regime === "Post-Distribution Vacuum" || regime.includes("Distribusi");
       
-      // Determine conditions for unified engine
-      const isDistributionActive = isDistributionRegime && flowQuality >= 40;
-      const isVolatilityUnhealthy = isHighRisk || isDistributionRegime;
-      const flowReliability = flowQuality >= 70 ? "Tinggi" : flowQuality >= 50 ? "Sedang" : "Rendah";
-      const isEntryValid = isAccumulationRegime && !isHighRisk && flowQuality >= 60;
+      // CRITICAL: Use SAME simple logic as /api/stocks for these conditions
+      // This ensures consistency between homepage and detail page
+      const isDistributionActive = isDistributionFlow && flowIntensity.includes("Besar");
+      const isVolatilityUnhealthy = isDistributionFlow && flowIntensity.includes("Besar");
+      
+      // Risk level from simplified risk (for confidence calculation only)
+      const riskLevel = simplifiedRisk.level;
+      const isHighRisk = riskLevel === "Tinggi" || riskLevel === "Sangat Tinggi";
+      const flowQuality = score; // Flow Quality Score for confidence calculation
+      
+      // Flow reliability based on stock's stored value (not AI-computed)
+      const isFlowReliable = flowReliabilityValue === "Tinggi" || flowReliabilityValue === "High";
+      const isEntryValid = isAccumulationFlow && isFlowReliable && readinessScore >= 80;
       
       // USE UNIFIED ACTION GUIDANCE ENGINE
       const unifiedResult = computeUnifiedActionGuidance({
         readinessScore,
         marketRegime: regime,
-        flowReliability,
+        flowReliability: flowReliabilityValue,
         isDistributionActive,
         isVolatilityUnhealthy,
         isEntryValid
@@ -2075,7 +2129,11 @@ export async function registerRoutes(
       insiderBandarAlignment,
       
       // Smart Money Readiness Score (Core Intelligence)
-      smartMoneyReadinessScore,
+      // IMPORTANT: Override score with consistent value from actionGuidance
+      smartMoneyReadinessScore: {
+        ...smartMoneyReadinessScore,
+        score: actionGuidance._debug.readinessScore, // Use consistent score
+      },
       
       // Action Guidance Mode (Decision Layer)
       actionGuidance,

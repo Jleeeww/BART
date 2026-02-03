@@ -64,6 +64,28 @@ Tracks insider transactions with institutional-grade analysis:
 
 All commentary maintains neutral, analytical tone without buy/sell recommendations or price targets.
 
+### Unified Action Guidance System (CRITICAL ARCHITECTURE)
+
+The platform uses a single source of truth for action guidance, ensuring strict consistency between homepage categorization and stock detail pages.
+
+**5 LOCKED States:**
+1. **AKUMULASI_BERTAHAP** (Green) - Layak Akumulasi: readinessScore ≥80, accumulation regime, entry valid
+2. **WATCHLIST_PRIORITAS** (Yellow) - Tunggu Konfirmasi: readinessScore 60-79, showing promise
+3. **PANTAU_SAJA** (Gray) - Belum Siap: readinessScore 40-59, needs more clarity
+4. **HINDARI_DULU** (Red) - Hindari Entry Baru: distribution regime OR high volatility
+5. **KURANGI_EXIT** (Red) - Kurangi Posisi: active distribution with score ≥60
+
+**Consistency Rules:**
+- Both `/api/stocks` and `/api/ai` endpoints use `computeUnifiedActionGuidance()` function
+- Readiness score computed with same algorithm: Base 50 + flow bias + intensity + reliability + growth
+- Distribution/volatility flags use simple flow data (not AI-computed risk levels)
+- Homepage bucket derived from unified state: Siap Dipantau, Watchlist Prioritas, Hindari Dulu
+
+**Technical Implementation:**
+- `smartMoneyReadinessScore.score` is overridden with `actionGuidance._debug.readinessScore` for display consistency
+- `isDistributionActive` = `flowBias === "Distribusi" && flowIntensity.includes("Besar")`
+- `isVolatilityUnhealthy` = same simple logic as above
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
