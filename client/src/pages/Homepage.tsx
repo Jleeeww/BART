@@ -79,7 +79,7 @@ function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardD
                 {stock.readinessScore}/100
               </Badge>
               {stock.isInWatchlist && (
-                <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30">
+                <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" data-testid={`badge-watchlist-${stock.symbol}`}>
                   Watchlist
                 </Badge>
               )}
@@ -117,7 +117,6 @@ function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardD
             <Button
               size="icon"
               variant="ghost"
-              className="h-8 w-8"
               disabled={isToggling}
               onClick={() => onToggleWatchlist(stock.symbol, !stock.isInWatchlist)}
               data-testid={`button-watchlist-${stock.symbol}`}
