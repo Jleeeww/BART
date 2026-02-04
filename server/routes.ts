@@ -2472,6 +2472,13 @@ export async function registerRoutes(
   const BLUE_CHIP_STOCKS = ["ICBP", "UNVR", "BBCA", "ADRO", "UNTR"];
   const SPECULATIVE_STOCKS = ["BUMI", "DADA", "BULL", "PIPA", "WIFI", "SGER", "MORA"];
 
+  // Simple cache for Yahoo Finance data (avoid rate limiting)
+  const marketDataCache = new Map<string, {
+    data: any;
+    timestamp: number;
+  }>();
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+
   // News Classification Types
   type NewsClassification = "FUNDAMENTAL" | "SENTIMENT" | "IRRELEVANT";
 
@@ -2546,7 +2553,7 @@ export async function registerRoutes(
     };
   }
 
-  // Fetch real market data from Yahoo Finance
+  // Fetch real market data from Yahoo Finance (with caching)
   async function fetchRealMarketData(symbol: string, date: string): Promise<{
     open: number;
     high: number;
@@ -2559,6 +2566,14 @@ export async function registerRoutes(
     dataSource: "REAL" | "SIMULATED";
     confidence: "Tinggi" | "Sedang" | "Rendah";
   }> {
+    // Check cache first
+    const cacheKey = `${symbol}-${date}`;
+    const cached = marketDataCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`Using cached data for ${symbol}`);
+      return cached.data;
+    }
+
     try {
       // Yahoo Finance uses .JK suffix for IDX stocks
       const yahooSymbol = `${symbol}.JK`;
@@ -2609,7 +2624,7 @@ export async function registerRoutes(
       const change = close - prevClose;
       const changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0;
       
-      return {
+      const realData = {
         open: Math.round(open),
         high: Math.round(high),
         low: Math.round(low),
@@ -2618,9 +2633,14 @@ export async function registerRoutes(
         change: Math.round(change),
         changePercent: Math.round(changePercent * 100) / 100,
         marketCap: result.meta?.marketCap || null,
-        dataSource: "REAL",
-        confidence: "Tinggi"
+        dataSource: "REAL" as const,
+        confidence: "Tinggi" as const
       };
+      
+      // Cache the result
+      marketDataCache.set(cacheKey, { data: realData, timestamp: Date.now() });
+      
+      return realData;
     } catch (error) {
       console.log(`Failed to fetch real data for ${symbol}, using simulated data:`, error);
       
@@ -3034,6 +3054,10 @@ export async function registerRoutes(
       }
     }
     
+    // Count data sources
+    const realDataCount = auditDetails.filter(d => d.marketData?.dataSource === "REAL").length;
+    const simulatedDataCount = auditDetails.filter(d => d.marketData?.dataSource === "SIMULATED").length;
+    
     const summary = {
       runId,
       replayDate: dataDate,
@@ -3044,12 +3068,18 @@ export async function registerRoutes(
         blueChips: BLUE_CHIP_STOCKS,
         speculative: SPECULATIVE_STOCKS,
       },
+      dataSourceStats: {
+        realData: realDataCount,
+        simulatedData: simulatedDataCount,
+        realDataPercent: Math.round((realDataCount / stocksToSimulate.length) * 100),
+      },
       passCount,
       failCount,
       consistencyFailures,
       safetyFailures,
       uxSanityFailures,
       behaviorFailures,
+      validationApproach: "Stock classification (Blue Chip vs Speculative) determines expected behavior validation",
       details: auditDetails,
       auditPersisted: true,
     };

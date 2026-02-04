@@ -100,25 +100,42 @@ Protects retail users from speculative pump-and-dump stocks using 4-layer detect
 - Stock routed exclusively to "hindari_dulu" bucket
 
 ### Market Replay Simulator (Pre-Live Validation)
-Simulation mode for validating AI analysis and UX consistency:
+Simulation mode for validating AI analysis and UX consistency using REAL historical market data:
+
+**Locked Stock Universe (12 stocks):**
+- Blue Chips: ICBP, UNVR, BBCA, ADRO, UNTR (expected: Watchlist/Akumulasi, calm language)
+- Speculative: BUMI, DADA, BULL, PIPA, WIFI, SGER, MORA (expected: Gorengan detector, Hindari Dulu)
 
 **Activation:**
 - Toggle "Mode Simulasi" in homepage header
-- Banner appears: "Mode Simulasi Aktif – Menggunakan data historis"
+- Banner shows: "Mode Simulasi Aktif – Data T-1" with "Real Market Data" badge
+
+**Data Sources:**
+- Real OHLC data fetched from Yahoo Finance API (.JK suffix for IDX stocks)
+- 5-minute cache to avoid rate limiting
+- Fallback to simulated data if API fails (with confidence: "Sedang")
+
+**News Classification (Smart Filter):**
+- FUNDAMENTAL: Earnings, dividends, capex, acquisitions, mergers
+- SENTIMENT: Rumors, speculation, analyst recommendations
+- IRRELEVANT: Market noise, technical analysis
+- News NEVER directly changes Action Guidance (context only)
 
 **Validation Pipeline:**
-- Full analysis: Feature Extraction → Gorengan Detection → Market Regime → Readiness Score → Action Guidance → Bucket Assignment
+- Feature Extraction → Gorengan Detection → Market Regime → Readiness Score → Action Guidance → Bucket Assignment
 - Consistency Check: Homepage bucket matches action guidance state
-- Safety Check: Gorengan stocks never show Akumulasi/Watchlist
+- Safety Check: Gorengan stocks clamped to max 59 readiness, Hindari Dulu
 - UX Sanity Check: All labels in Bahasa Indonesia (no English)
+- Behavior Check: Blue chips vs speculative expectations
 
 **API Endpoints:**
-- `POST /api/simulation/run`: Run full validation (returns audit summary)
+- `POST /api/simulation/run`: Run full validation (returns audit summary with dataSourceStats)
 - `GET /api/simulation/audit/:runId`: Retrieve persisted audit logs
 
-**Audit Persistence:**
+**Audit Output:**
+- Per-stock: readinessScore, marketRegime, actionGuidance, isGorengan, marketData (OHLC + dataSource), newsClassification
+- Summary: passCount/failCount, dataSourceStats (realData/simulatedData/realDataPercent)
 - Logs saved to `simulation_audit_log` table
-- Includes: runId, symbol, checks (consistency/safety/ux), overall result, failure reasons
 
 ## User Preferences
 
