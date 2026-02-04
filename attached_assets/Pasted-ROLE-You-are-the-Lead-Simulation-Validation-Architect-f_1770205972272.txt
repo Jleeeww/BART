@@ -1,0 +1,182 @@
+ROLE:
+You are the Lead Simulation & Validation Architect for an Indonesian
+AI-powered stock intelligence platform.
+
+TASK:
+Run Simulation Mode using REAL historical market data (T-1)
+and REAL published news to validate AI analysis, UX, and Action Guidance
+for a fixed set of Indonesian stocks.
+
+This is a PRE-LIVE replay system.
+Accuracy and consistency matter more than speed.
+
+================================================
+STOCK UNIVERSE (LOCKED)
+================================================
+
+Simulate ONLY the following stocks:
+
+ICBP
+UNVR
+BBCA
+ADRO
+UNTR
+BUMI
+DADA
+BULL
+PIPA
+WIFI
+SGER
+MORA
+
+No additional stocks allowed.
+
+================================================
+PART 1 — DATA MODE (SIMULATION)
+================================================
+
+Force application state:
+
+SIMULATION_MODE = TRUE
+DATA_DATE = last market close (T-1)
+
+- All data must reflect the same date
+- No live or streaming data calls allowed
+
+================================================
+PART 2 — MARKET DATA REQUIREMENTS
+================================================
+
+For each stock, load REAL historical data:
+
+Required:
+- Daily OHLC (T-1)
+- Volume
+- % change
+- Market cap (if available)
+
+Optional but recommended:
+- Broker summary (CSV/manual import allowed)
+- Foreign vs domestic net flow
+
+If broker data is missing:
+- Mark confidence as "Sedang"
+- DO NOT fabricate data
+
+================================================
+PART 3 — REAL NEWS INGESTION
+================================================
+
+Load REAL news articles published on DATA_DATE for each stock.
+
+Sources may include:
+- Public financial news sites
+- RSS feeds
+- Manually curated JSON (acceptable for simulation)
+
+For each article:
+- Headline
+- Source
+- Publish time
+- Full text or summary
+
+================================================
+PART 4 — SMART NEWS FILTER (MANDATORY)
+================================================
+
+For each news item, classify:
+
+1) Fundamental Impact
+   - Earnings
+   - Corporate action
+   - Capex, acquisition, restructuring
+
+2) Sentiment / Noise
+   - Speculation
+   - Promotional headlines
+   - Vague expansion plans
+
+3) Irrelevant / Market Noise
+
+Generate AI explanation (Bahasa Indonesia):
+- What this news means
+- Whether it affects structure or just sentiment
+- Whether it should change investor behavior
+
+IMPORTANT:
+- News must NEVER directly change Action Guidance
+- News may only add context or warnings
+
+================================================
+PART 5 — FULL ANALYSIS PIPELINE (NO SKIPS)
+================================================
+
+For each stock, run:
+
+Historical Market Data
+  ↓
+Feature Extraction
+  ↓
+Gorengan Detector (hard override)
+  ↓
+Market Regime Engine
+  ↓
+Smart Money Readiness Score
+  ↓
+Action Guidance Arbiter (single source of truth)
+  ↓
+Homepage Bucket Assignment
+  ↓
+UX Explanation Generation (Bahasa Indonesia)
+
+================================================
+PART 6 — EXPECTED BEHAVIOR CHECKS
+================================================
+
+Mandatory expectations:
+
+- Blue chips (ICBP, UNVR, BBCA, ADRO, UNTR):
+  • Mostly Watchlist / Akumulasi
+  • Calm language
+  • No hype
+
+- Speculative stocks (BUMI, DADA, BULL, PIPA, WIFI, SGER, MORA):
+  • Gorengan Detector must activate when appropriate
+  • Action = Hindari Dulu / Kurangi
+  • No Watchlist for gorengan
+
+================================================
+PART 7 — SIMULATION AUDIT OUTPUT
+================================================
+
+Generate an INTERNAL audit report (not user-facing):
+
+For each stock:
+- Final Action Guidance
+- Readiness Score
+- Market Regime
+- Gorengan status
+- News classification summary
+- PASS / FAIL flag
+- Reason if FAIL
+
+================================================
+LANGUAGE & UX RULES
+================================================
+
+- ALL explanations in Bahasa Indonesia
+- No English text
+- No hype
+- Clear, retail-understandable language
+
+================================================
+FINAL GOAL
+================================================
+
+The simulation must clearly answer:
+"Apa tindakan paling masuk akal hari ini?"
+
+If any stock gives mixed or confusing signals,
+mark it as FAIL and fix logic before live deployment.
+
+Proceed with Simulation Mode now.
