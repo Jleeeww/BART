@@ -1,0 +1,140 @@
+ROLE:
+You are the Lead Quant Risk Architect for an Indonesian stock intelligence platform.
+Your responsibility is to protect retail users from speculative pump-and-dump stocks
+("saham gorengan") by enforcing a hard safety engine.
+
+TASK:
+Implement an AUTOMATED GORENGAN DETECTOR that overrides Action Guidance and Readiness Score
+when manipulation risk is detected.
+
+This engine is mandatory and non-optional.
+
+================================================
+NON-NEGOTIABLE RULES
+================================================
+
+1. Gorengan detection MUST override optimism.
+2. Gorengan detection MUST be deterministic (rule-based, not vibes).
+3. When gorengan is detected:
+   - Akumulasi Bertahap is DISABLED
+   - Watchlist Prioritas is DISABLED
+4. Action Guidance MUST be forced to conservative states.
+5. All UI text MUST be in Bahasa Indonesia.
+6. This engine applies globally:
+   - Homepage
+   - Stock Detail Page
+   - Watchlist
+   - Alerts (future-ready)
+
+================================================
+DEFINITION: SAHAM GORENGAN
+================================================
+
+A stock is classified as GORENGAN when speculative retail behavior
+dominates price movement without institutional accumulation.
+
+================================================
+DETECTION LAYERS (LOCKED)
+================================================
+
+Implement FOUR independent detection layers.
+
+------------------------------------------------
+LAYER 1 — PRICE & VOLUME ANOMALY
+------------------------------------------------
+Trigger if ANY is true:
+- Price increase > 25% within ≤ 5 trading days
+- Repeated intraday spikes ≥ 10%
+- Volume > 3× 20-day average
+
+------------------------------------------------
+LAYER 2 — BROKER FLOW FRAGMENTATION (CRITICAL)
+------------------------------------------------
+Trigger if:
+- No dominant broker (Top 3 net buy < 35%)
+- Many small brokers net buying
+- Broker patterns are inconsistent day-to-day
+- Retail proxy brokers dominate activity
+
+------------------------------------------------
+LAYER 3 — RETAIL DOMINANCE
+------------------------------------------------
+Trigger if:
+- Small lot transactions dominate
+- High frequency, low size trades
+- Foreign flow is absent or contradictory
+- No accumulation ladder detected
+
+------------------------------------------------
+LAYER 4 — STRUCTURAL FAILURE
+------------------------------------------------
+Trigger if:
+- Market Regime ≠ Accumulation
+- No tape control detected
+- Absorption fails (price up but sell pressure strong)
+- Distribution appears shortly after spike
+
+================================================
+FINAL GORENGAN DECISION RULE
+================================================
+
+IF (Triggered_Layers ≥ 2)
+THEN
+  GORENGAN_STATUS = TRUE
+ELSE
+  GORENGAN_STATUS = FALSE
+
+================================================
+OVERRIDE LOGIC (MANDATORY)
+================================================
+
+IF GORENGAN_STATUS = TRUE:
+
+1. FORCE Action Guidance:
+   - Allowed states:
+     🔴 HINDARI DULU
+     ⚫ KURANGI / EXIT (holders only)
+   - DISALLOW:
+     ❌ Akumulasi Bertahap
+     ❌ Watchlist Prioritas
+
+2. CLAMP Smart Money Readiness:
+   - Maximum displayed Readiness = 59
+   - Even if internal structural score is higher
+
+3. ADD Internal Flag:
+   - risk_override = "GOR"
+
+================================================
+UX REQUIREMENTS
+================================================
+
+- Display a clear warning label:
+  "Aktivitas spekulatif ritel terdeteksi"
+
+- Do NOT soften language.
+- Do NOT hide this status behind clicks.
+- Keep tone professional, not emotional.
+
+================================================
+VALIDATION CHECK
+================================================
+
+Before finishing:
+- Verify gorengan stocks NEVER appear in:
+  • Siap Dipantau
+  • Watchlist Prioritas
+- Verify homepage and stock detail ALWAYS match
+- Verify no optimistic wording remains
+
+================================================
+FINAL OUTPUT
+================================================
+
+A hard safety engine that:
+- Prevents false buy signals
+- Protects retail users during hype
+- Maintains long-term trust
+- Works reliably under live market conditions
+
+Proceed with implementation now.

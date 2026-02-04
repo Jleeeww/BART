@@ -37,6 +37,10 @@ interface StockCardData {
   homepageBucket: "siap_dipantau" | "watchlist_prioritas" | "hindari_dulu";
   aiSentence: string;
   isInWatchlist: boolean;
+  // Gorengan Safety Flags
+  isGorengan?: boolean;
+  gorenganWarning?: string | null;
+  riskOverride?: string | null;
 }
 
 function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardData; onToggleWatchlist: (symbol: string, isAdding: boolean) => void; isToggling: boolean }) {
@@ -90,6 +94,16 @@ function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardD
               {stock.isInWatchlist && (
                 <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" data-testid={`badge-watchlist-${stock.symbol}`}>
                   Watchlist
+                </Badge>
+              )}
+              {stock.isGorengan && (
+                <Badge 
+                  variant="destructive" 
+                  className="text-xs font-bold animate-pulse"
+                  data-testid={`badge-gorengan-${stock.symbol}`}
+                >
+                  <AlertTriangle className="w-3 h-3 mr-1" />
+                  Spekulatif
                 </Badge>
               )}
             </div>

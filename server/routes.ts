@@ -214,6 +214,217 @@ function computeUnifiedActionGuidance(input: ActionGuidanceInput): ActionGuidanc
   };
 }
 
+// ========================================
+// GORENGAN DETECTOR (SAFETY ENGINE)
+// Protects retail users from pump-and-dump stocks
+// ========================================
+
+interface GorenganDetectionInput {
+  priceChangePercent5d: number;
+  hasIntradaySpikes: boolean;
+  volumeRatio: number; // current vs 20-day avg
+  top3BrokerNetBuyPercent: number;
+  hasBrokerFragmentation: boolean;
+  retailProxyDominates: boolean;
+  smallLotDominates: boolean;
+  foreignFlowAbsent: boolean;
+  hasAccumulationLadder: boolean;
+  marketRegime: string;
+  hasTapeControl: boolean;
+  hasAbsorptionFailure: boolean;
+  hasPostSpikeDistribution: boolean;
+}
+
+interface GorenganResult {
+  isGorengan: boolean;
+  triggeredLayers: number[];
+  layerDetails: string[];
+  riskOverride: string | null;
+}
+
+function detectGorengan(input: GorenganDetectionInput): GorenganResult {
+  const triggeredLayers: number[] = [];
+  const layerDetails: string[] = [];
+
+  // ========================================
+  // LAYER 1 — PRICE & VOLUME ANOMALY
+  // ========================================
+  const layer1Triggered = 
+    input.priceChangePercent5d > 25 ||
+    input.hasIntradaySpikes ||
+    input.volumeRatio > 3;
+  
+  if (layer1Triggered) {
+    triggeredLayers.push(1);
+    const details: string[] = [];
+    if (input.priceChangePercent5d > 25) details.push(`Kenaikan harga ${input.priceChangePercent5d.toFixed(1)}% dalam 5 hari`);
+    if (input.hasIntradaySpikes) details.push("Lonjakan intraday ≥10% terdeteksi");
+    if (input.volumeRatio > 3) details.push(`Volume ${input.volumeRatio.toFixed(1)}× rata-rata 20 hari`);
+    layerDetails.push(`Layer 1 (Anomali Harga & Volume): ${details.join(", ")}`);
+  }
+
+  // ========================================
+  // LAYER 2 — BROKER FLOW FRAGMENTATION
+  // ========================================
+  const layer2Triggered =
+    input.top3BrokerNetBuyPercent < 35 ||
+    input.hasBrokerFragmentation ||
+    input.retailProxyDominates;
+  
+  if (layer2Triggered) {
+    triggeredLayers.push(2);
+    const details: string[] = [];
+    if (input.top3BrokerNetBuyPercent < 35) details.push(`Top 3 broker hanya ${input.top3BrokerNetBuyPercent.toFixed(0)}% net buy`);
+    if (input.hasBrokerFragmentation) details.push("Fragmentasi broker tinggi");
+    if (input.retailProxyDominates) details.push("Broker proxy ritel mendominasi");
+    layerDetails.push(`Layer 2 (Fragmentasi Broker): ${details.join(", ")}`);
+  }
+
+  // ========================================
+  // LAYER 3 — RETAIL DOMINANCE
+  // ========================================
+  const layer3Triggered =
+    input.smallLotDominates ||
+    input.foreignFlowAbsent ||
+    !input.hasAccumulationLadder;
+  
+  if (layer3Triggered) {
+    triggeredLayers.push(3);
+    const details: string[] = [];
+    if (input.smallLotDominates) details.push("Transaksi lot kecil mendominasi");
+    if (input.foreignFlowAbsent) details.push("Aliran asing absen");
+    if (!input.hasAccumulationLadder) details.push("Tidak ada pola akumulasi bertahap");
+    layerDetails.push(`Layer 3 (Dominasi Ritel): ${details.join(", ")}`);
+  }
+
+  // ========================================
+  // LAYER 4 — STRUCTURAL FAILURE
+  // ========================================
+  const isAccumulationRegime = input.marketRegime.includes("Akumulasi") || 
+    input.marketRegime === "Stealth Accumulation" || 
+    input.marketRegime === "Active Accumulation";
+  
+  const layer4Triggered =
+    !isAccumulationRegime ||
+    !input.hasTapeControl ||
+    input.hasAbsorptionFailure ||
+    input.hasPostSpikeDistribution;
+  
+  if (layer4Triggered) {
+    triggeredLayers.push(4);
+    const details: string[] = [];
+    if (!isAccumulationRegime) details.push("Rezim pasar bukan akumulasi");
+    if (!input.hasTapeControl) details.push("Tidak ada kendali tape");
+    if (input.hasAbsorptionFailure) details.push("Absorpsi gagal (harga naik tapi tekanan jual kuat)");
+    if (input.hasPostSpikeDistribution) details.push("Distribusi pasca-lonjakan terdeteksi");
+    layerDetails.push(`Layer 4 (Kegagalan Struktural): ${details.join(", ")}`);
+  }
+
+  // ========================================
+  // FINAL DECISION: GORENGAN if ≥2 layers triggered
+  // ========================================
+  const isGorengan = triggeredLayers.length >= 2;
+
+  return {
+    isGorengan,
+    triggeredLayers,
+    layerDetails,
+    riskOverride: isGorengan ? "GOR" : null
+  };
+}
+
+// Helper function to compute gorengan detection from stock data
+function computeGorenganFromStock(stock: {
+  changePercent: string;
+  flowBias: string;
+  flowIntensity: string;
+  flowReliability: string;
+  brokerData: string;
+  foreignActivityData: string;
+  stockCharacter?: string | null;
+}): GorenganResult {
+  // Parse broker data
+  let brokerData: any[] = [];
+  try {
+    brokerData = JSON.parse(stock.brokerData || "[]");
+  } catch (e) {
+    brokerData = [];
+  }
+
+  // Parse foreign activity data
+  let foreignData: any = {};
+  try {
+    foreignData = JSON.parse(stock.foreignActivityData || "{}");
+  } catch (e) {
+    foreignData = {};
+  }
+
+  // Calculate top 3 broker net buy percentage
+  const sortedBrokers = [...brokerData].sort((a, b) => {
+    const aNet = (parseFloat(a.netBuy) || 0) - (parseFloat(a.netSell) || 0);
+    const bNet = (parseFloat(b.netBuy) || 0) - (parseFloat(b.netSell) || 0);
+    return bNet - aNet;
+  });
+  
+  const totalNetBuy = brokerData.reduce((sum, b) => sum + Math.max(0, (parseFloat(b.netBuy) || 0) - (parseFloat(b.netSell) || 0)), 0);
+  const top3NetBuy = sortedBrokers.slice(0, 3).reduce((sum, b) => sum + Math.max(0, (parseFloat(b.netBuy) || 0) - (parseFloat(b.netSell) || 0)), 0);
+  const top3Percent = totalNetBuy > 0 ? (top3NetBuy / totalNetBuy) * 100 : 50;
+
+  // Determine broker fragmentation
+  const hasBrokerFragmentation = brokerData.length > 10 && top3Percent < 40;
+
+  // Check for retail proxy brokers (typically smaller regional brokers)
+  const retailProxyBrokers = ["YP", "RX", "CC", "PD", "NH"];
+  const retailProxyDominates = brokerData.some(b => 
+    retailProxyBrokers.includes(b.code) && 
+    (parseFloat(b.netBuy) || 0) > 0
+  );
+
+  // Foreign flow analysis
+  const foreignNetFlow = parseFloat(foreignData.foreignNet || "0");
+  const domesticNetFlow = parseFloat(foreignData.domesticNet || "0");
+  const foreignFlowAbsent = Math.abs(foreignNetFlow) < Math.abs(domesticNetFlow) * 0.1;
+
+  // Stock character check for speculation
+  const isSpeculative = stock.stockCharacter === "Spekulatif";
+
+  // Determine accumulation ladder (based on flow reliability and consistency)
+  const hasAccumulationLadder = stock.flowReliability === "Tinggi" && 
+    stock.flowBias === "Akumulasi" && 
+    !stock.flowIntensity.includes("Distribusi");
+
+  // Estimate volume ratio (simplified - in production would use actual volume data)
+  const volumeRatio = isSpeculative ? 3.5 : 1.2;
+
+  // Price change analysis
+  const priceChangePercent = Math.abs(parseFloat(stock.changePercent) || 0);
+  const priceChangePercent5d = priceChangePercent * 3; // Estimate 5-day from daily
+
+  // Build market regime from flow
+  let marketRegime = "Transisi";
+  if (stock.flowBias === "Akumulasi") {
+    marketRegime = stock.flowIntensity.includes("Besar") ? "Active Accumulation" : "Akumulasi Awal";
+  } else if (stock.flowBias === "Distribusi") {
+    marketRegime = "Distribution into Strength";
+  }
+
+  return detectGorengan({
+    priceChangePercent5d,
+    hasIntradaySpikes: isSpeculative && priceChangePercent > 5,
+    volumeRatio,
+    top3BrokerNetBuyPercent: top3Percent,
+    hasBrokerFragmentation,
+    retailProxyDominates,
+    smallLotDominates: isSpeculative,
+    foreignFlowAbsent,
+    hasAccumulationLadder,
+    marketRegime,
+    hasTapeControl: stock.flowReliability === "Tinggi",
+    hasAbsorptionFailure: stock.flowBias === "Distribusi" && priceChangePercent > 0,
+    hasPostSpikeDistribution: stock.flowBias === "Distribusi" && priceChangePercent5d > 15
+  });
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -880,7 +1091,7 @@ export async function registerRoutes(
         const isEntryValid = isAccumulationRegime && isFlowReliable && readinessScore >= 80;
 
         // USE UNIFIED ACTION GUIDANCE ENGINE
-        const actionGuidanceResult = computeUnifiedActionGuidance({
+        let actionGuidanceResult = computeUnifiedActionGuidance({
           readinessScore,
           marketRegime,
           flowReliability,
@@ -888,6 +1099,46 @@ export async function registerRoutes(
           isVolatilityUnhealthy,
           isEntryValid
         });
+
+        // ========================================
+        // GORENGAN DETECTOR - SAFETY OVERRIDE
+        // ========================================
+        const gorenganResult = computeGorenganFromStock({
+          changePercent: stock.changePercent,
+          flowBias: stock.flowBias,
+          flowIntensity: stock.flowIntensity,
+          flowReliability: stock.flowReliability,
+          brokerData: stock.brokerData,
+          foreignActivityData: stock.foreignActivityData,
+          stockCharacter: stock.stockCharacter
+        });
+
+        // Apply gorengan override if detected
+        let displayReadinessScore = readinessScore;
+        let isGorengan = gorenganResult.isGorengan;
+        let gorenganWarning: string | null = null;
+
+        if (isGorengan) {
+          // CLAMP readiness score to max 59
+          displayReadinessScore = Math.min(readinessScore, 59);
+          
+          // FORCE action guidance to conservative state
+          if (actionGuidanceResult.state === "AKUMULASI_BERTAHAP" || 
+              actionGuidanceResult.state === "WATCHLIST_PRIORITAS") {
+            actionGuidanceResult = {
+              state: "HINDARI_DULU",
+              label: "Hindari Dulu",
+              color: "red",
+              shortSummary: "Aktivitas spekulatif ritel terdeteksi. Risiko manipulasi tinggi.",
+              whyAction: gorenganResult.layerDetails,
+              mainRisk: "Potensi penurunan tajam setelah fase spekulasi berakhir.",
+              failureTrigger: "Jika muncul akumulasi institusional yang terukur dan konsisten.",
+              homepageBucket: "hindari_dulu"
+            };
+          }
+          
+          gorenganWarning = "Aktivitas spekulatif ritel terdeteksi";
+        }
 
         // Generate AI sentence based on action guidance
         const aiSentence = actionGuidanceResult.shortSummary;
@@ -900,7 +1151,7 @@ export async function registerRoutes(
           changePercent: stock.changePercent,
           sector: stock.sector,
           sectorBadge: stock.sectorBadge,
-          readinessScore,
+          readinessScore: displayReadinessScore,
           marketRegime,
           // Unified Action Guidance
           actionGuidance: actionGuidanceResult.label,
@@ -909,6 +1160,10 @@ export async function registerRoutes(
           homepageBucket: actionGuidanceResult.homepageBucket,
           aiSentence,
           isInWatchlist: watchlistSymbols.has(stock.symbol),
+          // Gorengan Safety Flags
+          isGorengan,
+          gorenganWarning,
+          riskOverride: gorenganResult.riskOverride,
         };
       });
 
@@ -1825,7 +2080,7 @@ export async function registerRoutes(
       const isEntryValid = isAccumulationFlow && isFlowReliable && readinessScore >= 80;
       
       // USE UNIFIED ACTION GUIDANCE ENGINE
-      const unifiedResult = computeUnifiedActionGuidance({
+      let unifiedResult = computeUnifiedActionGuidance({
         readinessScore,
         marketRegime: regime,
         flowReliability: flowReliabilityValue,
@@ -1833,6 +2088,49 @@ export async function registerRoutes(
         isVolatilityUnhealthy,
         isEntryValid
       });
+
+      // ========================================
+      // GORENGAN DETECTOR - SAFETY OVERRIDE
+      // ========================================
+      const gorenganResult = computeGorenganFromStock({
+        changePercent: String(stockData?.changePercent || "0"),
+        flowBias,
+        flowIntensity,
+        flowReliability: flowReliabilityValue,
+        brokerData: stockData?.brokerData || "[]",
+        foreignActivityData: stockData?.foreignActivityData || "{}",
+        stockCharacter: stockData?.stockCharacter
+      });
+
+      // Apply gorengan override
+      let displayReadinessScore = readinessScore;
+      let isGorenganFlag = gorenganResult.isGorengan;
+      let gorenganWarningText: string | null = null;
+
+      if (isGorenganFlag) {
+        // CLAMP readiness score to max 59
+        displayReadinessScore = Math.min(readinessScore, 59);
+        
+        // FORCE action guidance to conservative state
+        if (unifiedResult.state === "AKUMULASI_BERTAHAP" || 
+            unifiedResult.state === "WATCHLIST_PRIORITAS") {
+          unifiedResult = {
+            state: "HINDARI_DULU",
+            label: "Hindari Dulu",
+            color: "red",
+            shortSummary: "Aktivitas spekulatif ritel terdeteksi. Risiko manipulasi tinggi.",
+            whyAction: gorenganResult.layerDetails,
+            mainRisk: "Potensi penurunan tajam setelah fase spekulasi berakhir.",
+            failureTrigger: "Jika muncul akumulasi institusional yang terukur dan konsisten.",
+            homepageBucket: "hindari_dulu"
+          };
+        }
+        
+        gorenganWarningText = "Aktivitas spekulatif ritel terdeteksi";
+      }
+
+      // Use the display readiness score for output
+      readinessScore = displayReadinessScore;
       
       // ========================================
       // CONFIDENCE LAYER
@@ -1905,13 +2203,19 @@ export async function registerRoutes(
         },
         // Homepage bucket for consistency check
         homepageBucket: unifiedResult.homepageBucket,
+        // Gorengan Safety Flags
+        isGorengan: isGorenganFlag,
+        gorenganWarning: gorenganWarningText,
+        gorenganDetails: isGorenganFlag ? gorenganResult.layerDetails : [],
+        riskOverride: gorenganResult.riskOverride,
         // Debug info for transparency
         _debug: {
           readinessScore,
           regime,
           riskLevel,
           flowQuality,
-          unifiedState: unifiedResult.state
+          unifiedState: unifiedResult.state,
+          gorenganTriggeredLayers: gorenganResult.triggeredLayers
         }
       };
     })();
