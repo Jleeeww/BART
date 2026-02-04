@@ -1,0 +1,89 @@
+You are the UX systems engineer for an Indonesian stock intelligence platform
+focused on bandarmology, market regime analysis, and decision guidance.
+
+TASK:
+Integrate short, educational tooltips across the UI to clarify key concepts
+(Readiness Score, Action Guidance, Watchlist, Risk) WITHOUT changing
+any existing logic or calculations.
+
+Tooltips must reduce confusion for beginner retail investors
+and reinforce the correct mental model.
+
+--------------------------------------------------
+GLOBAL RULES (NON-NEGOTIABLE)
+--------------------------------------------------
+
+1. Tooltips are EDUCATIONAL ONLY, not analytical.
+2. Tooltips must be ONE sentence only.
+3. All tooltip text must be Bahasa Indonesia.
+4. Do NOT change Readiness Score logic.
+5. Do NOT change Action Guidance logic.
+6. Do NOT add new indicators or UI clutter.
+7. Tooltips must appear only on hover / info icon (ⓘ).
+
+--------------------------------------------------
+TOOLTIP PLACEMENT (MANDATORY)
+--------------------------------------------------
+
+Add tooltips to the following UI elements:
+
+1) Smart Money Readiness Score
+2) Action Guidance badge
+3) Watchlist Prioritas label
+4) Akumulasi Bertahap label
+5) Hindari Dulu label
+6) Failure / Risk explanation section (if present)
+
+--------------------------------------------------
+TOOLTIP TEXT (LOCKED — USE EXACT WORDING)
+--------------------------------------------------
+
+Smart Money Readiness Score tooltip:
+"Readiness mengukur kesiapan struktur saham, bukan waktu beli."
+
+Action Guidance tooltip:
+"Tindakan ini menunjukkan langkah paling masuk akal saat ini berdasarkan kondisi pasar."
+
+Watchlist Prioritas tooltip:
+"Saham ini menarik, tetapi belum memiliki rasio risiko–imbalan yang optimal untuk dibeli."
+
+Akumulasi Bertahap tooltip:
+"Kondisi saat ini mendukung pembelian bertahap dengan risiko yang relatif terkendali."
+
+Hindari Dulu tooltip:
+"Risiko saat ini lebih besar dibanding potensi yang tersedia."
+
+Failure / Risk section tooltip:
+"Analisis ini bisa tidak berlaku jika terjadi perubahan perilaku pelaku besar."
+
+--------------------------------------------------
+UX IMPLEMENTATION DETAILS
+--------------------------------------------------
+
+- Use a subtle ⓘ icon next to the label or title.
+- Tooltip appears on hover (desktop) and tap (mobile).
+- Do NOT display tooltips by default.
+- Do NOT stack multiple tooltips in one area.
+- Tooltips must not obstruct main content.
+
+--------------------------------------------------
+CONSISTENCY CHECK
+--------------------------------------------------
+
+Before completing:
+1. Verify tooltips appear consistently on homepage and stock detail pages.
+2. Verify tooltip wording matches the exact text provided.
+3. Verify no English tooltips remain.
+4. Verify tooltips do not contradict Action Guidance or Readiness logic.
+
+--------------------------------------------------
+FINAL OUTPUT
+--------------------------------------------------
+
+A clean, educational tooltip system that:
+- Instantly clarifies Readiness vs Action
+- Reduces beginner confusion
+- Increases trust without adding noise
+- Integrates seamlessly with the existing app brain
+
+Proceed with implementation now.

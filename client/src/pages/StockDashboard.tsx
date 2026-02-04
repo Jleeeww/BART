@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
-import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp, EyeOff, Eye, HelpCircle, BarChart3 } from "lucide-react";
+import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp, EyeOff, Eye, HelpCircle, BarChart3, Info } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // IDX Market Session Status based on WIB time
 function getIDXSessionStatus(): { label: string; color: "green" | "yellow" | "red" } {
@@ -333,26 +334,36 @@ export default function StockDashboard() {
                           
                           {/* Combined Status Badge (Primary) */}
                           <div className="flex flex-wrap items-center gap-3">
-                            <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wide ${
-                              aiData.actionGuidance.statusColor === "green" 
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300" 
-                                : aiData.actionGuidance.statusColor === "yellow"
-                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
-                                  : aiData.actionGuidance.statusColor === "orange"
-                                    ? "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300"
-                                    : aiData.actionGuidance.statusColor === "red"
-                                      ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
-                                      : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                            }`} data-testid="badge-combined-status">
-                              <span className={`w-2.5 h-2.5 rounded-full ${
-                                aiData.actionGuidance.statusColor === "green" ? "bg-emerald-500" 
-                                  : aiData.actionGuidance.statusColor === "yellow" ? "bg-amber-500"
-                                    : aiData.actionGuidance.statusColor === "orange" ? "bg-orange-500"
-                                      : aiData.actionGuidance.statusColor === "red" ? "bg-red-500"
-                                        : "bg-slate-400"
-                              }`}></span>
-                              {aiData.actionGuidance.statusLabel}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wide ${
+                                aiData.actionGuidance.statusColor === "green" 
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300" 
+                                  : aiData.actionGuidance.statusColor === "yellow"
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
+                                    : aiData.actionGuidance.statusColor === "orange"
+                                      ? "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300"
+                                      : aiData.actionGuidance.statusColor === "red"
+                                        ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
+                                        : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                              }`} data-testid="badge-combined-status">
+                                <span className={`w-2.5 h-2.5 rounded-full ${
+                                  aiData.actionGuidance.statusColor === "green" ? "bg-emerald-500" 
+                                    : aiData.actionGuidance.statusColor === "yellow" ? "bg-amber-500"
+                                      : aiData.actionGuidance.statusColor === "orange" ? "bg-orange-500"
+                                        : aiData.actionGuidance.statusColor === "red" ? "bg-red-500"
+                                          : "bg-slate-400"
+                                }`}></span>
+                                {aiData.actionGuidance.statusLabel}
+                              </span>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" data-testid="tooltip-action-guidance" />
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs text-center">
+                                  <p>Tindakan ini menunjukkan langkah paling masuk akal saat ini berdasarkan kondisi pasar.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                             
                             {/* Watchlist Priority Tag */}
                             {aiData.actionGuidance.isWatchlistPriority && (
@@ -572,7 +583,17 @@ export default function StockDashboard() {
                                 }`} />
                               </div>
                               <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Kesiapan Smart Money</p>
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Kesiapan Smart Money</p>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help" data-testid="tooltip-readiness-score" />
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-xs text-center">
+                                      <p>Readiness mengukur kesiapan struktur saham, bukan waktu beli.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
                                 <p className="text-[10px] text-muted-foreground/70 mb-1">Penilaian kesiapan struktural (bukan sinyal beli)</p>
                                 <div className="flex items-baseline gap-2">
                                   <span className={`text-3xl font-bold font-display ${
@@ -1559,6 +1580,14 @@ export default function StockDashboard() {
                               <h3 className="text-sm font-bold text-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
                                 <AlertTriangle className="w-4 h-4 text-amber-500" />
                                 Kapan Analisis Ini Bisa Salah
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help" data-testid="tooltip-failure-risk" />
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs text-center">
+                                    <p>Analisis ini bisa tidak berlaku jika terjadi perubahan perilaku pelaku besar.</p>
+                                  </TooltipContent>
+                                </Tooltip>
                               </h3>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {aiData.simplifiedRisk.failureTriggers.slice(0, 3).map((trigger: string, idx: number) => (

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   TrendingUp, 
@@ -15,7 +16,8 @@ import {
   Star,
   StarOff,
   Flame,
-  ArrowRight
+  ArrowRight,
+  Info
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -273,6 +275,14 @@ export default function Homepage() {
               <Flame className="w-4 h-4 text-emerald-500" />
               <span className="hidden sm:inline">Siap Dipantau</span>
               <span className="sm:hidden">Siap</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help shrink-0" data-testid="tooltip-siap-dipantau" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-center">
+                  <p>Kondisi saat ini mendukung pembelian bertahap dengan risiko yang relatif terkendali.</p>
+                </TooltipContent>
+              </Tooltip>
               <Badge variant="secondary" className="ml-1 text-xs">
                 {readyStocks.length}
               </Badge>
@@ -281,6 +291,14 @@ export default function Homepage() {
               <Eye className="w-4 h-4 text-amber-500" />
               <span className="hidden sm:inline">Watchlist Prioritas</span>
               <span className="sm:hidden">Pantau</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help shrink-0" data-testid="tooltip-watchlist-prioritas" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-center">
+                  <p>Saham ini menarik, tetapi belum memiliki rasio risiko–imbalan yang optimal untuk dibeli.</p>
+                </TooltipContent>
+              </Tooltip>
               <Badge variant="secondary" className="ml-1 text-xs">
                 {watchlistStocks.length}
               </Badge>
@@ -289,6 +307,14 @@ export default function Homepage() {
               <AlertTriangle className="w-4 h-4 text-red-500" />
               <span className="hidden sm:inline">Hindari Dulu</span>
               <span className="sm:hidden">Hindari</span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help shrink-0" data-testid="tooltip-hindari-dulu" />
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-center">
+                  <p>Risiko saat ini lebih besar dibanding potensi yang tersedia.</p>
+                </TooltipContent>
+              </Tooltip>
               <Badge variant="secondary" className="ml-1 text-xs">
                 {avoidStocks.length}
               </Badge>
