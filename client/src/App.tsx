@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Homepage from "@/pages/Homepage";
 import StockDashboard from "@/pages/StockDashboard";
+import { SimulationProvider } from "@/contexts/SimulationContext";
+import { SimulationBanner } from "@/components/SimulationBanner";
 
 function Router() {
   return (
@@ -24,8 +26,11 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        <SimulationProvider>
+          <SimulationBanner />
+          <Toaster />
+          <Router />
+        </SimulationProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

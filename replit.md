@@ -86,6 +86,40 @@ The platform uses a single source of truth for action guidance, ensuring strict 
 - `isDistributionActive` = `flowBias === "Distribusi" && flowIntensity.includes("Besar")`
 - `isVolatilityUnhealthy` = same simple logic as above
 
+### Gorengan Detector (Safety Engine)
+Protects retail users from speculative pump-and-dump stocks using 4-layer detection:
+1. **Price & Volume Anomaly**: >25% 5-day rise with volume >3× average
+2. **Broker Flow Fragmentation**: Top 3 brokers < 35% net buy concentration
+3. **Retail Dominance**: Small lot activity, no foreign flow
+4. **Structural Failure**: No accumulation regime, no tape control
+
+**Override Behavior:**
+- isGorengan = true if ≥2 layers triggered
+- Readiness score capped at max 59
+- Action guidance forced to HINDARI_DULU
+- Stock routed exclusively to "hindari_dulu" bucket
+
+### Market Replay Simulator (Pre-Live Validation)
+Simulation mode for validating AI analysis and UX consistency:
+
+**Activation:**
+- Toggle "Mode Simulasi" in homepage header
+- Banner appears: "Mode Simulasi Aktif – Menggunakan data historis"
+
+**Validation Pipeline:**
+- Full analysis: Feature Extraction → Gorengan Detection → Market Regime → Readiness Score → Action Guidance → Bucket Assignment
+- Consistency Check: Homepage bucket matches action guidance state
+- Safety Check: Gorengan stocks never show Akumulasi/Watchlist
+- UX Sanity Check: All labels in Bahasa Indonesia (no English)
+
+**API Endpoints:**
+- `POST /api/simulation/run`: Run full validation (returns audit summary)
+- `GET /api/simulation/audit/:runId`: Retrieve persisted audit logs
+
+**Audit Persistence:**
+- Logs saved to `simulation_audit_log` table
+- Includes: runId, symbol, checks (consistency/safety/ux), overall result, failure reasons
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

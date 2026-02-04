@@ -1,0 +1,167 @@
+ROLE:
+You are the Lead Systems Architect for an Indonesian AI-powered stock intelligence platform.
+Your task is to implement a SAFE, deterministic Market Replay Simulator
+to validate AI analysis, Action Guidance, and UX consistency
+using real historical market data (yesterday / last close).
+
+This is a PRE-LIVE validation system.
+No real-time trading behavior is allowed.
+
+================================================
+CORE OBJECTIVE
+================================================
+
+Enable the entire application to run in "Simulation Mode",
+where historical market data is replayed through the full analysis pipeline
+as if it were live, allowing end-to-end validation of:
+
+- Market Regime detection
+- Smart Money Readiness Score
+- Gorengan Detector
+- Action Guidance arbitration
+- Homepage bucketing
+- Stock detail explanations
+- Tooltip clarity (Bahasa Indonesia)
+
+================================================
+PART 1 — SIMULATION MODE (GLOBAL TOGGLE)
+================================================
+
+Implement a global application state:
+
+SIMULATION_MODE = true | false
+
+UI REQUIREMENTS:
+- Add a clear toggle in the top navigation:
+  Label: "Mode Simulasi"
+- When ON:
+  - Display a subtle banner:
+    "Mode Simulasi Aktif – Menggunakan data historis"
+- When OFF:
+  - App behaves normally (future live mode)
+
+IMPORTANT:
+- Simulation Mode must NOT change UI layout
+- Only the DATA SOURCE changes
+
+================================================
+PART 2 — MARKET REPLAY DATA SOURCE
+================================================
+
+Create a dedicated data source layer:
+
+DataSource = {
+  mode: "LIVE" | "REPLAY",
+  date: YYYY-MM-DD (default: yesterday)
+}
+
+In Simulation Mode:
+- Fetch market data from stored historical snapshots ONLY
+- Do NOT call live APIs
+- Data must be frozen and deterministic
+
+Minimum required dataset per stock:
+- Daily OHLC
+- Volume
+- % Change
+- Broker Summary (net buy/sell per broker)
+- Foreign vs Domestic flow
+- Transaction structure (if available)
+- Corporate actions / news (optional, tagged)
+
+Store replay data as:
+- JSON files or database snapshots
+- One snapshot per trading day
+
+================================================
+PART 3 — FULL ANALYSIS PIPELINE (MANDATORY)
+================================================
+
+Replay data must flow through the EXACT same pipeline
+used for live analysis:
+
+RAW HISTORICAL DATA
+  ↓
+Feature Extraction
+  ↓
+Gorengan Detector (hard override)
+  ↓
+Market Regime Engine
+  ↓
+Smart Money Readiness Score
+  ↓
+Action Guidance Arbiter (single source of truth)
+  ↓
+Homepage Bucket Assignment
+  ↓
+UX Explanation Generation (Bahasa Indonesia)
+
+NO shortcuts.
+NO skipping layers.
+
+================================================
+PART 4 — SIMULATION VALIDATION RULES
+================================================
+
+During Simulation Mode, enforce these checks:
+
+A) CONSISTENCY CHECK
+- Homepage category MUST equal Stock Detail Action Guidance
+- Watchlist status MUST match Action Guidance
+- No stock may appear in conflicting states
+
+B) SAFETY CHECK
+- Gorengan stocks must NEVER show:
+  • Akumulasi Bertahap
+  • Watchlist Prioritas
+- Readiness Score must be clamped if gorengan detected
+
+C) UX SANITY CHECK
+For each stock, the UI must clearly answer:
+"Apa yang harus dilakukan sekarang?"
+
+If ambiguous → FAIL
+
+================================================
+PART 5 — SIMULATION AUDIT OUTPUT (INTERNAL)
+================================================
+
+In Simulation Mode, log an internal audit report:
+
+For each stock:
+- Replay date
+- Final Action Guidance
+- Readiness Score
+- Gorengan status
+- Market Regime
+- Homepage bucket
+- PASS / FAIL flags with reason
+
+This audit is NOT shown to users.
+It is for developer / founder validation only.
+
+================================================
+PART 6 — LANGUAGE & UX REQUIREMENTS
+================================================
+
+- ALL AI explanations must be Bahasa Indonesia
+- No English text allowed
+- Tone: profesional, tenang, tidak hype
+- Tooltips must remain active in Simulation Mode
+
+================================================
+FINAL GUARANTEE
+================================================
+
+After implementation, the app must be able to:
+
+- Replay yesterday’s market as if live
+- Show the full homepage readiness map
+- Open any stock and see consistent Action Guidance
+- Detect gorengan reliably
+- Expose UX or logic errors BEFORE live deployment
+
+Do NOT proceed to live data integration
+until Simulation Mode passes without FAIL flags.
+
+Proceed with implementation now.

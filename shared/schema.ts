@@ -95,3 +95,74 @@ export const insertWatchlistSchema = createInsertSchema(watchlist).omit({
 
 export type WatchlistItem = typeof watchlist.$inferSelect;
 export type InsertWatchlistItem = z.infer<typeof insertWatchlistSchema>;
+
+// Historical Market Data for Simulation Mode
+export const historicalSnapshots = pgTable("historical_snapshots", {
+  id: serial("id").primaryKey(),
+  snapshotDate: text("snapshot_date").notNull(), // YYYY-MM-DD format
+  symbol: text("symbol").notNull(),
+  // OHLCV Data
+  open: numeric("open").notNull(),
+  high: numeric("high").notNull(),
+  low: numeric("low").notNull(),
+  close: numeric("close").notNull(),
+  volume: numeric("volume").notNull(),
+  changePercent: numeric("change_percent").notNull(),
+  // Broker Summary
+  brokerData: text("broker_data").notNull(), // JSON: top broker net buys/sells
+  // Foreign vs Domestic Flow
+  foreignBuy: numeric("foreign_buy").notNull(),
+  foreignSell: numeric("foreign_sell").notNull(),
+  domesticBuy: numeric("domestic_buy").notNull(),
+  domesticSell: numeric("domestic_sell").notNull(),
+  // Transaction Structure
+  avgBuyPrice: text("avg_buy_price").notNull(),
+  avgSellPrice: text("avg_sell_price").notNull(),
+  // Derived Flow Data
+  flowBias: text("flow_bias").notNull(),
+  flowIntensity: text("flow_intensity").notNull(),
+  flowReliability: text("flow_reliability").notNull(),
+  // Corporate Actions/News (optional)
+  corporateActions: text("corporate_actions"), // JSON array
+  newsItems: text("news_items"), // JSON array
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertHistoricalSnapshotSchema = createInsertSchema(historicalSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type HistoricalSnapshot = typeof historicalSnapshots.$inferSelect;
+export type InsertHistoricalSnapshot = z.infer<typeof insertHistoricalSnapshotSchema>;
+
+// Simulation Audit Log
+export const simulationAuditLog = pgTable("simulation_audit_log", {
+  id: serial("id").primaryKey(),
+  runId: text("run_id").notNull(), // Unique ID for this simulation run
+  replayDate: text("replay_date").notNull(),
+  symbol: text("symbol").notNull(),
+  // Analysis Results
+  readinessScore: numeric("readiness_score").notNull(),
+  marketRegime: text("market_regime").notNull(),
+  actionGuidanceState: text("action_guidance_state").notNull(),
+  actionGuidanceLabel: text("action_guidance_label").notNull(),
+  homepageBucket: text("homepage_bucket").notNull(),
+  isGorengan: text("is_gorengan").notNull(), // "true" or "false"
+  gorenganLayers: text("gorengan_layers"), // JSON array of triggered layers
+  // Validation Results
+  consistencyCheck: text("consistency_check").notNull(), // PASS or FAIL
+  safetyCheck: text("safety_check").notNull(), // PASS or FAIL
+  uxSanityCheck: text("ux_sanity_check").notNull(), // PASS or FAIL
+  overallResult: text("overall_result").notNull(), // PASS or FAIL
+  failureReasons: text("failure_reasons"), // JSON array of reasons
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSimulationAuditLogSchema = createInsertSchema(simulationAuditLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type SimulationAuditLog = typeof simulationAuditLog.$inferSelect;
+export type InsertSimulationAuditLog = z.infer<typeof insertSimulationAuditLogSchema>;

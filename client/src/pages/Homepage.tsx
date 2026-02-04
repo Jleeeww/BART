@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { SimulationToggle } from "@/components/SimulationToggle";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -273,9 +274,12 @@ export default function Homepage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <header className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground mb-2" data-testid="text-homepage-title">
-            Peta Kesiapan Saham Hari Ini
-          </h1>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
+            <h1 className="text-2xl font-bold text-foreground" data-testid="text-homepage-title">
+              Peta Kesiapan Saham Hari Ini
+            </h1>
+            <SimulationToggle />
+          </div>
           <p className="text-sm text-muted-foreground" data-testid="text-homepage-subtitle">
             Disusun berdasarkan perilaku bandar, struktur pasar, dan risiko distribusi.
             <br />

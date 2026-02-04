@@ -1,6 +1,19 @@
 import { db } from "./db";
-import { stocks, watchlist, type Stock, type InsertStock, type WatchlistItem, type InsertWatchlistItem } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { 
+  stocks, 
+  watchlist, 
+  historicalSnapshots,
+  simulationAuditLog,
+  type Stock, 
+  type InsertStock, 
+  type WatchlistItem, 
+  type InsertWatchlistItem,
+  type HistoricalSnapshot,
+  type InsertHistoricalSnapshot,
+  type SimulationAuditLog,
+  type InsertSimulationAuditLog
+} from "@shared/schema";
+import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
   getStockBySymbol(symbol: string): Promise<Stock | undefined>;
@@ -10,6 +23,12 @@ export interface IStorage {
   addToWatchlist(item: InsertWatchlistItem): Promise<WatchlistItem>;
   removeFromWatchlist(symbol: string): Promise<void>;
   isInWatchlist(symbol: string): Promise<boolean>;
+  // Simulation methods
+  getHistoricalSnapshot(symbol: string, date: string): Promise<HistoricalSnapshot | undefined>;
+  getAllHistoricalSnapshots(date: string): Promise<HistoricalSnapshot[]>;
+  createHistoricalSnapshot(snapshot: InsertHistoricalSnapshot): Promise<HistoricalSnapshot>;
+  insertSimulationAuditLog(log: InsertSimulationAuditLog): Promise<SimulationAuditLog>;
+  getSimulationAuditLogs(runId: string): Promise<SimulationAuditLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -43,6 +62,40 @@ export class DatabaseStorage implements IStorage {
   async isInWatchlist(symbol: string): Promise<boolean> {
     const [item] = await db.select().from(watchlist).where(eq(watchlist.symbol, symbol));
     return !!item;
+  }
+
+  // Simulation methods
+  async getHistoricalSnapshot(symbol: string, date: string): Promise<HistoricalSnapshot | undefined> {
+    const [snapshot] = await db.select()
+      .from(historicalSnapshots)
+      .where(and(
+        eq(historicalSnapshots.symbol, symbol),
+        eq(historicalSnapshots.snapshotDate, date)
+      ));
+    return snapshot;
+  }
+
+  async getAllHistoricalSnapshots(date: string): Promise<HistoricalSnapshot[]> {
+    return await db.select()
+      .from(historicalSnapshots)
+      .where(eq(historicalSnapshots.snapshotDate, date));
+  }
+
+  async createHistoricalSnapshot(snapshot: InsertHistoricalSnapshot): Promise<HistoricalSnapshot> {
+    const [created] = await db.insert(historicalSnapshots).values(snapshot).returning();
+    return created;
+  }
+
+  async insertSimulationAuditLog(log: InsertSimulationAuditLog): Promise<SimulationAuditLog> {
+    const [created] = await db.insert(simulationAuditLog).values(log).returning();
+    return created;
+  }
+
+  async getSimulationAuditLogs(runId: string): Promise<SimulationAuditLog[]> {
+    return await db.select()
+      .from(simulationAuditLog)
+      .where(eq(simulationAuditLog.runId, runId))
+      .orderBy(desc(simulationAuditLog.createdAt));
   }
 }
 
