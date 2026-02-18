@@ -1029,142 +1029,277 @@ export async function registerRoutes(
 
   // Get all stocks for homepage with readiness data
   // Uses UNIFIED ACTION GUIDANCE ENGINE for consistency
+  // LOCKED HOMEPAGE UNIVERSE - all 12 stocks must always render
+  const HOMEPAGE_UNIVERSE = [
+    "ICBP", "UNVR", "BBCA", "ADRO", "UNTR",
+    "BUMI", "DADA", "BULL", "PIPA", "WIFI", "SGER", "MORA"
+  ];
+
+  const UNIVERSE_STOCK_NAMES: Record<string, string> = {
+    ICBP: "Indofood CBP Sukses Makmur Tbk",
+    UNVR: "Unilever Indonesia Tbk",
+    BBCA: "Bank Central Asia Tbk",
+    ADRO: "Adaro Energy Indonesia Tbk",
+    UNTR: "United Tractors Tbk",
+    BUMI: "Bumi Resources Tbk",
+    DADA: "Diamond Citra Propertindo Tbk",
+    BULL: "Buana Lintas Lautan Tbk",
+    PIPA: "Bukaka Teknik Utama Tbk",
+    WIFI: "Solusi Sinergi Digital Tbk",
+    SGER: "Sumber Global Energy Tbk",
+    MORA: "Mora Telematika Indonesia Tbk",
+  };
+
   app.get("/api/stocks", async (_req, res) => {
     try {
       const allStocks = await storage.getAllStocks();
       const watchlistItems = await storage.getWatchlist();
       const watchlistSymbols = new Set(watchlistItems.map(w => w.symbol));
 
-      // Calculate readiness score for each stock based on flow data
-      const stocksWithReadiness = allStocks.map(stock => {
-        let readinessScore = 50; // Base score
-        
-        // Parse flow data
-        const flowBias = stock.flowBias;
-        const flowIntensity = stock.flowIntensity;
-        const flowReliability = stock.flowReliability || "Sedang";
-        
-        // Flow Bias scoring
-        if (flowBias === "Akumulasi") readinessScore += 20;
-        else if (flowBias === "Distribusi") readinessScore -= 20;
-        
-        // Flow Intensity scoring
-        if (flowIntensity.includes("Besar") && flowBias === "Akumulasi") readinessScore += 15;
-        else if (flowIntensity.includes("Sedang") && flowBias === "Akumulasi") readinessScore += 8;
-        else if (flowIntensity.includes("Besar") && flowBias === "Distribusi") readinessScore -= 15;
-        else if (flowIntensity.includes("Sedang") && flowBias === "Distribusi") readinessScore -= 8;
-        
-        // Flow Reliability scoring
-        if (flowReliability === "Tinggi") readinessScore += 10;
-        else if (flowReliability === "Sedang") readinessScore += 5;
-        else if (flowReliability === "Rendah") readinessScore -= 5;
-        
-        // Growth factor
-        const growth = parseFloat(stock.growth);
-        if (growth > 10) readinessScore += 5;
-        else if (growth < 0) readinessScore -= 10;
-        
-        // Clamp score to 0-100
-        readinessScore = Math.max(0, Math.min(100, readinessScore));
+      // Build map of DB stocks by symbol
+      const dbStockMap = new Map(allStocks.map(s => [s.symbol, s]));
 
-        // Determine market regime
-        let marketRegime = "Netral";
-        if (flowBias === "Akumulasi") {
-          if (flowIntensity.includes("Besar")) marketRegime = "Akumulasi Aktif";
-          else if (flowIntensity.includes("Sedang")) marketRegime = "Akumulasi Bertahap";
-          else marketRegime = "Akumulasi Awal";
-        } else if (flowBias === "Distribusi") {
-          if (flowIntensity.includes("Besar")) marketRegime = "Distribusi Aktif";
-          else if (flowIntensity.includes("Sedang")) marketRegime = "Distribusi Bertahap";
-          else marketRegime = "Distribusi Akhir Siklus";
-        }
+      // Ensure all 12 universe stocks are present - fill missing with fallback
+      const missingSymbols: string[] = [];
+      const universeStocks = HOMEPAGE_UNIVERSE.map(symbol => {
+        const existing = dbStockMap.get(symbol);
+        if (existing) return existing;
 
-        // Determine if distribution is active
-        const isDistributionActive = flowBias === "Distribusi" && flowIntensity.includes("Besar");
-        
-        // Determine if volatility is unhealthy (simplified check)
-        const isVolatilityUnhealthy = flowBias === "Distribusi" && flowIntensity.includes("Besar");
-        
-        // Determine entry validity based on accumulation regime and flow quality
-        const isAccumulationRegime = flowBias === "Akumulasi";
-        const isFlowReliable = flowReliability === "Tinggi";
-        const isEntryValid = isAccumulationRegime && isFlowReliable && readinessScore >= 80;
-
-        // USE UNIFIED ACTION GUIDANCE ENGINE
-        let actionGuidanceResult = computeUnifiedActionGuidance({
-          readinessScore,
-          marketRegime,
-          flowReliability,
-          isDistributionActive,
-          isVolatilityUnhealthy,
-          isEntryValid
-        });
-
-        // ========================================
-        // GORENGAN DETECTOR - SAFETY OVERRIDE
-        // ========================================
-        const gorenganResult = computeGorenganFromStock({
-          changePercent: stock.changePercent,
-          flowBias: stock.flowBias,
-          flowIntensity: stock.flowIntensity,
-          flowReliability: stock.flowReliability,
-          brokerData: stock.brokerData,
-          foreignActivityData: stock.foreignActivityData,
-          stockCharacter: stock.stockCharacter
-        });
-
-        // Apply gorengan override if detected
-        let displayReadinessScore = readinessScore;
-        let isGorengan = gorenganResult.isGorengan;
-        let gorenganWarning: string | null = null;
-
-        if (isGorengan) {
-          // CLAMP readiness score to max 59
-          displayReadinessScore = Math.min(readinessScore, 59);
-          
-          // FORCE action guidance to conservative state
-          if (actionGuidanceResult.state === "AKUMULASI_BERTAHAP" || 
-              actionGuidanceResult.state === "WATCHLIST_PRIORITAS") {
-            actionGuidanceResult = {
-              state: "HINDARI_DULU",
-              label: "Hindari Dulu",
-              color: "red",
-              shortSummary: "Aktivitas spekulatif ritel terdeteksi. Risiko manipulasi tinggi.",
-              whyAction: gorenganResult.layerDetails,
-              mainRisk: "Potensi penurunan tajam setelah fase spekulasi berakhir.",
-              failureTrigger: "Jika muncul akumulasi institusional yang terukur dan konsisten.",
-              homepageBucket: "hindari_dulu"
-            };
-          }
-          
-          gorenganWarning = "Aktivitas spekulatif ritel terdeteksi";
-        }
-
-        // Generate AI sentence based on action guidance
-        const aiSentence = actionGuidanceResult.shortSummary;
+        missingSymbols.push(symbol);
+        console.log(`[UNIVERSE AUDIT] Stock ${symbol} missing from DB — using fallback`);
 
         return {
-          symbol: stock.symbol,
-          name: stock.name,
-          price: stock.price,
-          change: stock.change,
-          changePercent: stock.changePercent,
-          sector: stock.sector,
-          sectorBadge: stock.sectorBadge,
-          readinessScore: displayReadinessScore,
-          marketRegime,
-          // Unified Action Guidance
-          actionGuidance: actionGuidanceResult.label,
-          actionColor: actionGuidanceResult.color,
-          actionState: actionGuidanceResult.state,
-          homepageBucket: actionGuidanceResult.homepageBucket,
-          aiSentence,
-          isInWatchlist: watchlistSymbols.has(stock.symbol),
-          // Gorengan Safety Flags
-          isGorengan,
-          gorenganWarning,
-          riskOverride: gorenganResult.riskOverride,
+          id: 0,
+          symbol,
+          name: UNIVERSE_STOCK_NAMES[symbol] || symbol,
+          price: 0,
+          change: 0,
+          changePercent: 0,
+          summary: "Data tidak tersedia atau gagal diproses",
+          description: "",
+          marketCap: null,
+          peRatio: null,
+          dividendYield: null,
+          updatedAt: null,
+          aiConfidence: null,
+          sector: null,
+          subsector: null,
+          roe: null,
+          netMargin: null,
+          growth: "0",
+          investorView: null,
+          financialSummary: null,
+          revenue2023: null, revenue2024: null, revenue2025: null,
+          netProfit2023: null, netProfit2024: null, netProfit2025: null,
+          assets2023: null, assets2024: null, assets2025: null,
+          liabilities2023: null, liabilities2024: null, liabilities2025: null,
+          ocf2023: null, ocf2024: null, ocf2025: null,
+          tradingActivitySummary: null,
+          flowReliability: "Rendah",
+          brokerData: null,
+          flowOverviewSummary: null,
+          flowBias: "Netral",
+          foreignActivityData: null,
+          flowIntensity: "Tidak Ada Data",
+          avgBuyPrice: null, avgSellPrice: null,
+          newsOverviewSummary: null,
+          newsImpact: null, newsRelevance: null, newsFeed: null,
+          corporateActions: null,
+          investorInterpretation: null, eventAnalysis: null,
+          financialsAnalystView: null, flowAnalystView: null, riskAnalystView: null,
+          riskData: null, insiderData: null,
+          idxIndices: null, sectorBadge: null,
+          stockTags: null, stockCharacter: null, stockCharacterDesc: null,
+          retailSentiment: null, foreignDomesticInterpretation: null,
+          localRiskFactors: null, retailSummary: null,
         };
+      });
+
+      // Console audit
+      console.log(`[UNIVERSE AUDIT] totalUniverseCount: ${HOMEPAGE_UNIVERSE.length}`);
+      console.log(`[UNIVERSE AUDIT] totalRenderedCount: ${universeStocks.length}`);
+      if (missingSymbols.length > 0) {
+        console.log(`[UNIVERSE AUDIT] missingSymbols: ${missingSymbols.join(", ")}`);
+      } else {
+        console.log(`[UNIVERSE AUDIT] missingSymbols: none`);
+      }
+
+      // Calculate readiness score for each stock based on flow data
+      // RULE: Never filter out stocks. If analysis fails, use fallback state.
+      const stocksWithReadiness = universeStocks.map(stock => {
+        try {
+          const flowBias = stock.flowBias || "Netral";
+          const flowIntensity = stock.flowIntensity || "Tidak Ada Data";
+          const flowReliability = stock.flowReliability || "Rendah";
+
+          // Check if this is a fallback stock with no real data
+          const hasRealData = stock.id !== 0 && Number(stock.price) > 0;
+
+          if (!hasRealData) {
+            console.log(`[UNIVERSE AUDIT] ${stock.symbol}: analysis skipped — using fallback state (Data Tidak Lengkap)`);
+            return {
+              symbol: stock.symbol,
+              name: stock.name,
+              price: stock.price,
+              change: stock.change,
+              changePercent: stock.changePercent,
+              sector: stock.sector,
+              sectorBadge: stock.sectorBadge,
+              readinessScore: 0,
+              marketRegime: "Tidak Diketahui",
+              actionGuidance: "Data Tidak Lengkap",
+              actionColor: "red",
+              actionState: "HINDARI_DULU",
+              homepageBucket: "hindari_dulu",
+              aiSentence: "Data tidak tersedia atau gagal diproses",
+              isInWatchlist: watchlistSymbols.has(stock.symbol),
+              isGorengan: false,
+              gorenganWarning: null,
+              riskOverride: null,
+            };
+          }
+
+          let readinessScore = 50; // Base score
+          
+          // Flow Bias scoring
+          if (flowBias === "Akumulasi") readinessScore += 20;
+          else if (flowBias === "Distribusi") readinessScore -= 20;
+          
+          // Flow Intensity scoring
+          if (flowIntensity.includes("Besar") && flowBias === "Akumulasi") readinessScore += 15;
+          else if (flowIntensity.includes("Sedang") && flowBias === "Akumulasi") readinessScore += 8;
+          else if (flowIntensity.includes("Besar") && flowBias === "Distribusi") readinessScore -= 15;
+          else if (flowIntensity.includes("Sedang") && flowBias === "Distribusi") readinessScore -= 8;
+          
+          // Flow Reliability scoring
+          if (flowReliability === "Tinggi") readinessScore += 10;
+          else if (flowReliability === "Sedang") readinessScore += 5;
+          else if (flowReliability === "Rendah") readinessScore -= 5;
+          
+          // Growth factor
+          const growth = parseFloat(stock.growth || "0");
+          if (growth > 10) readinessScore += 5;
+          else if (growth < 0) readinessScore -= 10;
+          
+          // Clamp score to 0-100
+          readinessScore = Math.max(0, Math.min(100, readinessScore));
+
+          // Determine market regime
+          let marketRegime = "Netral";
+          if (flowBias === "Akumulasi") {
+            if (flowIntensity.includes("Besar")) marketRegime = "Akumulasi Aktif";
+            else if (flowIntensity.includes("Sedang")) marketRegime = "Akumulasi Bertahap";
+            else marketRegime = "Akumulasi Awal";
+          } else if (flowBias === "Distribusi") {
+            if (flowIntensity.includes("Besar")) marketRegime = "Distribusi Aktif";
+            else if (flowIntensity.includes("Sedang")) marketRegime = "Distribusi Bertahap";
+            else marketRegime = "Distribusi Akhir Siklus";
+          }
+
+          // Determine if distribution is active
+          const isDistributionActive = flowBias === "Distribusi" && flowIntensity.includes("Besar");
+          
+          // Determine if volatility is unhealthy (simplified check)
+          const isVolatilityUnhealthy = flowBias === "Distribusi" && flowIntensity.includes("Besar");
+          
+          // Determine entry validity based on accumulation regime and flow quality
+          const isAccumulationRegime = flowBias === "Akumulasi";
+          const isFlowReliable = flowReliability === "Tinggi";
+          const isEntryValid = isAccumulationRegime && isFlowReliable && readinessScore >= 80;
+
+          // USE UNIFIED ACTION GUIDANCE ENGINE
+          let actionGuidanceResult = computeUnifiedActionGuidance({
+            readinessScore,
+            marketRegime,
+            flowReliability,
+            isDistributionActive,
+            isVolatilityUnhealthy,
+            isEntryValid
+          });
+
+          // ========================================
+          // GORENGAN DETECTOR - SAFETY OVERRIDE
+          // ========================================
+          const gorenganResult = computeGorenganFromStock({
+            changePercent: typeof stock.changePercent === 'number' ? String(stock.changePercent) : stock.changePercent,
+            flowBias: stock.flowBias || "Netral",
+            flowIntensity: stock.flowIntensity || "Tidak Ada Data",
+            flowReliability: stock.flowReliability || "Rendah",
+            brokerData: stock.brokerData || "[]",
+            foreignActivityData: stock.foreignActivityData || "{}",
+            stockCharacter: stock.stockCharacter || null
+          });
+
+          // Apply gorengan override if detected
+          let displayReadinessScore = readinessScore;
+          let isGorengan = gorenganResult.isGorengan;
+          let gorenganWarning: string | null = null;
+
+          if (isGorengan) {
+            displayReadinessScore = Math.min(readinessScore, 59);
+            
+            if (actionGuidanceResult.state === "AKUMULASI_BERTAHAP" || 
+                actionGuidanceResult.state === "WATCHLIST_PRIORITAS") {
+              actionGuidanceResult = {
+                state: "HINDARI_DULU",
+                label: "Hindari Dulu",
+                color: "red",
+                shortSummary: "Aktivitas spekulatif ritel terdeteksi. Risiko manipulasi tinggi.",
+                whyAction: gorenganResult.layerDetails,
+                mainRisk: "Potensi penurunan tajam setelah fase spekulasi berakhir.",
+                failureTrigger: "Jika muncul akumulasi institusional yang terukur dan konsisten.",
+                homepageBucket: "hindari_dulu"
+              };
+            }
+            
+            gorenganWarning = "Aktivitas spekulatif ritel terdeteksi";
+          }
+
+          const aiSentence = actionGuidanceResult.shortSummary;
+
+          return {
+            symbol: stock.symbol,
+            name: stock.name,
+            price: stock.price,
+            change: stock.change,
+            changePercent: stock.changePercent,
+            sector: stock.sector,
+            sectorBadge: stock.sectorBadge,
+            readinessScore: displayReadinessScore,
+            marketRegime,
+            actionGuidance: actionGuidanceResult.label,
+            actionColor: actionGuidanceResult.color,
+            actionState: actionGuidanceResult.state,
+            homepageBucket: actionGuidanceResult.homepageBucket,
+            aiSentence,
+            isInWatchlist: watchlistSymbols.has(stock.symbol),
+            isGorengan,
+            gorenganWarning,
+            riskOverride: gorenganResult.riskOverride,
+          };
+        } catch (analysisError) {
+          console.error(`[UNIVERSE AUDIT] ${stock.symbol}: analysis FAILED — ${analysisError}`);
+          return {
+            symbol: stock.symbol,
+            name: stock.name,
+            price: stock.price || 0,
+            change: stock.change || 0,
+            changePercent: stock.changePercent || 0,
+            sector: stock.sector || null,
+            sectorBadge: stock.sectorBadge || null,
+            readinessScore: 0,
+            marketRegime: "Tidak Diketahui",
+            actionGuidance: "Data Tidak Lengkap",
+            actionColor: "red",
+            actionState: "HINDARI_DULU",
+            homepageBucket: "hindari_dulu",
+            aiSentence: "Data tidak tersedia atau gagal diproses",
+            isInWatchlist: watchlistSymbols.has(stock.symbol),
+            isGorengan: false,
+            gorenganWarning: null,
+            riskOverride: null,
+          };
+        }
       });
 
       res.json(stocksWithReadiness);

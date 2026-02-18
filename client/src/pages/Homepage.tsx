@@ -266,9 +266,26 @@ export default function Homepage() {
   };
 
   // Use homepageBucket for categorization (single source of truth from backend)
+  // RULE: Never silently filter stocks. All 12 must appear in one of these buckets.
   const readyStocks = stocks?.filter(s => s.homepageBucket === "siap_dipantau") || [];
   const watchlistStocks = stocks?.filter(s => s.homepageBucket === "watchlist_prioritas") || [];
   const avoidStocks = stocks?.filter(s => s.homepageBucket === "hindari_dulu") || [];
+
+  // Console audit: verify all stocks are bucketed
+  if (stocks && stocks.length > 0) {
+    const totalBucketed = readyStocks.length + watchlistStocks.length + avoidStocks.length;
+    const unbucketedStocks = stocks.filter(
+      s => !["siap_dipantau", "watchlist_prioritas", "hindari_dulu"].includes(s.homepageBucket)
+    );
+    console.log(`[HOMEPAGE AUDIT] totalUniverseCount: ${stocks.length}`);
+    console.log(`[HOMEPAGE AUDIT] totalRenderedCount: ${totalBucketed}`);
+    if (unbucketedStocks.length > 0) {
+      const missing = unbucketedStocks.map(s => `${s.symbol}(bucket=${s.homepageBucket})`);
+      console.warn(`[HOMEPAGE AUDIT] missingFromBuckets: ${missing.join(", ")}`);
+    } else {
+      console.log(`[HOMEPAGE AUDIT] missingSymbols: none — all stocks bucketed`);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
