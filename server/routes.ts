@@ -3222,6 +3222,165 @@ export async function registerRoutes(
     res.json(summary);
   });
 
+  // ========================================
+  // DIAGNOSTIC: Market Data Fetch Pipeline
+  // Tests Yahoo Finance connectivity for all 12 universe stocks
+  // ========================================
+  app.get("/api/diagnostics/market-data", async (_req, res) => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const dateStr = yesterday.toISOString().split("T")[0];
+
+    console.log(`\n========================================`);
+    console.log(`[DIAGNOSTICS] Market Data Fetch Pipeline`);
+    console.log(`[DIAGNOSTICS] Date: ${dateStr}`);
+    console.log(`[DIAGNOSTICS] Universe: ${SIMULATION_STOCK_UNIVERSE.length} stocks`);
+    console.log(`========================================\n`);
+
+    const results: Array<{
+      requestedSymbol: string;
+      yahooFormattedSymbol: string;
+      fetchStatus: "success" | "fail";
+      returnedOHLCLength: number;
+      returnedVolume: number | null;
+      ohlc: { open: number; high: number; low: number; close: number } | null;
+      errorMessage: string | null;
+    }> = [];
+
+    for (const symbol of SIMULATION_STOCK_UNIVERSE) {
+      const yahooFormattedSymbol = `${symbol}.JK`;
+      
+      try {
+        const endDate = new Date(dateStr);
+        endDate.setDate(endDate.getDate() + 1);
+        const startDate = new Date(dateStr);
+        startDate.setDate(startDate.getDate() - 7);
+
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooFormattedSymbol}?period1=${Math.floor(startDate.getTime() / 1000)}&period2=${Math.floor(endDate.getTime() / 1000)}&interval=1d`;
+
+        console.log(`[DIAGNOSTICS] ${symbol} → ${yahooFormattedSymbol} | Fetching...`);
+
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+          }
+        });
+
+        if (!response.ok) {
+          const errText = `HTTP ${response.status} ${response.statusText}`;
+          console.log(`[DIAGNOSTICS] ${symbol} → FAIL | ${errText}`);
+          results.push({
+            requestedSymbol: symbol,
+            yahooFormattedSymbol,
+            fetchStatus: "fail",
+            returnedOHLCLength: 0,
+            returnedVolume: null,
+            ohlc: null,
+            errorMessage: errText,
+          });
+          continue;
+        }
+
+        const data = await response.json();
+        const result = data.chart?.result?.[0];
+
+        if (!result || !result.indicators?.quote?.[0]) {
+          const errText = "No chart data in response";
+          console.log(`[DIAGNOSTICS] ${symbol} → FAIL | ${errText}`);
+          results.push({
+            requestedSymbol: symbol,
+            yahooFormattedSymbol,
+            fetchStatus: "fail",
+            returnedOHLCLength: 0,
+            returnedVolume: null,
+            ohlc: null,
+            errorMessage: errText,
+          });
+          continue;
+        }
+
+        const quote = result.indicators.quote[0];
+        const timestamps = result.timestamp || [];
+        const lastIdx = timestamps.length - 1;
+
+        const ohlcLength = timestamps.length;
+        const volume = lastIdx >= 0 ? (quote.volume?.[lastIdx] || 0) : null;
+        const ohlc = lastIdx >= 0 ? {
+          open: Math.round(quote.open?.[lastIdx] || 0),
+          high: Math.round(quote.high?.[lastIdx] || 0),
+          low: Math.round(quote.low?.[lastIdx] || 0),
+          close: Math.round(quote.close?.[lastIdx] || 0),
+        } : null;
+
+        console.log(`[DIAGNOSTICS] ${symbol} → SUCCESS | OHLC bars: ${ohlcLength} | Volume: ${volume} | Close: ${ohlc?.close}`);
+
+        results.push({
+          requestedSymbol: symbol,
+          yahooFormattedSymbol,
+          fetchStatus: "success",
+          returnedOHLCLength: ohlcLength,
+          returnedVolume: volume,
+          ohlc,
+          errorMessage: null,
+        });
+      } catch (error: any) {
+        const errMsg = error?.message || String(error);
+        console.log(`[DIAGNOSTICS] ${symbol} → FAIL | ${errMsg}`);
+        results.push({
+          requestedSymbol: symbol,
+          yahooFormattedSymbol,
+          fetchStatus: "fail",
+          returnedOHLCLength: 0,
+          returnedVolume: null,
+          ohlc: null,
+          errorMessage: errMsg,
+        });
+      }
+    }
+
+    const totalSuccess = results.filter(r => r.fetchStatus === "success").length;
+    const totalFailed = results.filter(r => r.fetchStatus === "fail").length;
+    const failedSymbols = results.filter(r => r.fetchStatus === "fail").map(r => r.requestedSymbol);
+
+    const summary = {
+      totalRequested: SIMULATION_STOCK_UNIVERSE.length,
+      totalSuccess,
+      totalFailed,
+      failedSymbols,
+    };
+
+    console.log(`\n========================================`);
+    console.log(`[DIAGNOSTICS] SUMMARY`);
+    console.log(`[DIAGNOSTICS] totalRequested: ${summary.totalRequested}`);
+    console.log(`[DIAGNOSTICS] totalSuccess: ${summary.totalSuccess}`);
+    console.log(`[DIAGNOSTICS] totalFailed: ${summary.totalFailed}`);
+    console.log(`[DIAGNOSTICS] failedSymbols: ${failedSymbols.length > 0 ? failedSymbols.join(", ") : "none"}`);
+    console.log(`========================================\n`);
+
+    // Also log DB stock presence for cross-reference
+    const allStocks = await storage.getAllStocks();
+    const dbSymbols = allStocks.map(s => s.symbol);
+    const inDB = SIMULATION_STOCK_UNIVERSE.filter(s => dbSymbols.includes(s));
+    const notInDB = SIMULATION_STOCK_UNIVERSE.filter(s => !dbSymbols.includes(s));
+
+    console.log(`[DIAGNOSTICS] DB cross-reference:`);
+    console.log(`[DIAGNOSTICS]   In DB (${inDB.length}): ${inDB.join(", ")}`);
+    console.log(`[DIAGNOSTICS]   NOT in DB (${notInDB.length}): ${notInDB.join(", ")}`);
+    console.log(`[DIAGNOSTICS]   DB has extra stocks not in universe: ${dbSymbols.filter(s => !SIMULATION_STOCK_UNIVERSE.includes(s)).join(", ") || "none"}`);
+
+    res.json({
+      diagnosticDate: dateStr,
+      perSymbol: results,
+      summary,
+      dbCrossReference: {
+        inDB,
+        notInDB,
+        extraInDB: dbSymbols.filter(s => !SIMULATION_STOCK_UNIVERSE.includes(s)),
+      },
+      explanation: "Homepage /api/stocks reads from database, NOT Yahoo Finance. Stocks not in DB get fallback state. Yahoo Finance is only used by the simulation pipeline (/api/simulation/run)."
+    });
+  });
+
   // Get simulation status
   app.get("/api/simulation/status", async (_req, res) => {
     res.json({
