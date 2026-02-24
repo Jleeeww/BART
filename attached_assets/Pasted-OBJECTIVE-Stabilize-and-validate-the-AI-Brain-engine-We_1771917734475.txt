@@ -1,0 +1,465 @@
+OBJECTIVE:
+Stabilize and validate the AI Brain engine.
+
+We must complete 3 steps:
+
+STEP 1:
+Create and run /api/test-engine
+
+STEP 2:
+Fix ALL failing scenarios
+
+STEP 3:
+Unify Homepage and Stock Detail logic so they use ONE brain only.
+
+The final system must produce CONSISTENT results.
+
+No duplicated logic allowed.
+
+
+========================================
+STEP 1 — BUILD ENGINE TEST SYSTEM
+========================================
+
+Create folder:
+
+server/engine/
+
+
+Create file:
+
+server/engine/testScenarios.ts
+
+
+Insert:
+
+
+export const TEST_SCENARIOS = [
+
+{
+name:"Active Accumulation",
+
+input:{
+netFlow:"high",
+brokerStability:"high",
+flowQuality:"high",
+priceTrend:"up",
+volatility:"low",
+insider:"buy",
+isGorengan:false
+},
+
+expected:{
+readinessMin:80,
+readinessMax:100,
+action:"BUY"
+}
+
+},
+
+
+{
+name:"Accumulation No Momentum",
+
+input:{
+netFlow:"high",
+brokerStability:"high",
+flowQuality:"high",
+priceTrend:"sideways",
+volatility:"low",
+insider:"neutral",
+isGorengan:false
+},
+
+expected:{
+readinessMin:70,
+readinessMax:95,
+action:"WATCHLIST"
+}
+
+},
+
+
+{
+name:"Distribution",
+
+input:{
+netFlow:"low",
+brokerStability:"medium",
+flowQuality:"low",
+priceTrend:"up",
+volatility:"high",
+insider:"sell",
+isGorengan:false
+},
+
+expected:{
+readinessMin:0,
+readinessMax:60,
+action:"AVOID"
+}
+
+},
+
+
+{
+name:"Gorengan Pump",
+
+input:{
+netFlow:"high",
+brokerStability:"low",
+flowQuality:"low",
+priceTrend:"up",
+volatility:"high",
+insider:"neutral",
+isGorengan:true
+},
+
+expected:{
+readinessMin:0,
+readinessMax:59,
+action:"AVOID"
+}
+
+}
+
+]
+
+
+
+--------------------------------
+
+
+Create file:
+
+server/engine/runTests.ts
+
+
+Insert:
+
+
+import { TEST_SCENARIOS } from "./testScenarios"
+import { getStockDecision } from "./unifiedDecision"
+
+
+
+export function runEngineTests(){
+
+const results = TEST_SCENARIOS.map((s)=>{
+
+const result = getStockDecision(s.input)
+
+
+const readinessOk =
+result.readiness >= s.expected.readinessMin &&
+result.readiness <= s.expected.readinessMax
+
+
+const actionOk =
+result.action === s.expected.action
+
+
+return{
+
+scenario:s.name,
+
+readiness:result.readiness,
+
+action:result.action,
+
+expected:s.expected,
+
+pass: readinessOk && actionOk,
+
+issues:{
+readiness: readinessOk ? null : "Readiness incorrect",
+action: actionOk ? null : "Action incorrect"
+}
+
+}
+
+})
+
+
+return{
+total:results.length,
+passed:results.filter(r=>r.pass).length,
+failed:results.filter(r=>!r.pass).length,
+results
+}
+
+}
+
+
+--------------------------------
+
+
+Add endpoint in:
+
+server/routes.ts
+
+
+
+import { runEngineTests } from "./engine/runTests"
+
+
+
+app.get("/api/test-engine",(req,res)=>{
+
+res.json(runEngineTests())
+
+})
+
+
+========================================
+STEP 2 — BUILD UNIFIED BRAIN
+========================================
+
+Create file:
+
+server/engine/unifiedDecision.ts
+
+
+
+export function getStockDecision(input){
+
+let readiness = 0
+
+
+//--------------------------------
+BASE READINESS
+//--------------------------------
+
+if(input.netFlow==="high")
+readiness+=25
+
+if(input.brokerStability==="high")
+readiness+=20
+
+if(input.flowQuality==="high")
+readiness+=20
+
+if(input.priceTrend==="up")
+readiness+=20
+
+if(input.volatility==="low")
+readiness+=10
+
+if(input.insider==="buy")
+readiness+=5
+
+
+//--------------------------------
+SAFETY RULES
+//--------------------------------
+
+
+IF GORENGAN:
+
+if(input.isGorengan){
+
+readiness=Math.min(readiness,59)
+
+return{
+
+readiness,
+
+action:"AVOID",
+
+bucket:"Hindari Dulu"
+
+}
+
+}
+
+
+--------------------------------
+
+
+NO MOMENTUM RULE
+
+
+if(readiness>=80 && input.priceTrend!=="up"){
+
+return{
+
+readiness,
+
+action:"WATCHLIST",
+
+bucket:"Watchlist Prioritas"
+
+}
+
+}
+
+
+
+--------------------------------
+
+
+BUY RULE
+
+
+if(readiness>=80){
+
+return{
+
+readiness,
+
+action:"BUY",
+
+bucket:"Siap Dipantau"
+
+}
+
+}
+
+
+
+--------------------------------
+
+
+WATCHLIST RULE
+
+
+if(readiness>=60){
+
+return{
+
+readiness,
+
+action:"WATCHLIST",
+
+bucket:"Watchlist Prioritas"
+
+}
+
+}
+
+
+
+--------------------------------
+
+
+AVOID RULE
+
+
+return{
+
+readiness,
+
+action:"AVOID",
+
+bucket:"Hindari Dulu"
+
+}
+
+
+}
+
+
+
+========================================
+STEP 3 — UNIFY APP BRAIN
+========================================
+
+CRITICAL:
+
+Homepage and Stock Detail MUST use SAME function:
+
+getStockDecision()
+
+
+Search codebase and replace any:
+
+calculateReadiness()
+generateAction()
+readinessScoreLogic
+
+
+with:
+
+
+getStockDecision(stockData)
+
+
+
+Homepage.tsx:
+
+Must use:
+
+decision.bucket
+
+
+StockDashboard.tsx:
+
+Must use:
+
+decision.action
+
+
+--------------------------------
+
+
+Ensure:
+
+Homepage bucket ALWAYS matches Detail action.
+
+Example:
+
+BUY -> Siap Dipantau
+
+WATCHLIST -> Watchlist Prioritas
+
+AVOID -> Hindari Dulu
+
+
+--------------------------------
+
+
+FINAL VALIDATION
+========================================
+
+
+After implementation:
+
+
+Run:
+
+/api/test-engine
+
+
+Requirement:
+
+failed = 0
+
+
+--------------------------------
+
+
+SUCCESS CONDITIONS:
+
+
+1) All scenarios PASS
+
+2) Homepage matches Detail page
+
+3) Gorengan always AVOID
+
+4) High readiness without momentum = WATCHLIST
+
+5) BUY only if readiness>=80 AND trend UP
+
+
+--------------------------------
+
+
+Do not break existing UI.
+
+Do not remove existing features.
+
+Only stabilize brain logic.
+
+
+Implement now.

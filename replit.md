@@ -64,27 +64,34 @@ Tracks insider transactions with institutional-grade analysis:
 
 All commentary maintains neutral, analytical tone without buy/sell recommendations or price targets.
 
-### Unified Action Guidance System (CRITICAL ARCHITECTURE)
+### Unified Brain Engine (CRITICAL ARCHITECTURE)
 
-The platform uses a single source of truth for action guidance, ensuring strict consistency between homepage categorization and stock detail pages.
+The platform uses a single decision function `getStockDecision()` in `server/engine/unifiedDecision.ts` as the ONLY source of truth for all action guidance. All three endpoints (`/api/stocks`, `/api/ai`, `/api/simulation/run`) call this single function — no duplicated logic.
 
-**5 LOCKED States:**
-1. **AKUMULASI_BERTAHAP** (Green) - Layak Akumulasi: readinessScore ≥80, accumulation regime, entry valid
-2. **WATCHLIST_PRIORITAS** (Yellow) - Tunggu Konfirmasi: readinessScore 60-79, showing promise
-3. **PANTAU_SAJA** (Gray) - Belum Siap: readinessScore 40-59, needs more clarity
-4. **HINDARI_DULU** (Red) - Hindari Entry Baru: distribution regime OR high volatility
-5. **KURANGI_EXIT** (Red) - Kurangi Posisi: active distribution with score ≥60
+**3 Actions × 3 Buckets:**
+1. **BUY** (Green) → **Siap Dipantau** — readiness ≥80 AND priceTrend up
+2. **WATCHLIST** (Yellow) → **Watchlist Prioritas** — readiness 60-79, or ≥80 without momentum
+3. **AVOID** (Red) → **Hindari Dulu** — readiness <60, or gorengan override
 
-**Consistency Rules:**
-- Both `/api/stocks` and `/api/ai` endpoints use `computeUnifiedActionGuidance()` function
-- Readiness score computed with same algorithm: Base 50 + flow bias + intensity + reliability + growth
-- Distribution/volatility flags use simple flow data (not AI-computed risk levels)
-- Homepage bucket derived from unified state: Siap Dipantau, Watchlist Prioritas, Hindari Dulu
+**Readiness Score Formula (0-100):**
+- netFlow high: +25, medium: +12
+- brokerStability high: +20, medium: +10
+- flowQuality high: +20, medium: +10
+- priceTrend up: +20, sideways: +5
+- volatility low: +10, medium: +5
+- insider buy: +5, sell: -5
+
+**Safety Rules:**
+- Gorengan stocks: readiness capped at 59, forced to AVOID
+- BUY requires readiness ≥80 AND upward price trend
+- High readiness without momentum → WATCHLIST (not BUY)
 
 **Technical Implementation:**
-- `smartMoneyReadinessScore.score` is overridden with `actionGuidance._debug.readinessScore` for display consistency
-- `isDistributionActive` = `flowBias === "Distribusi" && flowIntensity.includes("Besar")`
-- `isVolatilityUnhealthy` = same simple logic as above
+- `server/engine/unifiedDecision.ts` — `getStockDecision()` and `mapStockDataToInput()`
+- `server/engine/testScenarios.ts` — 4 locked test scenarios
+- `server/engine/runTests.ts` — Test runner for `/api/test-engine`
+- `mapStockDataToInput()` translates DB stock fields into brain input format
+- Homepage bucket always matches detail page action (enforced by same function)
 
 ### Gorengan Detector (Safety Engine)
 Protects retail users from speculative pump-and-dump stocks using 4-layer detection:
