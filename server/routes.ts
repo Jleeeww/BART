@@ -10,6 +10,7 @@ import { calculateFlowQualityScore } from "./engine/flowQuality";
 import { getInsiderDirection } from "./engine/insider";
 import { parseForeignData } from "./engine/foreignParser";
 import { detectTapeControl } from "./engine/tapeControl";
+import { detectAccumulationPhase } from "./engine/phaseDetection";
 
 // ========================================
 // UNIFIED BRAIN ENGINE
@@ -168,11 +169,14 @@ function computeGorenganFromStock(stock: {
 
   const hasBrokerFragmentation = brokerData.length > 10 && top3Percent < 40;
 
-  const retailProxyBrokers = ["YP", "RX", "CC", "PD", "NH"];
-  const retailProxyDominates = brokerData.some(b =>
-    retailProxyBrokers.includes(b.code) &&
-    parseBrokerIDR(b.netBuy) > 0
-  );
+  const totalVolume = brokerData.reduce((s, b) =>
+    s + parseBrokerIDR(b.netBuy) + parseBrokerIDR(b.netSell), 0);
+  const smallBrokerCount = totalVolume > 0
+    ? brokerData.filter(b =>
+        parseBrokerIDR(b.netBuy) + parseBrokerIDR(b.netSell) < totalVolume * 0.02
+      ).length
+    : 0;
+  const retailProxyDominates = brokerData.length > 0 && smallBrokerCount > brokerData.length * 0.5;
 
   const foreignFlowAbsent = Math.abs(foreignParsed.netForeignFlow) < Math.abs(foreignParsed.netDomesticFlow) * 0.1;
 
@@ -1344,96 +1348,64 @@ export async function registerRoutes(
       explanation: intentExplanation
     };
 
-    // Bandar Heatmap mock data - shows broker dominance over time
-    const bandarHeatmap = [
+    const enginePayload = {
+      flowBias: payload.flow_signals.flow_bias,
+      flowIntensity: payload.flow_signals.flow_intensity,
+      flowReliability: payload.flow_signals.flow_reliability
+    };
+    const currentPhaseLabel = detectAccumulationPhase(enginePayload);
+
+    const bandarHeatmap = (payload.broker_data || [])
+      .slice(0, 5)
+      .map((b: any) => ({
+        broker: b.code,
+        net: parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell)
+      }));
+
+    const phaseTimeline = [
       {
-        date: "2025-01",
-        brokers: [
-          { code: "BK", intensity: 80, role: "Akumulator" },
-          { code: "BNI", intensity: 65, role: "Akumulator" },
-          { code: "CIMB", intensity: 40, role: "Netral" },
-          { code: "YP", intensity: 20, role: "Distributor" }
-        ]
-      },
-      {
-        date: "2025-02",
-        brokers: [
-          { code: "BK", intensity: 75, role: "Akumulator" },
-          { code: "BNI", intensity: 70, role: "Akumulator" },
-          { code: "CIMB", intensity: 55, role: "Akumulator" },
-          { code: "YP", intensity: 35, role: "Distributor" }
-        ]
-      },
-      {
-        date: "2025-03",
-        brokers: [
-          { code: "BK", intensity: 50, role: "Netral" },
-          { code: "BNI", intensity: 60, role: "Akumulator" },
-          { code: "CIMB", intensity: 65, role: "Akumulator" },
-          { code: "YP", intensity: 45, role: "Netral" }
-        ]
-      },
-      {
-        date: "2025-04",
-        brokers: [
-          { code: "BK", intensity: 30, role: "Distributor" },
-          { code: "BNI", intensity: 25, role: "Distributor" },
-          { code: "CIMB", intensity: 35, role: "Distributor" },
-          { code: "YP", intensity: 70, role: "Akumulator" }
-        ]
+        phase: currentPhaseLabel,
+        confidence: payload.flow_signals.flow_reliability
       }
     ];
 
-    // Phase Timeline mock data - shows market phase evolution
-    const phaseTimeline = [
-      { date: "2025-01", phase: "Akumulasi Senyap", description: "Institusi membangun posisi secara diam-diam tanpa mempengaruhi harga secara signifikan." },
-      { date: "2025-02", phase: "Akumulasi Aktif", description: "Institusi mulai meningkatkan volume pembelian dan mendukung kenaikan harga secara bertahap." },
-      { date: "2025-03", phase: "Konfirmasi", description: "Pola akumulasi terkonfirmasi dengan volume dan momentum yang konsisten." },
-      { date: "2025-04", phase: "Mark-Up", description: "Fase kenaikan harga aktif dimana institusi mulai mendorong valuasi lebih tinggi." }
-    ];
-
-    // AI interpretation for phase timeline
-    const bandarPhaseInterpretation = `Perpindahan dari Akumulasi Senyap ke Akumulasi Aktif menunjukkan peningkatan keyakinan institusi. Stabilitas broker yang tinggi selama periode ini mengindikasikan adanya kampanye terstruktur, bukan akumulasi acak. Rotasi kepemilikan dari broker BK dan BNI ke YP pada bulan April menandakan potensi pergeseran fase pasar yang perlu dipantau.`;
+    const bandarPhaseInterpretation = `Fase saat ini terdeteksi sebagai "${currentPhaseLabel}" berdasarkan bias aliran (${payload.flow_signals.flow_bias}), intensitas (${payload.flow_signals.flow_intensity}), dan reliabilitas (${payload.flow_signals.flow_reliability}). Interpretasi ini diturunkan secara deterministik dari sinyal pasar aktual.`;
 
     // Smart Trap Detection - Mock logic based on flow patterns
     // Bull Trap: Price rising + Broker Stability falling + Distributor dominance + Distribution phase
     // Bear Trap: Price falling + Accumulator active + Foreign flow in + Stealth Accumulation phase
     const trapDetection = (() => {
-      const currentPhase = phaseTimeline[phaseTimeline.length - 1]?.phase || "";
-      const recentBrokers = bandarHeatmap[bandarHeatmap.length - 1]?.brokers || [];
-      const distributorCount = recentBrokers.filter((b: any) => b.role === "Distributor").length;
-      const accumulatorCount = recentBrokers.filter((b: any) => b.role === "Akumulator").length;
-      
-      // Mock: Check for Bull Trap conditions
-      const bullTrapConditions = 
-        (currentPhase === "Mark-Up" || currentPhase === "Distribusi") &&
-        distributorCount >= 2;
-      
-      // Mock: Check for Bear Trap conditions  
-      const bearTrapConditions = 
-        (currentPhase === "Akumulasi Senyap" || currentPhase === "Akumulasi Aktif") &&
-        accumulatorCount >= 2;
-      
+      const phase = currentPhaseLabel;
+      const flowBiasVal = payload.flow_signals.flow_bias;
+
+      const bullTrapConditions =
+        (phase === "Distribution" || phase === "Active Distribution") &&
+        flowBiasVal === "Distribusi";
+
+      const bearTrapConditions =
+        (phase === "Stealth Accumulation" || phase === "Active Accumulation") &&
+        flowBiasVal === "Akumulasi";
+
       if (bullTrapConditions) {
         return {
           type: "bull_trap",
           detected: true,
-          confidence: distributorCount >= 3 ? "Tinggi" : "Sedang",
+          confidence: phase === "Active Distribution" ? "Tinggi" : "Sedang",
           title: "Potensi Bull Trap Terdeteksi",
           explanation: "Kenaikan harga saat ini terjadi bersamaan dengan peningkatan distribusi oleh broker besar. Stabilitas akumulasi menurun, menunjukkan bahwa kenaikan kemungkinan dimanfaatkan sebagai likuiditas keluar bagi pelaku besar. Pergerakan harga naik dapat menjadi jebakan bagi investor yang masuk terlambat."
         };
       }
-      
+
       if (bearTrapConditions) {
         return {
           type: "bear_trap",
           detected: true,
-          confidence: accumulatorCount >= 3 ? "Tinggi" : "Sedang",
+          confidence: phase === "Active Accumulation" ? "Tinggi" : "Sedang",
           title: "Potensi Bear Trap Terdeteksi",
           explanation: "Penurunan harga terjadi di tengah peningkatan akumulasi oleh broker institusi. Hal ini sering terjadi saat pelaku besar menekan harga sementara untuk mengumpulkan saham sebelum fase kenaikan berikutnya. Tekanan jual mungkin bersifat sementara dan taktis."
         };
       }
-      
+
       return {
         type: "none",
         detected: false,
@@ -2204,12 +2176,18 @@ export async function registerRoutes(
     const hasSentiment = sentimentKeywords.some(kw => textLower.includes(kw));
     const hasIrrelevant = irrelevantKeywords.some(kw => textLower.includes(kw));
 
+    const behaviorKeywords = [
+      "rights issue", "right issue", "dividen", "akuisisi", "merger",
+      "buyback", "laba", "earnings", "restrukturisasi"
+    ];
+    const affectsBehavior = behaviorKeywords.some(kw => textLower.includes(kw));
+
     if (hasFundamental && !hasSentiment) {
       return {
         classification: "FUNDAMENTAL",
         aiExplanation: `Berita ini berkaitan dengan perubahan fundamental perusahaan yang berdampak pada struktur bisnis. Investor perlu memperhatikan implikasi jangka menengah-panjang.`,
         affectsStructure: true,
-        affectsBehavior: false
+        affectsBehavior
       };
     }
 
@@ -2218,7 +2196,7 @@ export async function registerRoutes(
         classification: "SENTIMENT",
         aiExplanation: `Berita ini bersifat spekulatif atau sentimen pasar. Tidak mengubah fundamental perusahaan, namun dapat mempengaruhi pergerakan harga jangka pendek.`,
         affectsStructure: false,
-        affectsBehavior: false
+        affectsBehavior
       };
     }
 

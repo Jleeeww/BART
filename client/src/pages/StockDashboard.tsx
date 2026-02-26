@@ -1014,95 +1014,49 @@ export default function StockDashboard() {
                         
                         {/* Legend above heatmap */}
                         <div className="mb-4 p-3 rounded-lg bg-muted/30 border border-border/50" data-testid="legend-heatmap-header">
-                          <p className="text-xs font-bold text-foreground uppercase tracking-widest mb-2">Legenda Warna Aktivitas Bandar</p>
+                          <p className="text-xs font-bold text-foreground uppercase tracking-widest mb-2">Legenda Aliran Dana Broker</p>
                           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                             <div className="flex items-center gap-1.5" data-testid="legend-akumulasi-kuat">
-                              <div className="w-4 h-4 rounded" style={{ backgroundColor: "#22c55e" }} />
-                              <span>Akumulasi Kuat</span>
-                            </div>
-                            <div className="flex items-center gap-1.5" data-testid="legend-aktivitas-ringan">
-                              <div className="w-4 h-4 rounded" style={{ backgroundColor: "#fde047" }} />
-                              <span>Aktivitas Ringan / Transisi</span>
+                              <div className="w-4 h-4 rounded bg-emerald-500" />
+                              <span>Net Beli (Akumulasi)</span>
                             </div>
                             <div className="flex items-center gap-1.5" data-testid="legend-distribusi-dominan">
-                              <div className="w-4 h-4 rounded" style={{ backgroundColor: "#8B0000" }} />
-                              <span>Distribusi Dominan</span>
-                            </div>
-                            <div className="flex items-center gap-1.5" data-testid="legend-tidak-signifikan">
-                              <div className="w-4 h-4 rounded bg-slate-300 dark:bg-slate-600" />
-                              <span>Tidak Signifikan</span>
+                              <div className="w-4 h-4 rounded bg-rose-500" />
+                              <span>Net Jual (Distribusi)</span>
                             </div>
                           </div>
                         </div>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-sm" data-testid="table-bandar-heatmap">
-                            <thead>
-                              <tr className="border-b border-border/50">
-                                <th className="text-left py-2 px-3 font-semibold text-foreground text-xs">Broker</th>
-                                {aiData.bandarHeatmap.map((period: any) => (
-                                  <th key={period.date} className="text-center py-2 px-3 font-semibold text-foreground text-xs" data-testid={`th-period-${period.date}`}>
-                                    {period.date.split("-")[1] === "01" ? "Jan" : 
-                                     period.date.split("-")[1] === "02" ? "Feb" : 
-                                     period.date.split("-")[1] === "03" ? "Mar" : 
-                                     period.date.split("-")[1] === "04" ? "Apr" : 
-                                     period.date.split("-")[1]}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(() => {
-                                const allCodes = aiData.bandarHeatmap.flatMap((p: any) => p.brokers.map((b: any) => b.code));
-                                const brokerCodes = Array.from(new Set(allCodes)) as string[];
-                                return brokerCodes.map((brokerCode: string) => (
-                                  <tr key={brokerCode} className="border-b border-border/30" data-testid={`row-broker-${brokerCode}`}>
-                                    <td className="py-2 px-3 font-mono font-semibold text-foreground text-xs">{brokerCode}</td>
-                                    {aiData.bandarHeatmap.map((period: any) => {
-                                      const broker = period.brokers.find((b: any) => b.code === brokerCode);
-                                      if (!broker) return <td key={period.date} className="text-center py-2 px-3"><div className="w-8 h-6 mx-auto rounded bg-slate-200 dark:bg-slate-700" /></td>;
-                                      
-                                      const intensity = broker.intensity;
-                                      const role = broker.role;
-                                      
-                                      // New color scheme: Bright Green, Soft Yellow, Dark Red, Light Gray
-                                      const getCellColor = () => {
-                                        if (role === "Tidak Aktif" || intensity < 20) {
-                                          return { bg: "#94a3b8", label: "Tidak Aktif" }; // Light Gray
-                                        }
-                                        if (role === "Akumulator") {
-                                          return { bg: "#22c55e", label: "Akumulasi" }; // Bright Green
-                                        }
-                                        if (role === "Distributor") {
-                                          return { bg: "#8B0000", label: "Distribusi" }; // Dark Red
-                                        }
-                                        return { bg: "#fde047", label: "Transisi" }; // Soft Yellow
-                                      };
-                                      
-                                      const cellStyle = getCellColor();
-                                      
-                                      return (
-                                        <td key={period.date} className="text-center py-2 px-3" data-testid={`cell-${brokerCode}-${period.date}`}>
-                                          <div className="relative group">
-                                            <div 
-                                              className="w-8 h-6 mx-auto rounded cursor-pointer"
-                                              style={{ 
-                                                backgroundColor: cellStyle.bg,
-                                                opacity: role === "Tidak Aktif" || intensity < 20 ? 0.5 : 0.4 + (intensity / 100) * 0.6
-                                              }}
-                                              data-testid={`heatmap-cell-${brokerCode}-${period.date}`}
-                                            />
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-foreground text-background text-xs rounded invisible group-hover:visible transition-opacity whitespace-nowrap z-10 pointer-events-none" data-testid={`tooltip-${brokerCode}-${period.date}`}>
-                                              {brokerCode} — {cellStyle.label} (Intensitas {intensity}%)
-                                            </div>
-                                          </div>
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
-                                ));
-                              })()}
-                            </tbody>
-                          </table>
+                          {aiData.bandarHeatmap.length > 0 ? (
+                            <div className="space-y-2" data-testid="table-bandar-heatmap">
+                              {aiData.bandarHeatmap.map((entry: any, idx: number) => {
+                                const net = entry.net || 0;
+                                const maxAbs = Math.max(...aiData.bandarHeatmap.map((e: any) => Math.abs(e.net || 0)), 1);
+                                const barWidth = Math.min(100, (Math.abs(net) / maxAbs) * 100);
+                                const isPositive = net >= 0;
+
+                                return (
+                                  <div key={idx} className="flex items-center gap-3 py-1.5 px-3 rounded-lg bg-muted/20" data-testid={`row-broker-${entry.broker}`}>
+                                    <span className="font-mono font-semibold text-foreground text-xs w-12 shrink-0">{entry.broker}</span>
+                                    <div className="flex-1 flex items-center gap-2">
+                                      <div className="flex-1 h-5 bg-muted/30 rounded overflow-hidden relative">
+                                        <div
+                                          className={`h-full rounded ${isPositive ? "bg-emerald-500" : "bg-rose-500"}`}
+                                          style={{ width: `${barWidth}%`, opacity: 0.7 + (barWidth / 100) * 0.3 }}
+                                          data-testid={`heatmap-bar-${entry.broker}`}
+                                        />
+                                      </div>
+                                      <span className={`text-xs font-mono font-semibold min-w-[80px] text-right ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                                        {isPositive ? "+" : ""}{(net / 1e9).toFixed(1)}B
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground text-center py-4">Data broker tidak tersedia</p>
+                          )}
                         </div>
                       </Card>
                     )}
@@ -1122,78 +1076,71 @@ export default function StockDashboard() {
                           </p>
                         </div>
                         
-                        {/* Timeline Bar */}
+                        {/* Current Phase Display */}
                         <div className="relative mb-6" data-testid="timeline-bar-container">
-                          <div className="flex items-stretch h-12 rounded-lg overflow-hidden border border-border/50">
-                            {aiData.phaseTimeline.map((item: any, index: number) => {
-                              const phaseColors: Record<string, string> = {
-                                "Akumulasi Senyap": "bg-blue-500",
-                                "Akumulasi Aktif": "bg-emerald-500",
-                                "Konfirmasi": "bg-green-600",
-                                "Mark-Up": "bg-amber-500",
-                                "Distribusi": "bg-rose-500",
-                                "Reset": "bg-slate-600"
-                              };
-                              const bgColor = phaseColors[item.phase] || "bg-slate-400";
-                              
-                              return (
-                                <div 
-                                  key={index}
-                                  className={`relative flex-1 ${bgColor} flex items-center justify-center group cursor-pointer`}
-                                  data-testid={`phase-segment-${index}`}
-                                >
-                                  <span className="text-xs font-semibold text-white drop-shadow-sm text-center px-1 leading-tight" data-testid={`phase-label-${index}`}>
-                                    {item.phase}
+                          {aiData.phaseTimeline.map((item: any, index: number) => {
+                            const phaseColors: Record<string, string> = {
+                              "Stealth Accumulation": "bg-blue-500",
+                              "Active Accumulation": "bg-emerald-500",
+                              "Early Accumulation": "bg-teal-500",
+                              "Active Distribution": "bg-rose-500",
+                              "Distribution": "bg-amber-500",
+                              "Sideways": "bg-slate-500"
+                            };
+                            const phaseLabels: Record<string, string> = {
+                              "Stealth Accumulation": "Akumulasi Tersembunyi",
+                              "Active Accumulation": "Akumulasi Aktif",
+                              "Early Accumulation": "Akumulasi Awal",
+                              "Active Distribution": "Distribusi Aktif",
+                              "Distribution": "Distribusi",
+                              "Sideways": "Sideways"
+                            };
+                            const bgColor = phaseColors[item.phase] || "bg-slate-400";
+                            const label = phaseLabels[item.phase] || item.phase;
+
+                            return (
+                              <div key={index} className={`${bgColor} rounded-lg p-4 flex items-center justify-between`} data-testid={`phase-segment-${index}`}>
+                                <div>
+                                  <span className="text-sm font-bold text-white drop-shadow-sm" data-testid={`phase-label-${index}`}>
+                                    {label}
                                   </span>
-                                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground font-mono" data-testid={`phase-date-${index}`}>
-                                    {item.date.split("-")[1] === "01" ? "Jan" : 
-                                     item.date.split("-")[1] === "02" ? "Feb" : 
-                                     item.date.split("-")[1] === "03" ? "Mar" : 
-                                     item.date.split("-")[1] === "04" ? "Apr" : 
-                                     item.date.split("-")[1]}
-                                  </div>
-                                  {/* Tooltip */}
-                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 px-3 py-2 bg-foreground text-background text-xs rounded-lg invisible group-hover:visible z-20 w-48 pointer-events-none shadow-lg" data-testid={`phase-tooltip-${index}`}>
-                                    <p className="font-bold mb-1">{item.phase}</p>
-                                    <p className="text-[11px] leading-relaxed opacity-90">{item.description}</p>
-                                  </div>
+                                  <p className="text-xs text-white/70 mt-1">Fase saat ini berdasarkan analisis sinyal pasar</p>
                                 </div>
-                              );
-                            })}
-                          </div>
-                          {/* Arrow indicators */}
-                          <div className="flex justify-between mt-3 px-2">
-                            {aiData.phaseTimeline.map((_: any, index: number) => (
-                              index < aiData.phaseTimeline.length - 1 && (
-                                <div key={index} className="flex-1 flex items-center justify-end pr-2" data-testid={`arrow-indicator-${index}`}>
-                                  <span className="text-muted-foreground text-lg">
-                                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                      <path d="M5 12h14M12 5l7 7-7 7" />
-                                    </svg>
+                                {item.confidence && (
+                                  <span className="text-xs font-semibold text-white/90 bg-white/20 px-2 py-1 rounded">
+                                    Reliabilitas: {item.confidence}
                                   </span>
-                                </div>
-                              )
-                            ))}
-                          </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
 
-                        {/* Phase Legend - Only show phases that exist in data */}
+                        {/* Phase Legend */}
                         <div className="flex flex-wrap gap-3 mb-4 text-xs" data-testid="legend-timeline">
                           {(() => {
-                            const phases = aiData.phaseTimeline.map((p: any) => p.phase);
                             const phaseColors: Record<string, string> = {
-                              "Akumulasi Senyap": "bg-blue-500",
-                              "Akumulasi Aktif": "bg-emerald-500",
-                              "Konfirmasi": "bg-green-600",
-                              "Mark-Up": "bg-amber-500",
-                              "Distribusi": "bg-rose-500",
-                              "Reset": "bg-slate-600"
+                              "Stealth Accumulation": "bg-blue-500",
+                              "Active Accumulation": "bg-emerald-500",
+                              "Early Accumulation": "bg-teal-500",
+                              "Active Distribution": "bg-rose-500",
+                              "Distribution": "bg-amber-500",
+                              "Sideways": "bg-slate-500"
                             };
+                            const phaseLabels: Record<string, string> = {
+                              "Stealth Accumulation": "Akumulasi Tersembunyi",
+                              "Active Accumulation": "Akumulasi Aktif",
+                              "Early Accumulation": "Akumulasi Awal",
+                              "Active Distribution": "Distribusi Aktif",
+                              "Distribution": "Distribusi",
+                              "Sideways": "Sideways"
+                            };
+                            const phases = aiData.phaseTimeline.map((p: any) => p.phase);
                             const uniquePhases = Array.from(new Set(phases)) as string[];
                             return uniquePhases.map((phase: string) => (
                               <div key={phase} className="flex items-center gap-1.5" data-testid={`legend-phase-${phase.replace(/\s+/g, '-').toLowerCase()}`}>
                                 <div className={`w-3 h-3 rounded ${phaseColors[phase] || 'bg-slate-400'}`} />
-                                <span className="text-muted-foreground">{phase}</span>
+                                <span className="text-muted-foreground">{phaseLabels[phase] || phase}</span>
                               </div>
                             ));
                           })()}

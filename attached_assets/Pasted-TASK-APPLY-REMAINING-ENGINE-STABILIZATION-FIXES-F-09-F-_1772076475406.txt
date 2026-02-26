@@ -1,0 +1,326 @@
+TASK: APPLY REMAINING ENGINE STABILIZATION FIXES (F-09 → F-13)
+
+We are completing the deterministic engine stabilization.
+
+These fixes remove:
+
+Mock intelligence data
+
+Manual broker labeling
+
+Score conflicts
+
+Engine inconsistencies
+
+Dead news logic
+
+Rules
+
+Do NOT change API structure.
+
+Do NOT remove existing endpoints.
+
+Do NOT redesign architecture.
+
+Do NOT introduce randomness.
+
+Preserve existing responses.
+
+Only replace broken logic.
+
+FIX F-09 — REMOVE MOCK HEATMAP & PHASE TIMELINE
+Problem
+
+Static intelligence data exists such as:
+
+bandarHeatmap
+phaseTimeline
+accumulationPhase
+
+These must not be hardcoded.
+
+They must be derived from engine signals.
+
+Create Phase Detection Engine
+
+Create file:
+
+server/engine/phaseDetection.ts
+
+Add:
+
+export function detectAccumulationPhase(payload:any){
+
+const bias=payload.flowBias;
+const intensity=payload.flowIntensity;
+const reliability=payload.flowReliability;
+
+if(bias==="Akumulasi" && intensity==="Akumulasi Besar")
+return "Active Accumulation";
+
+if(bias==="Akumulasi" && reliability==="Tinggi")
+return "Stealth Accumulation";
+
+if(bias==="Akumulasi")
+return "Early Accumulation";
+
+if(bias==="Distribusi" && intensity==="Distribusi Besar")
+return "Active Distribution";
+
+if(bias==="Distribusi")
+return "Distribution";
+
+return "Sideways";
+
+}
+Replace Mock Timeline Data
+
+Find any code like:
+
+phaseTimeline = [...]
+
+Replace with:
+
+const phase=detectAccumulationPhase(enginePayload);
+
+const phaseTimeline=[
+
+{
+phase,
+confidence:enginePayload.flowReliability
+}
+
+];
+Replace Fake Bandar Heatmap
+
+Find any static:
+
+bandarHeatmap
+
+Replace with deterministic broker data:
+
+const bandarHeatmap=brokerData
+.slice(0,5)
+.map(b=>({
+
+broker:b.code,
+
+net:
+
+parseBrokerIDR(b.netBuy)
+-
+parseBrokerIDR(b.netSell)
+
+}));
+
+Heatmap must reflect real broker flows.
+
+FIX F-10 — REMOVE RETAIL PROXY BROKER LIST
+Problem
+
+Hardcoded list like:
+
+["YP","RX","CC","PD","NH"]
+
+Must be removed.
+
+Detection must be behavior-based.
+
+Replace Retail Detection
+
+Find:
+
+retailProxyBrokers
+
+Delete entirely.
+
+Replace with:
+
+const totalVolume=brokerData.reduce((s,b)=>
+
+s+
+parseBrokerIDR(b.netBuy)+
+parseBrokerIDR(b.netSell)
+
+,0);
+
+const smallBrokerCount=brokerData.filter(b=>
+
+parseBrokerIDR(b.netBuy)+
+parseBrokerIDR(b.netSell)
+
+<totalVolume*0.02
+
+).length;
+
+const retailDominance=
+
+smallBrokerCount>
+brokerData.length*0.5;
+
+Retail detection now based on volume fragmentation.
+
+FIX F-11 — REMOVE SCORE OVERRIDE
+Problem
+
+Response recalculates scores after engine output.
+
+This creates conflicts.
+
+Engine must be single source of truth.
+
+Find:
+
+res.json({
+smartMoneyReadinessScore:
+...
+})
+
+If score is recomputed in routes:
+
+Remove recalculation.
+
+Replace with:
+
+res.json({
+
+...engineResult
+
+});
+
+Routes must only return engine results.
+
+FIX F-12 — SINGLE READINESS ENGINE
+Problem
+
+Multiple readiness score calculations exist.
+
+This creates inconsistencies.
+
+Search project:
+
+smartMoneyReadinessScore
+
+Ensure score is calculated ONLY inside:
+
+getStockDecision()
+
+Remove any calculations inside:
+
+route.ts
+routes.ts
+api routes
+
+Replace with:
+
+engineResult.smartMoneyReadinessScore
+
+Engine must be single source.
+
+FIX F-13 — FIX NEWS ENGINE
+Problem
+
+News classification always returns:
+
+affectsBehavior=false
+
+Engine ignores news.
+
+Create News Engine
+
+Create:
+
+server/engine/newsClassifier.ts
+
+Add:
+
+export function classifyNews(news:any[]){
+
+if(!news)return[];
+
+return news.map(n=>{
+
+const text=
+
+(
+(n.title||"")+
+" "+
+(n.summary||"")
+).toLowerCase();
+
+const affects=
+
+text.includes("rights issue")||
+text.includes("dividen")||
+text.includes("akuisisi")||
+text.includes("merger")||
+text.includes("buyback")||
+text.includes("laba")||
+text.includes("earnings")||
+text.includes("restrukturisasi");
+
+return{
+
+...n,
+
+affectsBehavior:affects
+
+};
+
+});
+
+}
+Replace News Logic
+
+Find:
+
+affectsBehavior:false
+
+Replace with:
+
+classifyNews(newsData)
+FINAL STEP
+
+After applying fixes:
+
+Run:
+
+/api/test-engine
+REQUIREMENTS
+
+Engine must now:
+
+Deterministic
+
+Same input → Same output
+
+No Fake Data
+
+No:
+
+mock heatmaps
+
+mock phases
+
+random brokers
+
+Single Source
+
+All intelligence from:
+
+getStockDecision()
+Stable Signals
+
+Repeated calls produce identical scores.
+
+REQUIRED OUTPUT
+
+After implementation list:
+
+Files created
+
+Files modified
+
+Functions replaced
+
+Test results

@@ -96,6 +96,8 @@ The platform uses a single decision function `getStockDecision()` in `server/eng
 - `server/engine/foreignParser.ts` — Foreign/domestic flow parser from JSON strings
 - `server/engine/parseBrokerIDR.ts` — IDR value parser supporting T/B/M suffixes
 - `server/engine/tapeControl.ts` — Tape control detection (tight range + volume + flow + price stability)
+- `server/engine/phaseDetection.ts` — Deterministic accumulation/distribution phase detection from flow signals
+- `server/engine/newsClassifier.ts` — Behavior-based news classification (replaces hardcoded `affectsBehavior: false`)
 - `mapStockDataToInput()` translates DB stock fields into brain input format using all engine modules
 - Homepage bucket always matches detail page action (enforced by same function)
 - Engine is fully deterministic: same input → same output, zero randomness
