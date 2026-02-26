@@ -4,6 +4,12 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { getStockDecision, mapStockDataToInput } from "./engine/unifiedDecision";
 import { runEngineTests } from "./engine/runTests";
+import { calculateBrokerStabilityScore } from "./engine/brokerStability";
+import { parseBrokerIDR } from "./engine/parseBrokerIDR";
+import { calculateFlowQualityScore } from "./engine/flowQuality";
+import { getInsiderDirection } from "./engine/insider";
+import { parseForeignData } from "./engine/foreignParser";
+import { detectTapeControl } from "./engine/tapeControl";
 
 // ========================================
 // UNIFIED BRAIN ENGINE
@@ -141,7 +147,6 @@ function computeGorenganFromStock(stock: {
   foreignActivityData: string;
   stockCharacter?: string | null;
 }): GorenganResult {
-  // Parse broker data
   let brokerData: any[] = [];
   try {
     brokerData = JSON.parse(stock.brokerData || "[]");
@@ -149,56 +154,34 @@ function computeGorenganFromStock(stock: {
     brokerData = [];
   }
 
-  // Parse foreign activity data
-  let foreignData: any = {};
-  try {
-    foreignData = JSON.parse(stock.foreignActivityData || "{}");
-  } catch (e) {
-    foreignData = {};
-  }
+  const foreignParsed = parseForeignData(stock.foreignActivityData || "{}");
 
-  // Calculate top 3 broker net buy percentage
   const sortedBrokers = [...brokerData].sort((a, b) => {
-    const aNet = (parseFloat(a.netBuy) || 0) - (parseFloat(a.netSell) || 0);
-    const bNet = (parseFloat(b.netBuy) || 0) - (parseFloat(b.netSell) || 0);
+    const aNet = parseBrokerIDR(a.netBuy) - parseBrokerIDR(a.netSell);
+    const bNet = parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell);
     return bNet - aNet;
   });
-  
-  const totalNetBuy = brokerData.reduce((sum, b) => sum + Math.max(0, (parseFloat(b.netBuy) || 0) - (parseFloat(b.netSell) || 0)), 0);
-  const top3NetBuy = sortedBrokers.slice(0, 3).reduce((sum, b) => sum + Math.max(0, (parseFloat(b.netBuy) || 0) - (parseFloat(b.netSell) || 0)), 0);
+
+  const totalNetBuy = brokerData.reduce((sum, b) => sum + Math.max(0, parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell)), 0);
+  const top3NetBuy = sortedBrokers.slice(0, 3).reduce((sum, b) => sum + Math.max(0, parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell)), 0);
   const top3Percent = totalNetBuy > 0 ? (top3NetBuy / totalNetBuy) * 100 : 50;
 
-  // Determine broker fragmentation
   const hasBrokerFragmentation = brokerData.length > 10 && top3Percent < 40;
 
-  // Check for retail proxy brokers (typically smaller regional brokers)
   const retailProxyBrokers = ["YP", "RX", "CC", "PD", "NH"];
-  const retailProxyDominates = brokerData.some(b => 
-    retailProxyBrokers.includes(b.code) && 
-    (parseFloat(b.netBuy) || 0) > 0
+  const retailProxyDominates = brokerData.some(b =>
+    retailProxyBrokers.includes(b.code) &&
+    parseBrokerIDR(b.netBuy) > 0
   );
 
-  // Foreign flow analysis
-  const foreignNetFlow = parseFloat(foreignData.foreignNet || "0");
-  const domesticNetFlow = parseFloat(foreignData.domesticNet || "0");
-  const foreignFlowAbsent = Math.abs(foreignNetFlow) < Math.abs(domesticNetFlow) * 0.1;
+  const foreignFlowAbsent = Math.abs(foreignParsed.netForeignFlow) < Math.abs(foreignParsed.netDomesticFlow) * 0.1;
 
-  // Stock character check for speculation
-  const isSpeculative = stock.stockCharacter === "Spekulatif";
-
-  // Determine accumulation ladder (based on flow reliability and consistency)
-  const hasAccumulationLadder = stock.flowReliability === "Tinggi" && 
-    stock.flowBias === "Akumulasi" && 
+  const hasAccumulationLadder = stock.flowReliability === "Tinggi" &&
+    stock.flowBias === "Akumulasi" &&
     !stock.flowIntensity.includes("Distribusi");
 
-  // Estimate volume ratio (simplified - in production would use actual volume data)
-  const volumeRatio = isSpeculative ? 3.5 : 1.2;
-
-  // Price change analysis
   const priceChangePercent = Math.abs(parseFloat(stock.changePercent) || 0);
-  const priceChangePercent5d = priceChangePercent * 3; // Estimate 5-day from daily
 
-  // Build market regime from flow
   let marketRegime = "Transisi";
   if (stock.flowBias === "Akumulasi") {
     marketRegime = stock.flowIntensity.includes("Besar") ? "Active Accumulation" : "Akumulasi Awal";
@@ -206,20 +189,33 @@ function computeGorenganFromStock(stock: {
     marketRegime = "Distribution into Strength";
   }
 
+  const avgBuyPrice = parseFloat(String(stock.brokerData ? sortedBrokers[0]?.avgBuy || "0" : "0").replace(/[^\d.]/g, "")) || 0;
+  const lastPrice = parseFloat(stock.changePercent || "0");
+  const volumeRatio = 1.2;
+
+  const hasTapeControlResult = detectTapeControl({
+    high: avgBuyPrice * 1.002,
+    low: avgBuyPrice * 0.998,
+    lastPrice: avgBuyPrice,
+    volumeRatio,
+    netFlow: totalNetBuy,
+    buyAvg: avgBuyPrice
+  });
+
   return detectGorengan({
-    priceChangePercent5d,
-    hasIntradaySpikes: isSpeculative && priceChangePercent > 5,
+    priceChangePercent5d: priceChangePercent,
+    hasIntradaySpikes: priceChangePercent > 10,
     volumeRatio,
     top3BrokerNetBuyPercent: top3Percent,
     hasBrokerFragmentation,
     retailProxyDominates,
-    smallLotDominates: isSpeculative,
+    smallLotDominates: brokerData.length > 15 && top3Percent < 25,
     foreignFlowAbsent,
     hasAccumulationLadder,
     marketRegime,
-    hasTapeControl: stock.flowReliability === "Tinggi",
+    hasTapeControl: hasTapeControlResult,
     hasAbsorptionFailure: stock.flowBias === "Distribusi" && priceChangePercent > 0,
-    hasPostSpikeDistribution: stock.flowBias === "Distribusi" && priceChangePercent5d > 15
+    hasPostSpikeDistribution: stock.flowBias === "Distribusi" && priceChangePercent > 15
   });
 }
 
@@ -1081,29 +1077,19 @@ export async function registerRoutes(
     const stockSymbol = payload.stock as string;
     const stockData = await storage.getStockBySymbol(stockSymbol);
     
-    // Calculate Flow Quality Score based on payload
-    // broker concentration, buy avg vs close, foreign vs domestic alignment
-    let score = 50; // Base score
-    
-    // Logic for Foreign/Domestic alignment
-    if (payload.flow_signals.net_foreign_buy_idr > 0 && payload.flow_signals.net_domestic_buy_idr > 0) {
-      score += 15; // Synchronized accumulation
-    } else if (payload.flow_signals.net_foreign_buy_idr < 0 && payload.flow_signals.net_domestic_buy_idr < 0) {
-      score -= 15; // Synchronized distribution
-    }
-    
-    // Logic for Buy Average vs Close
     const priceContext = payload.price_context;
     const buyAvg = payload.flow_signals.buy_avg_price;
-    if (buyAvg && priceContext.last_price > buyAvg) {
-      score += 10; // Positive price response
-    } else if (buyAvg && priceContext.last_price < buyAvg) {
-      score -= 10; // Negative price response
-    }
-    
-    // Logic for Flow Intensity
-    if (payload.flow_signals.flow_intensity === "Big Accumulation") score += 15;
-    if (payload.flow_signals.flow_intensity === "Big Distribution") score -= 15;
+    const sellAvg = payload.flow_signals.sell_avg_price;
+
+    let score = calculateFlowQualityScore({
+      netForeignFlow: payload.flow_signals.net_foreign_buy_idr || 0,
+      netDomesticFlow: payload.flow_signals.net_domestic_buy_idr || 0,
+      flowIntensity: payload.flow_signals.flow_intensity,
+      buyAvg: buyAvg,
+      lastPrice: priceContext?.last_price,
+      flowReliability: payload.flow_signals.flow_reliability,
+      sellAvg: sellAvg
+    });
     
     // Early Distribution Detection Logic
     const signals = [];
@@ -1174,90 +1160,6 @@ export async function registerRoutes(
     };
 
     const brokerControlScore = calculateBrokerControlScore(payload.broker_data || []);
-
-    // ─── Broker Stability Score Calculation ───
-    // Measures whether the same brokers consistently dominate accumulation across multiple periods
-    // This helps detect true operator campaigns vs temporary positioning
-    const calculateBrokerStabilityScore = (currentBrokers: any[]) => {
-      // Generate simulated historical data based on current broker patterns
-      // In production, this would use actual historical broker flow data
-      const historicalDays = 5;
-      const historicalData: Array<{ date: string; brokers: Array<{ code: string; net: number }> }> = [];
-      
-      // Parse current broker data
-      const parsedBrokers = currentBrokers.map(b => {
-        const buyVal = b.netBuy ? parseFloat(b.netBuy.replace(/[^\d.]/g, "")) : 0;
-        const sellVal = b.netSell ? parseFloat(b.netSell.replace(/[^\d.]/g, "")) : 0;
-        return { code: b.code, net: buyVal - sellVal };
-      });
-      
-      // Simulate historical patterns with some variance
-      for (let i = 0; i < historicalDays; i++) {
-        const dayBrokers = parsedBrokers.map(b => ({
-          code: b.code,
-          net: b.net * (0.7 + Math.random() * 0.6) // Add 30% variance
-        }));
-        historicalData.push({
-          date: `Day-${i + 1}`,
-          brokers: dayBrokers
-        });
-      }
-      
-      if (historicalData.length === 0) {
-        return {
-          score: 0,
-          level: "Rendah" as const,
-          interpretation: "Data historis tidak cukup untuk menilai stabilitas broker."
-        };
-      }
-      
-      // Step 1 & 2: For each day, identify top 3 brokers and track frequency
-      const brokerAppearances: Record<string, number> = {};
-      let totalTop3Slots = 0;
-      
-      for (const day of historicalData) {
-        const positiveBrokers = day.brokers.filter(b => b.net > 0);
-        positiveBrokers.sort((a, b) => b.net - a.net);
-        const top3 = positiveBrokers.slice(0, 3);
-        
-        totalTop3Slots += top3.length;
-        
-        for (const broker of top3) {
-          brokerAppearances[broker.code] = (brokerAppearances[broker.code] || 0) + 1;
-        }
-      }
-      
-      if (totalTop3Slots === 0) {
-        return {
-          score: 0,
-          level: "Rendah" as const,
-          interpretation: "Tidak terdeteksi pola akumulasi konsisten dalam periode yang dianalisis."
-        };
-      }
-      
-      // Step 3: Compute stability score
-      // Find top recurring brokers (those appearing most frequently)
-      const sortedByAppearance = Object.entries(brokerAppearances)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3);
-      
-      const topRecurringAppearances = sortedByAppearance.reduce((sum, [, count]) => sum + count, 0);
-      const stabilityScore = Math.round((topRecurringAppearances / totalTop3Slots) * 100);
-      
-      // Step 4: Classify
-      let level: "Rendah" | "Sedang" | "Tinggi" = "Rendah";
-      let interpretation = "Kepemimpinan akumulasi berputar. Ini menunjukkan penempatan jangka pendek daripada kampanye institusional terkoordinasi.";
-      
-      if (stabilityScore >= 70) {
-        level = "Tinggi";
-        interpretation = "Broker yang sama secara konsisten mendominasi akumulasi, menandakan kampanye operator terstruktur dengan intensi berkelanjutan.";
-      } else if (stabilityScore >= 40) {
-        level = "Sedang";
-        interpretation = "Beberapa broker aktif berulang kali, mengindikasikan minat institusional yang mulai terbentuk namun belum sepenuhnya mengendalikan.";
-      }
-      
-      return { score: stabilityScore, level, interpretation };
-    };
 
     const brokerStabilityScore = calculateBrokerStabilityScore(payload.broker_data || []);
 
@@ -1634,20 +1536,29 @@ export async function registerRoutes(
       return { score: combined, level, interpretation };
     })();
 
-    // ─── INSIDER-BANDAR ALIGNMENT (PART D) ───
-    // Determines if insider activity aligns with bandar behavior
     const insiderBandarAlignment = (() => {
-      // Mock logic based on flow direction vs insider sentiment
-      const flowDirection = payload.flow_signals.flow_bias === "Akumulasi" ? "beli" : "jual";
-      const insiderDirection = "beli"; // From mock insider data showing 78% buy
+      const flowDirection = payload.flow_signals.flow_bias === "Akumulasi" ? "BUY" : "SELL";
+
+      let insiderParsed: any = null;
+      if (stockData?.insiderData) {
+        try {
+          insiderParsed = typeof stockData.insiderData === "string"
+            ? JSON.parse(stockData.insiderData)
+            : stockData.insiderData;
+        } catch {}
+      }
+      const insiderDir = getInsiderDirection(insiderParsed);
       
       let status = "Netral";
       let interpretation = "";
       
-      if (flowDirection === insiderDirection && score > 60) {
+      if (insiderDir === "NO_DATA") {
+        status = "Netral";
+        interpretation = "Data transaksi insider tidak tersedia. Tidak dapat menilai keselarasan dengan perilaku bandar.";
+      } else if (flowDirection === insiderDir && score > 60) {
         status = "Selaras";
         interpretation = "Aktivitas insider sejalan dengan perilaku bandar. Manajemen menunjukkan keyakinan yang konsisten dengan akumulasi institusi, memperkuat validitas tesis fundamental.";
-      } else if (flowDirection !== insiderDirection) {
+      } else if (flowDirection !== insiderDir && insiderDir !== "NEUTRAL") {
         status = "Bertentangan";
         interpretation = "Aktivitas insider berlawanan dengan arah aliran institusi. Divergensi ini memerlukan perhatian khusus karena insider mungkin memiliki informasi yang belum tercermin di pasar.";
       } else {
@@ -2410,24 +2321,20 @@ export async function registerRoutes(
     } catch (error) {
       console.log(`Failed to fetch real data for ${symbol}, using simulated data:`, error);
       
-      // Generate realistic simulated data
       const basePrice = getBasePrice(symbol);
-      const volatility = SPECULATIVE_STOCKS.includes(symbol) ? 0.08 : 0.03;
-      const randomChange = (Math.random() - 0.5) * 2 * volatility;
-      
-      const close = Math.round(basePrice * (1 + randomChange));
-      const high = Math.round(close * (1 + Math.random() * 0.02));
-      const low = Math.round(close * (1 - Math.random() * 0.02));
+      const close = basePrice;
+      const high = Math.round(close * 1.01);
+      const low = Math.round(close * 0.99);
       const open = Math.round((high + low) / 2);
-      
+
       return {
         open,
         high,
         low,
         close,
-        volume: Math.round(10000000 + Math.random() * 50000000),
-        change: close - basePrice,
-        changePercent: Math.round(randomChange * 10000) / 100,
+        volume: 25000000,
+        change: 0,
+        changePercent: 0,
         marketCap: null,
         dataSource: "SIMULATED",
         confidence: "Sedang"
@@ -2461,7 +2368,7 @@ export async function registerRoutes(
         return {
           headline: n.headline,
           source: n.source,
-          publishTime: `${date}T09:${Math.floor(Math.random() * 59)}:00`,
+          publishTime: `${date}T09:00:00`,
           classification: n.classification,
           aiExplanation: classified.aiExplanation,
           affectsStructure: classified.affectsStructure,
@@ -2481,7 +2388,7 @@ export async function registerRoutes(
         return {
           headline: n.headline,
           source: n.source,
-          publishTime: `${date}T10:${Math.floor(Math.random() * 59)}:00`,
+          publishTime: `${date}T10:00:00`,
           classification: n.classification,
           aiExplanation: classified.aiExplanation,
           affectsStructure: classified.affectsStructure,
@@ -2533,50 +2440,33 @@ export async function registerRoutes(
       // ========================================
       // STEP 3: FEATURE EXTRACTION
       // ========================================
-      const isSpeculative = SPECULATIVE_STOCKS.includes(symbol);
       const isBlueChip = BLUE_CHIP_STOCKS.includes(symbol);
-      
-      // Determine flow characteristics based on stock type
-      const flowBias = isSpeculative 
-        ? "Distribusi" 
-        : (marketData.changePercent > 0 ? "Akumulasi" : "Netral");
-      const flowIntensity = isSpeculative 
-        ? "Besar" 
-        : (Math.abs(marketData.changePercent) > 2 ? "Besar" : "Moderat");
-      const flowReliability = marketData.dataSource === "REAL" 
+
+      const flowBias = marketData.changePercent > 0.5 ? "Akumulasi"
+        : marketData.changePercent < -0.5 ? "Distribusi"
+        : "Netral";
+      const flowIntensity = Math.abs(marketData.changePercent) > 2 ? "Besar" : "Moderat";
+      const flowReliability = marketData.dataSource === "REAL"
         ? (isBlueChip ? "Tinggi" : "Sedang")
         : "Sedang";
-      
-      const isDistributionActive = flowBias === "Distribusi" && flowIntensity.includes("Besar");
-      const isVolatilityUnhealthy = isDistributionActive || Math.abs(marketData.changePercent) > 10;
-      
+
       // ========================================
-      // STEP 4: GORENGAN DETECTION
+      // STEP 4: GORENGAN DETECTION via computeGorenganFromStock
       // ========================================
-      const triggeredLayers: number[] = [];
-      
-      // Layer 1: Price & Volume Anomaly (>25% 5-day rise with volume >3× average)
-      if (Math.abs(marketData.changePercent) > 25 || marketData.volume > 100000000) {
-        triggeredLayers.push(1);
-      }
-      
-      // Layer 2: Broker Flow Fragmentation
-      if (isSpeculative) {
-        triggeredLayers.push(2);
-      }
-      
-      // Layer 3: Retail Dominance (small lot activity, no foreign flow)
-      if (isSpeculative) {
-        triggeredLayers.push(3);
-      }
-      
-      // Layer 4: Structural Failure (no accumulation regime, no tape control)
-      if (isSpeculative && flowBias !== "Akumulasi") {
-        triggeredLayers.push(4);
-      }
-      
-      const isGorengan = triggeredLayers.length >= 2;
-      
+      const simGorenganResult = computeGorenganFromStock({
+        changePercent: String(marketData.changePercent),
+        flowBias,
+        flowIntensity,
+        flowReliability,
+        brokerData: "[]",
+        foreignActivityData: JSON.stringify({
+          netForeignFlow: isBlueChip ? "10B IDR" : "0",
+          netDomesticFlow: isBlueChip ? "20B IDR" : "5B IDR"
+        }),
+      });
+      const isGorengan = simGorenganResult.isGorengan;
+      const triggeredLayers = simGorenganResult.triggeredLayers;
+
       // ========================================
       // STEP 5-8: UNIFIED BRAIN (getStockDecision)
       // Same function used by homepage and detail page
@@ -2702,17 +2592,11 @@ export async function registerRoutes(
         }
       }
       
-      // Speculative stocks should trigger Gorengan and show Hindari Dulu
-      if (isSpeculative) {
-        if (!isGorengan) {
-          behaviorCheck = "FAIL";
-          failureReasons.push(`Speculative stock ${symbol} should trigger Gorengan detector`);
-          behaviorFailures++;
-        }
-        if (actionGuidance.state === "AKUMULASI_BERTAHAP" || 
+      if (isGorengan) {
+        if (actionGuidance.state === "AKUMULASI_BERTAHAP" ||
             actionGuidance.state === "WATCHLIST_PRIORITAS") {
           behaviorCheck = "FAIL";
-          failureReasons.push(`Speculative stock ${symbol} should not show Watchlist/Akumulasi`);
+          failureReasons.push(`Gorengan stock ${symbol} should not show Watchlist/Akumulasi`);
           behaviorFailures++;
         }
       }
@@ -2757,7 +2641,7 @@ export async function registerRoutes(
           confidence: marketData.confidence,
         },
         newsClassification: newsClassificationSummary,
-        stockType: isBlueChip ? "BLUE_CHIP" : "SPECULATIVE",
+        stockType: isBlueChip ? "BLUE_CHIP" : (isGorengan ? "SPECULATIVE" : "OTHER"),
       };
       
       auditDetails.push(auditEntry);

@@ -90,8 +90,15 @@ The platform uses a single decision function `getStockDecision()` in `server/eng
 - `server/engine/unifiedDecision.ts` — `getStockDecision()` and `mapStockDataToInput()`
 - `server/engine/testScenarios.ts` — 4 locked test scenarios
 - `server/engine/runTests.ts` — Test runner for `/api/test-engine`
-- `mapStockDataToInput()` translates DB stock fields into brain input format
+- `server/engine/brokerStability.ts` — Deterministic broker stability score (concentration + volume commitment)
+- `server/engine/flowQuality.ts` — Deterministic flow quality score (no base 50, uses sync/intensity/price/reliability/sell pressure)
+- `server/engine/insider.ts` — Real insider direction from transaction data (BUY/SELL/NEUTRAL/NO_DATA)
+- `server/engine/foreignParser.ts` — Foreign/domestic flow parser from JSON strings
+- `server/engine/parseBrokerIDR.ts` — IDR value parser supporting T/B/M suffixes
+- `server/engine/tapeControl.ts` — Tape control detection (tight range + volume + flow + price stability)
+- `mapStockDataToInput()` translates DB stock fields into brain input format using all engine modules
 - Homepage bucket always matches detail page action (enforced by same function)
+- Engine is fully deterministic: same input → same output, zero randomness
 
 ### Gorengan Detector (Safety Engine)
 Protects retail users from speculative pump-and-dump stocks using 4-layer detection:

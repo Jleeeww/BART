@@ -1,0 +1,451 @@
+TASK: APPLY ENGINE STABILIZATION PATCH (13 FIXES)
+
+We are upgrading the intelligence engine to become deterministic, stable, and institutional-grade.
+
+All fixes must follow these rules:
+
+Rules
+
+Do NOT change architecture.
+
+Do NOT remove existing engines.
+
+Do NOT add machine learning.
+
+Do NOT introduce randomness.
+
+Same input must produce same output.
+
+Preserve existing API responses.
+
+Refactor safely.
+
+This is a stabilization patch, not a redesign.
+
+FIX F-01 — REMOVE RANDOMNESS
+
+Locate any code using:
+
+Math.random()
+
+Especially inside:
+
+calculateBrokerStabilityScore
+
+Remove all randomness.
+
+Replace with deterministic broker stability model:
+
+Create:
+
+server/engine/brokerStability.ts
+
+Add:
+
+export function calculateBrokerStabilityScore(brokers:any[]){
+
+if(!brokers || brokers.length===0)
+return {score:0,level:"Rendah"};
+
+const parsed=brokers.map(b=>{
+
+const buy=parseBrokerIDR(b.netBuy);
+const sell=parseBrokerIDR(b.netSell);
+
+return{
+
+code:b.code,
+net:buy-sell,
+volPct:parseFloat(
+(b.volumePercent||"0").replace("%","")
+)
+
+};
+
+});
+
+const buyers=
+parsed
+.filter(b=>b.net>0)
+.sort((a,b)=>b.net-a.net);
+
+if(buyers.length===0)
+return {score:5,level:"Rendah"};
+
+const total=
+buyers.reduce((s,b)=>s+b.net,0);
+
+const top3=
+buyers.slice(0,3)
+.reduce((s,b)=>s+b.net,0);
+
+const concentration=
+total>0?top3/total:0;
+
+const volumeCommitment=
+Math.min(
+
+buyers
+.slice(0,3)
+.reduce((s,b)=>s+b.volPct,0)
+/30,
+
+1
+
+);
+
+const score=Math.round(
+
+concentration*60+
+volumeCommitment*40
+
+);
+
+const level=
+
+score>70?"Tinggi":
+score>40?"Sedang":
+"Rendah";
+
+return {score,level};
+
+}
+
+Replace all previous Broker Stability calculations with this function.
+
+FIX F-02 — REMOVE BASE SCORE 50
+
+Locate:
+
+let score = 50
+
+Remove it.
+
+Create:
+
+server/engine/flowQuality.ts
+
+Add:
+
+export function calculateFlowQualityScore(p:any){
+
+let score=0;
+
+/* SYNCHRONIZATION */
+
+const foreign=p.netForeignFlow||0;
+const domestic=p.netDomesticFlow||0;
+
+if(foreign>0 && domestic>0)
+score+=25;
+else if(foreign>0 || domestic>0)
+score+=12;
+
+/* INTENSITY */
+
+const map:any={
+
+"Akumulasi Besar":25,
+"Akumulasi Sedang":18,
+"Akumulasi Ringan":12,
+"Netral":10,
+"Distribusi Sedang":4,
+"Distribusi Besar":0
+
+};
+
+score+=map[p.flowIntensity]??10;
+
+/* PRICE REACTION */
+
+if(p.buyAvg && p.lastPrice){
+
+const ratio=p.lastPrice/p.buyAvg;
+
+if(ratio>1.01)
+score+=20;
+
+else if(ratio>0.995)
+score+=14;
+
+else if(ratio>0.98)
+score+=7;
+
+else
+score+=2;
+
+}
+
+/* RELIABILITY */
+
+const rel:any={
+
+"Tinggi":15,
+"Sedang":8,
+"Rendah":2
+
+};
+
+score+=rel[p.flowReliability]??8;
+
+/* SELL PRESSURE */
+
+if(p.buyAvg && p.sellAvg){
+
+const sellRatio=p.sellAvg/p.buyAvg;
+
+if(sellRatio>=1)
+score+=15;
+
+else if(sellRatio>=0.998)
+score+=10;
+
+else if(sellRatio>=0.995)
+score+=5;
+
+}
+
+return Math.max(
+0,
+Math.min(100,score)
+);
+
+}
+
+Replace all Flow Quality score logic with this function.
+
+FIX F-03 — INSIDER HARDCODING
+
+Remove:
+
+const insiderDirection="beli"
+
+Create:
+
+server/engine/insider.ts
+
+Add:
+
+export function getInsiderDirection(insiderData:any){
+
+if(!insiderData)
+return "NO_DATA";
+
+const tx=insiderData.transactions||[];
+
+let buy=0;
+let sell=0;
+
+tx.forEach(t=>{
+
+const shares=
+parseInt(
+String(t.shares)
+.replace(/\D/g,"")
+)||0;
+
+if(
+t.type==="BUY"||
+t.type==="Beli"
+)
+buy+=shares;
+
+if(
+t.type==="SELL"||
+t.type==="Jual"
+)
+sell+=shares;
+
+});
+
+if(buy>sell*1.2)
+return "BUY";
+
+if(sell>buy*1.2)
+return "SELL";
+
+return "NEUTRAL";
+
+}
+
+Use real insider data.
+
+If missing:
+
+Return NO_DATA.
+
+FIX F-04 — REMOVE SPECULATIVE LABELING
+
+Remove any code like:
+
+if(isSpeculative)
+triggeredLayers.push()
+
+Detection must use:
+
+computeGorenganFromStock()
+
+Never stock labels.
+
+FIX F-05 — FOREIGN FLOW PARSING
+
+Create:
+
+server/engine/foreignParser.ts
+
+Add:
+
+export function parseForeignData(json:string){
+
+let d:any={};
+
+try{
+d=JSON.parse(json||"{}");
+}catch{}
+
+const foreign=
+parseIDR(d.netForeignFlow)
+||
+parseIDR(d.foreignNet)
+||
+0;
+
+const domestic=
+parseIDR(d.netDomesticFlow)
+||
+parseIDR(d.domesticNet)
+||
+0;
+
+return{
+
+netForeignFlow:foreign,
+netDomesticFlow:domestic
+
+};
+
+}
+
+function parseIDR(v:any){
+
+if(!v)return 0;
+
+const s=
+String(v)
+.replace(/[^\d.\-]/g,"");
+
+return parseFloat(s)||0;
+
+}
+
+Use everywhere foreign data is parsed.
+
+FIX F-06 — BROKER IDR PARSER
+
+Create:
+
+server/engine/parseBrokerIDR.ts
+
+Add:
+
+export function parseBrokerIDR(v:any){
+
+if(!v)return 0;
+
+const s=
+String(v)
+.toUpperCase();
+
+const num=parseFloat(
+s.replace(/[^\d.]/g,"")
+)||0;
+
+if(s.includes("T"))
+return num*1e12;
+
+if(s.includes("B"))
+return num*1e9;
+
+if(s.includes("M"))
+return num*1e6;
+
+return num;
+
+}
+
+Use everywhere broker IDR parsed.
+
+FIX F-07 — REMOVE DAILY ×3
+
+Remove:
+
+priceChangePercent * 3
+
+Replace with:
+
+Math.abs(
+parseFloat(stock.changePercent)||0
+)
+FIX F-08 — STRONG TAPE CONTROL
+
+Create:
+
+server/engine/tapeControl.ts
+
+Add:
+
+export function detectTapeControl(p:any){
+
+const range=p.high-p.low;
+
+const tightRange=
+range/p.lastPrice<0.005;
+
+const volumeHigh=
+p.volumeRatio>1.5;
+
+const flowPositive=
+p.netFlow>0;
+
+const stableVsFlow=
+p.lastPrice<=p.buyAvg*1.005;
+
+return(
+
+tightRange &&
+volumeHigh &&
+flowPositive &&
+stableVsFlow
+
+);
+
+}
+FINAL STEP
+
+After all fixes:
+
+Run:
+
+/api/test-engine
+
+Requirements:
+
+Same stock → same result every run
+
+No randomness
+
+Gorengan detection stable
+
+Flow score stable
+
+OUTPUT REQUIRED
+
+After applying fixes:
+
+List:
+
+Files modified
+
+Functions replaced
+
+Tests passed

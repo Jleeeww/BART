@@ -1,3 +1,8 @@
+import { calculateBrokerStabilityScore } from "./brokerStability";
+import { calculateFlowQualityScore } from "./flowQuality";
+import { getInsiderDirection } from "./insider";
+import { parseForeignData } from "./foreignParser";
+
 export interface StockDecisionInput {
   netFlow: "high" | "medium" | "low";
   brokerStability: "high" | "medium" | "low";
@@ -166,20 +171,28 @@ export function mapStockDataToInput(stockData: {
     else netFlow = "medium";
   }
 
+  let brokerArr: any[] = [];
+  try {
+    brokerArr = JSON.parse(stockData.brokerData || "[]");
+  } catch {}
+  const stabilityResult = calculateBrokerStabilityScore(brokerArr);
   let brokerStability: "high" | "medium" | "low" = "low";
-  if (flowReliability === "Tinggi" || flowReliability === "High") brokerStability = "high";
-  else if (flowReliability === "Sedang" || flowReliability === "Medium") brokerStability = "medium";
+  if (stabilityResult.level === "Tinggi") brokerStability = "high";
+  else if (stabilityResult.level === "Sedang") brokerStability = "medium";
 
+  const foreignParsed = parseForeignData(stockData.foreignActivityData || "{}");
+  const fqScore = calculateFlowQualityScore({
+    netForeignFlow: foreignParsed.netForeignFlow,
+    netDomesticFlow: foreignParsed.netDomesticFlow,
+    flowIntensity: flowIntensity,
+    flowReliability: flowReliability,
+    buyAvg: null,
+    lastPrice: null,
+    sellAvg: null,
+  });
   let flowQuality: "high" | "medium" | "low" = "low";
-  if (flowBias === "Akumulasi" && (flowReliability === "Tinggi" || flowReliability === "High")) {
-    flowQuality = "high";
-  } else if (flowBias === "Akumulasi") {
-    flowQuality = "medium";
-  } else if (flowBias === "Distribusi") {
-    flowQuality = "low";
-  } else {
-    flowQuality = "medium";
-  }
+  if (fqScore >= 65) flowQuality = "high";
+  else if (fqScore >= 35) flowQuality = "medium";
 
   let priceTrend: "up" | "sideways" | "down" = "sideways";
   if (changePercent > 0.5) priceTrend = "up";
@@ -197,8 +210,9 @@ export function mapStockDataToInput(stockData: {
       const parsed = typeof stockData.insiderData === "string"
         ? JSON.parse(stockData.insiderData)
         : stockData.insiderData;
-      if (parsed?.alignmentScore > 60) insider = "buy";
-      else if (parsed?.alignmentScore < 40) insider = "sell";
+      const dir = getInsiderDirection(parsed);
+      if (dir === "BUY") insider = "buy";
+      else if (dir === "SELL") insider = "sell";
     } catch {}
   }
 
