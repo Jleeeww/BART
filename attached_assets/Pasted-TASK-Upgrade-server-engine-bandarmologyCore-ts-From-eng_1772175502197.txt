@@ -1,0 +1,454 @@
+TASK
+
+Upgrade:
+
+server/engine/bandarmologyCore.ts
+
+From:
+
+engineVersion: "1.0.0"
+
+To:
+
+engineVersion: "1.1.0"
+
+This upgrade must implement:
+
+Flow Normalization Model
+
+Broker Rotation Model
+
+Stealth Accumulation Model
+
+Fake Breakout Risk Model
+
+Regime Probability Model
+
+AND fix:
+
+Flow normalization negative range
+
+Stealth slope problem
+
+Model pipeline order
+
+This must remain:
+
+Deterministic
+
+Stable
+
+Explainable
+
+Production safe
+
+STEP 1 — UPDATE ENGINE VERSION
+
+Find:
+
+engineVersion: "1.0.0"
+
+Replace:
+
+engineVersion: "1.1.0"
+STEP 2 — MODEL 6 FLOW NORMALIZATION
+
+Add new model:
+
+function computeFlowNormalized(input: BandarmologyInput): ScoreWithExplanation {
+
+ const totalNetFlow =
+ input.flow.netForeignFlow +
+ input.flow.netDomesticFlow;
+
+ if (input.volume.avg20dValue <= 0) {
+
+ return {
+
+ score: 0,
+ level: "Sangat Lemah",
+ components: [],
+ explanation: "Data nilai transaksi historis tidak tersedia",
+ isReliable:false,
+ reliabilityNote:"avg20dValue tidak tersedia"
+
+ };
+
+ }
+
+ const ratio =
+ totalNetFlow /
+ input.volume.avg20dValue;
+
+/*
+CRITICAL FIX B-1
+
+Must include negative range
+
+Distribution stocks must NOT all map to zero
+*/
+
+ const score =
+ clamp100(
+ ((ratio + 0.5) / 2.0) * 100
+ );
+
+ return {
+
+ score,
+
+ level: buildLevelLabel(score),
+
+ components: [],
+
+ explanation:
+ `Aliran bersih relatif terhadap rata-rata nilai transaksi menghasilkan rasio ${ratio.toFixed(2)}`,
+
+ isReliable:true,
+
+ reliabilityNote:null
+
+ };
+
+}
+STEP 3 — MODEL 7 BROKER ROTATION
+
+Add:
+
+function computeBrokerRotation(input: BandarmologyInput): ScoreWithExplanation {
+
+ if(!input.brokers || input.brokers.length<5){
+
+ return{
+
+ score:50,
+
+ level:"Sedang",
+
+ components:[],
+
+ explanation:"Data broker historis tidak cukup",
+
+ isReliable:false,
+
+ reliabilityNote:"Broker history <2 sessions"
+
+ };
+
+ }
+
+ const today =
+ parseBrokers(input.brokers)
+ .sort((a,b)=>Math.abs(b.net)-Math.abs(a.net))
+ .slice(0,5)
+ .map(b=>b.code);
+
+/*
+Simple deterministic proxy:
+
+Assume last session broker history unavailable
+
+Return neutral unreliable
+*/
+
+ return{
+
+ score:50,
+
+ level:"Sedang",
+
+ components:[],
+
+ explanation:"Model rotasi broker membutuhkan data multi-hari",
+
+ isReliable:false,
+
+ reliabilityNote:"Broker history belum tersedia"
+
+ };
+
+}
+
+(This keeps model stable until historical broker DB exists.)
+
+STEP 4 — MODEL 8 STEALTH ACCUMULATION
+
+Add:
+
+function computeStealthAccumulation(
+ input:BandarmologyInput,
+ flowNormalizedScore:number
+):ScoreWithExplanation{
+
+ if(!input.priceHistory||input.priceHistory.length<5){
+
+ return{
+
+ score:50,
+ level:"Sedang",
+ components:[],
+ explanation:"Data harga historis tidak cukup",
+ isReliable:false,
+ reliabilityNote:"priceHistory <5"
+
+ };
+
+ }
+
+ const prices=input.priceHistory;
+
+ const n=prices.length;
+
+ let sumX=0;
+ let sumY=0;
+ let sumXY=0;
+ let sumX2=0;
+
+ for(let i=0;i<n;i++){
+
+ sumX+=i;
+ sumY+=prices[i];
+ sumXY+=i*prices[i];
+ sumX2+=i*i;
+
+ }
+
+ const slope=
+ (n*sumXY-sumX*sumY)/
+ (n*sumX2-sumX*sumX);
+
+/*
+CRITICAL FIX B-2
+
+Slight negative slopes allowed
+*/
+
+ let slopeScore;
+
+ if (slope < -0.005) slopeScore = 20;
+ else if (slope < -0.001) slopeScore = 55;
+ else if (slope < 0.000) slopeScore = 65;
+ else if (slope < 0.002) slopeScore = 70;
+ else if (slope < 0.005) slopeScore = 80;
+ else if (slope < 0.010) slopeScore = 60;
+ else slopeScore = 35;
+
+ const volumeRatio =
+ input.volume.todayVolume/
+ Math.max(input.volume.avg20dVolume,1);
+
+ let volumeScore;
+
+ if(volumeRatio<0.7) volumeScore=30;
+ else if(volumeRatio<1.3) volumeScore=90;
+ else if(volumeRatio<2) volumeScore=60;
+ else volumeScore=30;
+
+ const score=
+ clamp100(
+
+ flowNormalizedScore*0.40+
+ slopeScore*0.30+
+ volumeScore*0.30
+
+ );
+
+ return{
+
+ score,
+
+ level:buildLevelLabel(score),
+
+ components:[],
+
+ explanation:"Deteksi akumulasi stealth berdasarkan tren harga dan aliran",
+
+ isReliable:true,
+
+ reliabilityNote:null
+
+ };
+
+}
+STEP 5 — MODEL 9 FAKE BREAKOUT RISK
+
+Add:
+
+function computeFakeBreakoutRisk(
+ input:BandarmologyInput,
+ flowNormalized:number,
+ brokerDominance:number
+):ScoreWithExplanation{
+
+ const priceChangePct=
+ ((input.price.close-input.price.prevClose)/
+ input.price.prevClose)*100;
+
+ let priceScore;
+
+ if(priceChangePct<1) priceScore=10;
+ else if(priceChangePct<3) priceScore=40;
+ else if(priceChangePct<6) priceScore=70;
+ else priceScore=90;
+
+ const weakFlow=100-flowNormalized;
+
+ const weakDominance=100-brokerDominance;
+
+ const range=
+ (input.price.high-input.price.low)/
+ Math.max(input.price.close,1);
+
+ let volScore;
+
+ if(range<0.01) volScore=10;
+ else if(range<0.02) volScore=30;
+ else if(range<0.04) volScore=70;
+ else volScore=90;
+
+ const score=
+ clamp100(
+
+ priceScore*0.35+
+ weakFlow*0.30+
+ weakDominance*0.20+
+ volScore*0.15
+
+ );
+
+ return{
+
+ score,
+
+ level:buildLevelLabel(score),
+
+ components:[],
+
+ explanation:"Risiko breakout palsu berdasarkan harga dan dukungan institusi",
+
+ isReliable:true,
+
+ reliabilityNote:null
+
+ };
+
+}
+STEP 6 — MODEL 10 REGIME PROBABILITIES
+
+Add:
+
+function computeRegimeProbabilities(
+ accumulation:number,
+ absorption:number,
+ dominance:number,
+ risk:number
+){
+
+ const strongRaw=
+ accumulation*0.4+
+ absorption*0.3+
+ dominance*0.3;
+
+ const distRaw=
+ risk*0.6+
+ (100-accumulation)*0.4;
+
+ const sideRaw=
+ 100-
+ Math.abs(accumulation-50)*2;
+
+ const total=
+ strongRaw+
+ distRaw+
+ sideRaw;
+
+ return{
+
+ strongAccumulation:
+ clamp100(strongRaw/total*100),
+
+ distribution:
+ clamp100(distRaw/total*100),
+
+ sideways:
+ clamp100(sideRaw/total*100)
+
+ };
+
+}
+STEP 7 — PIPELINE ORDER (CRITICAL FIX B-3)
+
+Inside:
+
+computeBandarmology()
+
+Order must be:
+
+const flowNormalized=
+computeFlowNormalized(input);
+
+const brokerDominance=
+computeBrokerDominance(input);
+
+const brokerRotation=
+computeBrokerRotation(input);
+
+const stealthAccumulation=
+computeStealthAccumulation(
+ input,
+ flowNormalized.score
+);
+
+const fakeBreakout=
+computeFakeBreakoutRisk(
+ input,
+ flowNormalized.score,
+ brokerDominance.score
+);
+
+Then run v1.0 models:
+
+accumulationStrength
+absorptionScore
+marketRegime
+riskFailure
+STEP 8 — ADD OUTPUT FIELDS
+
+Extend:
+
+BandarmologyResult
+
+Add:
+
+flowNormalized:ScoreWithExplanation
+brokerRotation:ScoreWithExplanation
+stealthAccumulation:ScoreWithExplanation
+fakeBreakoutRisk:ScoreWithExplanation
+
+regimeProbabilities:{
+ strongAccumulation:number
+ distribution:number
+ sideways:number
+}
+SUCCESS CRITERIA
+Determinism
+
+Endpoint:
+
+/api/test-bandarmology
+
+Must return:
+
+identical:true
+Stability
+
+Must NOT crash if:
+
+No volume history
+
+No broker history
+
+No price history
+
+Engine Version
+1.1.0

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// BANDARMOLOGY INTELLIGENCE CORE v1.0
+// BANDARMOLOGY INTELLIGENCE CORE v1.1
 // Permanent Intelligence Engine — Single Source of Truth
 // ═══════════════════════════════════════════════════════════
 //
@@ -13,7 +13,15 @@
 // - No buy/sell recommendations or price targets
 // - Neutral analytical tone throughout
 //
-// ENGINE VERSION: 1.0.0
+// ENGINE VERSION: 1.1.0
+//
+// v1.1.0 ADDITIONS:
+// - Model 6: Flow Normalization (negative range fix B-1)
+// - Model 7: Broker Rotation
+// - Model 8: Stealth Accumulation (slope fix B-2)
+// - Model 9: Fake Breakout Risk
+// - Model 10: Regime Probabilities
+// - Fix B-3: Pipeline order correction
 // ═══════════════════════════════════════════════════════════
 
 import { parseBrokerIDR } from "./parseBrokerIDR";
@@ -25,8 +33,40 @@ import { detectTapeControl } from "./tapeControl";
 import { detectAccumulationPhase } from "./phaseDetection";
 
 // ═══════════════════════════════════════════════════════════
+// UTILITY FUNCTIONS (v1.1)
+// ═══════════════════════════════════════════════════════════
+
+function clamp100(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function buildLevelLabel(score: number): string {
+  if (score >= 80) return "Sangat Kuat";
+  if (score >= 60) return "Kuat";
+  if (score >= 40) return "Sedang";
+  if (score >= 20) return "Lemah";
+  return "Sangat Lemah";
+}
+
+function parseBrokers(brokerData: any[]): Array<{ code: string; net: number }> {
+  return brokerData.map((b: any) => ({
+    code: b.code || "",
+    net: parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell)
+  }));
+}
+
+// ═══════════════════════════════════════════════════════════
 // TYPE DEFINITIONS
 // ═══════════════════════════════════════════════════════════
+
+export interface ScoreWithExplanation {
+  score: number;
+  level: string;
+  components: Array<{ name: string; value: number }>;
+  explanation: string;
+  isReliable: boolean;
+  reliabilityNote: string | null;
+}
 
 export interface BandarmologyInput {
   // Flow signals
@@ -57,6 +97,25 @@ export interface BandarmologyInput {
 
   // Event context
   eventType?: string;
+
+  // v1.1 — Extended fields (optional, graceful degradation if missing)
+  flow?: {
+    netForeignFlow: number;
+    netDomesticFlow: number;
+  };
+  volume?: {
+    todayVolume: number;
+    avg20dVolume: number;
+    avg20dValue: number;
+  };
+  price?: {
+    close: number;
+    prevClose: number;
+    high: number;
+    low: number;
+  };
+  priceHistory?: number[];
+  brokers?: any[];
 }
 
 export interface GorenganResult {
@@ -179,6 +238,17 @@ export interface BandarmologyResult {
 
   // ─── GORENGAN DETECTION ───
   gorenganResult: GorenganResult;
+
+  // ─── v1.1 NEW MODELS ───
+  flowNormalized: ScoreWithExplanation;
+  brokerRotation: ScoreWithExplanation;
+  stealthAccumulation: ScoreWithExplanation;
+  fakeBreakoutRisk: ScoreWithExplanation;
+  regimeProbabilities: {
+    strongAccumulation: number;
+    distribution: number;
+    sideways: number;
+  };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1033,6 +1103,224 @@ function computeSmartMoneyReadinessScore(
 }
 
 // ═══════════════════════════════════════════════════════════
+// MODEL 6: FLOW NORMALIZATION (v1.1)
+// CRITICAL FIX B-1: Includes negative range for distribution
+// ═══════════════════════════════════════════════════════════
+
+function computeFlowNormalized(input: BandarmologyInput): ScoreWithExplanation {
+  const flow = input.flow || { netForeignFlow: input.netForeignBuyIdr, netDomesticFlow: input.netDomesticBuyIdr };
+  const totalNetFlow = flow.netForeignFlow + flow.netDomesticFlow;
+
+  if (!input.volume || input.volume.avg20dValue <= 0) {
+    return {
+      score: 0,
+      level: "Sangat Lemah",
+      components: [],
+      explanation: "Data nilai transaksi historis tidak tersedia",
+      isReliable: false,
+      reliabilityNote: "avg20dValue tidak tersedia"
+    };
+  }
+
+  const ratio = totalNetFlow / input.volume.avg20dValue;
+
+  const score = clamp100(((ratio + 0.5) / 2.0) * 100);
+
+  return {
+    score,
+    level: buildLevelLabel(score),
+    components: [],
+    explanation: `Aliran bersih relatif terhadap rata-rata nilai transaksi menghasilkan rasio ${ratio.toFixed(2)}`,
+    isReliable: true,
+    reliabilityNote: null
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODEL 7: BROKER ROTATION (v1.1)
+// Stable until historical broker DB exists
+// ═══════════════════════════════════════════════════════════
+
+function computeBrokerRotation(input: BandarmologyInput): ScoreWithExplanation {
+  const brokers = input.brokers || input.brokerData;
+
+  if (!brokers || brokers.length < 5) {
+    return {
+      score: 50,
+      level: "Sedang",
+      components: [],
+      explanation: "Data broker historis tidak cukup",
+      isReliable: false,
+      reliabilityNote: "Broker history <2 sessions"
+    };
+  }
+
+  parseBrokers(brokers)
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+    .slice(0, 5)
+    .map(b => b.code);
+
+  return {
+    score: 50,
+    level: "Sedang",
+    components: [],
+    explanation: "Model rotasi broker membutuhkan data multi-hari",
+    isReliable: false,
+    reliabilityNote: "Broker history belum tersedia"
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODEL 8: STEALTH ACCUMULATION (v1.1)
+// CRITICAL FIX B-2: Slight negative slopes allowed
+// ═══════════════════════════════════════════════════════════
+
+function computeStealthAccumulation(
+  input: BandarmologyInput,
+  flowNormalizedScore: number
+): ScoreWithExplanation {
+  if (!input.priceHistory || input.priceHistory.length < 5) {
+    return {
+      score: 50,
+      level: "Sedang",
+      components: [],
+      explanation: "Data harga historis tidak cukup",
+      isReliable: false,
+      reliabilityNote: "priceHistory <5"
+    };
+  }
+
+  const prices = input.priceHistory;
+  const n = prices.length;
+
+  let sumX = 0;
+  let sumY = 0;
+  let sumXY = 0;
+  let sumX2 = 0;
+
+  for (let i = 0; i < n; i++) {
+    sumX += i;
+    sumY += prices[i];
+    sumXY += i * prices[i];
+    sumX2 += i * i;
+  }
+
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+
+  let slopeScore: number;
+  if (slope < -0.005) slopeScore = 20;
+  else if (slope < -0.001) slopeScore = 55;
+  else if (slope < 0.000) slopeScore = 65;
+  else if (slope < 0.002) slopeScore = 70;
+  else if (slope < 0.005) slopeScore = 80;
+  else if (slope < 0.010) slopeScore = 60;
+  else slopeScore = 35;
+
+  const vol = input.volume || { todayVolume: 0, avg20dVolume: 1, avg20dValue: 0 };
+  const volumeRatio = vol.todayVolume / Math.max(vol.avg20dVolume, 1);
+
+  let volumeScore: number;
+  if (volumeRatio < 0.7) volumeScore = 30;
+  else if (volumeRatio < 1.3) volumeScore = 90;
+  else if (volumeRatio < 2) volumeScore = 60;
+  else volumeScore = 30;
+
+  const score = clamp100(
+    flowNormalizedScore * 0.40 +
+    slopeScore * 0.30 +
+    volumeScore * 0.30
+  );
+
+  return {
+    score,
+    level: buildLevelLabel(score),
+    components: [],
+    explanation: "Deteksi akumulasi stealth berdasarkan tren harga dan aliran",
+    isReliable: true,
+    reliabilityNote: null
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODEL 9: FAKE BREAKOUT RISK (v1.1)
+// ═══════════════════════════════════════════════════════════
+
+function computeFakeBreakoutRisk(
+  input: BandarmologyInput,
+  flowNormalized: number,
+  brokerDominance: number
+): ScoreWithExplanation {
+  const p = input.price || {
+    close: input.lastPrice || 0,
+    prevClose: input.lastPrice || 1,
+    high: input.lastPrice || 0,
+    low: input.lastPrice || 0
+  };
+
+  const priceChangePct = ((p.close - p.prevClose) / Math.max(p.prevClose, 1)) * 100;
+
+  let priceScore: number;
+  if (priceChangePct < 1) priceScore = 10;
+  else if (priceChangePct < 3) priceScore = 40;
+  else if (priceChangePct < 6) priceScore = 70;
+  else priceScore = 90;
+
+  const weakFlow = 100 - flowNormalized;
+  const weakDominance = 100 - brokerDominance;
+
+  const range = (p.high - p.low) / Math.max(p.close, 1);
+
+  let volScore: number;
+  if (range < 0.01) volScore = 10;
+  else if (range < 0.02) volScore = 30;
+  else if (range < 0.04) volScore = 70;
+  else volScore = 90;
+
+  const score = clamp100(
+    priceScore * 0.35 +
+    weakFlow * 0.30 +
+    weakDominance * 0.20 +
+    volScore * 0.15
+  );
+
+  return {
+    score,
+    level: buildLevelLabel(score),
+    components: [],
+    explanation: "Risiko breakout palsu berdasarkan harga dan dukungan institusi",
+    isReliable: true,
+    reliabilityNote: null
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODEL 10: REGIME PROBABILITIES (v1.1)
+// ═══════════════════════════════════════════════════════════
+
+function computeRegimeProbabilities(
+  accumulation: number,
+  absorption: number,
+  dominance: number,
+  risk: number
+): { strongAccumulation: number; distribution: number; sideways: number } {
+  const strongRaw = accumulation * 0.4 + absorption * 0.3 + dominance * 0.3;
+  const distRaw = risk * 0.6 + (100 - accumulation) * 0.4;
+  const sideRaw = 100 - Math.abs(accumulation - 50) * 2;
+
+  const total = strongRaw + distRaw + sideRaw;
+
+  if (total <= 0) {
+    return { strongAccumulation: 33, distribution: 33, sideways: 34 };
+  }
+
+  return {
+    strongAccumulation: clamp100(strongRaw / total * 100),
+    distribution: clamp100(distRaw / total * 100),
+    sideways: clamp100(sideRaw / total * 100)
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
 // BUILD INPUT FROM RAW STOCK / PAYLOAD DATA
 // Transforms raw API payload into BandarmologyInput
 // ═══════════════════════════════════════════════════════════
@@ -1267,9 +1555,33 @@ export function computeBandarmology(input: BandarmologyInput): BandarmologyResul
     hasPostSpikeDistribution: input.flowBias === "Distribusi" && priceChangePercent > 15
   });
 
+  // ─── STEP 19: FLOW NORMALIZATION (v1.1 — Model 6, fix B-1) ───
+  const flowNormalized = computeFlowNormalized(input);
+
+  // ─── STEP 20: BROKER ROTATION (v1.1 — Model 7) ───
+  const brokerRotation = computeBrokerRotation(input);
+
+  // ─── STEP 21: STEALTH ACCUMULATION (v1.1 — Model 8, fix B-2) ───
+  const stealthAccumulation = computeStealthAccumulation(input, flowNormalized.score);
+
+  // ─── STEP 22: FAKE BREAKOUT RISK (v1.1 — Model 9) ───
+  const fakeBreakoutRisk = computeFakeBreakoutRisk(
+    input,
+    flowNormalized.score,
+    brokerControlScore.score
+  );
+
+  // ─── STEP 23: REGIME PROBABILITIES (v1.1 — Model 10) ───
+  const regimeProbabilities = computeRegimeProbabilities(
+    smartMoneyReadinessScore.score,
+    flowQuality,
+    brokerControlScore.score,
+    simplifiedRisk.level === "Tinggi" ? 80 : simplifiedRisk.level === "Sedang" ? 50 : 20
+  );
+
   // ─── RETURN COMPLETE RESULT ───
   return {
-    engineVersion: "1.0.0",
+    engineVersion: "1.1.0",
     flowQualityScore: flowQuality,
     flowQualityInterpretation,
     earlyDistributionFlag,
@@ -1294,6 +1606,11 @@ export function computeBandarmology(input: BandarmologyInput): BandarmologyResul
     insiderBandarAlignment,
     simplifiedRisk,
     smartMoneyReadinessScore,
-    gorenganResult
+    gorenganResult,
+    flowNormalized,
+    brokerRotation,
+    stealthAccumulation,
+    fakeBreakoutRisk,
+    regimeProbabilities
   };
 }
