@@ -87,7 +87,8 @@ The platform uses a single decision function `getStockDecision()` in `server/eng
 - High readiness without momentum → WATCHLIST (not BUY)
 
 **Technical Implementation:**
-- `server/engine/unifiedDecision.ts` — `getStockDecision()` and `mapStockDataToInput()`
+- `server/engine/bandarmologyCore.ts` — **Intelligence Layer**: `computeBandarmology()` and `buildBandarmologyInput()` — consolidates ALL 18-step bandarmology intelligence into a single deterministic engine. Includes: GorenganDetector, BrokerControl, BrokerStability, TapeControl, BrokerClassification, MarketMode (A/D), ConvictionPhase, SmartMoneyIntent, TrapDetection, DecisionEngine, ControlQuality, InsiderAlignment, SimplifiedRisk, SmartMoneyReadiness, PhaseDetection. Also exports `computeGorenganFromStock()` for homepage use.
+- `server/engine/unifiedDecision.ts` — **Action Layer**: `getStockDecision()` and `mapStockDataToInput()` — single source of truth for BUY/WATCHLIST/AVOID decisions
 - `server/engine/testScenarios.ts` — 4 locked test scenarios
 - `server/engine/runTests.ts` — Test runner for `/api/test-engine`
 - `server/engine/brokerStability.ts` — Deterministic broker stability score (concentration + volume commitment)
@@ -101,6 +102,7 @@ The platform uses a single decision function `getStockDecision()` in `server/eng
 - `mapStockDataToInput()` translates DB stock fields into brain input format using all engine modules
 - Homepage bucket always matches detail page action (enforced by same function)
 - Engine is fully deterministic: same input → same output, zero randomness
+- **Architecture**: `computeBandarmology()` = intelligence layer; `getStockDecision()` = action layer. The `/api/ai` endpoint calls `computeBandarmology()` for intelligence then `getStockDecision()` for action. The `/api/stocks` endpoint calls `computeGorenganFromStock()` and `getStockDecision()` directly. All three paths produce consistent results.
 
 ### Gorengan Detector (Safety Engine)
 Protects retail users from speculative pump-and-dump stocks using 4-layer detection:

@@ -1,0 +1,246 @@
+TASK
+
+We are implementing the Bandarmology Intelligence Core v1.0 as the permanent intelligence engine.
+
+This replaces the intelligence logic currently inside route.ts.
+
+The system must use:
+
+server/engine/bandarmologyCore.ts
+
+as the single source of truth for bandarmology intelligence.
+
+STEP 1 — CREATE ENGINE FILE
+
+Create file:
+
+server/engine/bandarmologyCore.ts
+
+Paste the full Bandarmology Core v1.0 code exactly as provided.
+
+Do NOT modify anything.
+
+Do NOT simplify anything.
+
+Do NOT remove comments.
+
+Do NOT change formulas.
+
+This file must remain exactly as designed.
+
+STEP 2 — IMPORT ENGINE INTO route.ts
+
+Open:
+
+server/routes.ts
+
+Add import at top:
+
+import {
+  computeBandarmology,
+  buildBandarmologyInput
+} from "./engine/bandarmologyCore";
+STEP 3 — CONNECT ENGINE TO STOCK ANALYSIS
+
+Find where stock intelligence is computed.
+
+Replace old logic that computes:
+
+accumulation logic
+
+flow logic
+
+broker logic
+
+regime logic
+
+risk logic
+
+Replace with:
+
+const bandarmologyInput = buildBandarmologyInput(stock);
+
+const bandarmology = computeBandarmology(bandarmologyInput);
+STEP 4 — RETURN ENGINE OUTPUT IN API
+
+Ensure /api/ai response includes:
+
+bandarmology: bandarmology
+
+Example:
+
+res.json({
+  stock,
+  bandarmology
+});
+STEP 5 — HOMEPAGE ENGINE CONNECTION
+
+Homepage endpoint:
+
+/api/stocks
+
+For each stock:
+
+Add:
+
+const bandarmologyInput = buildBandarmologyInput(stock);
+
+const bandarmology = computeBandarmology(bandarmologyInput);
+
+Attach minimal intelligence summary:
+
+stock.bandarmologySummary = {
+  accumulation: bandarmology.accumulationStrength.score,
+  absorption: bandarmology.absorptionScore.score,
+  dominance: bandarmology.brokerDominance.score,
+  regime: bandarmology.marketRegime.regime,
+  institutionalSignal: bandarmology.composite.institutionalSignal,
+  confidence: bandarmology.composite.overallConfidence
+};
+
+Do NOT include full explanation on homepage.
+
+Homepage must stay fast.
+
+STEP 6 — REMOVE DUPLICATE INTELLIGENCE
+
+Search for and REMOVE:
+
+computeGorenganFromStock
+detectGorengan
+manual broker scoring
+manual regime detection
+manual flow scoring
+
+BandarmologyCore.ts must be the only intelligence engine.
+
+No duplicate scoring logic allowed.
+
+STEP 7 — PRESERVE UNIFIED DECISION ENGINE
+
+Do NOT remove:
+
+getStockDecision()
+mapStockDataToInput()
+
+Instead connect them to bandarmology:
+
+Example:
+
+const bandarmologyInput = buildBandarmologyInput(stock);
+
+const bandarmology = computeBandarmology(bandarmologyInput);
+
+const decisionInput = mapStockDataToInput(stock, bandarmology);
+
+const decision = getStockDecision(decisionInput);
+STEP 8 — DETERMINISM TEST
+
+Add temporary test endpoint:
+
+/api/test-bandarmology
+
+Code:
+
+app.get("/api/test-bandarmology", async (req, res) => {
+
+  const stock = await storage.getStockBySymbol("BBCA");
+
+  const input = buildBandarmologyInput(stock);
+
+  const run1 = computeBandarmology(input);
+  const run2 = computeBandarmology(input);
+  const run3 = computeBandarmology(input);
+
+  res.json({
+    identical:
+
+      JSON.stringify(run1) === JSON.stringify(run2)
+      &&
+      JSON.stringify(run2) === JSON.stringify(run3),
+
+    run1,
+    run2,
+    run3
+  });
+
+});
+
+Expected result:
+
+identical = true
+
+If false → engine broken.
+
+STEP 9 — VERSION LOCK
+
+Ensure engine metadata returns:
+
+engineVersion: "1.0.0"
+
+This must never change unless architecture changes.
+
+STEP 10 — FINAL STRUCTURE
+
+Final architecture must be:
+
+server/
+
+ engine/
+  bandarmologyCore.ts
+  unifiedDecision.ts
+  runTests.ts
+
+ routes.ts
+ storage.ts
+RULES
+
+Do NOT:
+
+Add random numbers
+
+Add ML
+
+Add indicators
+
+Add heuristics
+
+Modify formulas
+
+Do:
+
+Keep deterministic behavior
+
+Preserve explanations
+
+Preserve scoring logic
+
+SUCCESS CRITERIA
+
+System works when:
+
+Test 1
+/api/test-bandarmology
+
+returns:
+
+identical: true
+Test 2
+
+Homepage loads normally.
+
+Test 3
+
+Stock detail page shows bandarmology output.
+
+Test 4
+
+No runtime errors.
+
+FINAL GOAL
+
+BandarmologyCore.ts becomes:
+
+Permanent Intelligence Core v1.0
+
+Single source of truth.
