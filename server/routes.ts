@@ -4,7 +4,8 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { getStockDecision, mapStockDataToInput } from "./engine/unifiedDecision";
 import { runEngineTests } from "./engine/runTests";
-import { computeBandarmology, buildBandarmologyInput, computeGorenganFromStock } from "./engine/bandarmologyCore";
+import { computeBandarmology, buildBandarmologyInput, computeGorenganFromStock } from "./engine/bandarmologyCoreV1";
+import { testBandarmologyRouter } from "./routes/testBandarmology";
 
 // ========================================
 // UNIFIED BRAIN ENGINE
@@ -17,6 +18,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+
+  app.use("/api", testBandarmologyRouter);
 
   // Seed data check (simple check on startup)
   try {

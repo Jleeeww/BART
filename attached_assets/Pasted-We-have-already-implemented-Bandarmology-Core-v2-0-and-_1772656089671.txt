@@ -1,0 +1,97 @@
+We have already implemented Bandarmology Core v2.0 and pasted all files.
+
+Files that already exist:
+
+server/engine/bandarmologyCore.ts
+server/engine/buildBandarmologyInput.ts
+server/engine/bandarmologyHistory.ts
+server/routes/testBandarmology.ts
+
+Your job is ONLY to integrate and test the system.
+
+DO NOT modify any formulas or model logic.
+
+-----------------------------------------------------
+
+STEP 1 — REGISTER ROUTE
+
+Open:
+
+server/routes.ts
+
+Add this import at the top of the file:
+
+import { testBandarmologyRouter } from "./routes/testBandarmology";
+
+Then inside the registerRoutes(app) function add:
+
+app.use("/api", testBandarmologyRouter);
+
+Do not change any other routes.
+
+-----------------------------------------------------
+
+STEP 2 — VERIFY ENGINE IMPORTS
+
+Ensure the following imports resolve correctly:
+
+In testBandarmology.ts
+
+import { computeBandarmologyV2 } from "../engine/bandarmologyCore";
+import { buildBandarmologyInput } from "../engine/buildBandarmologyInput";
+import { getM6History } from "../engine/bandarmologyHistory";
+
+Fix only path issues if necessary.
+
+-----------------------------------------------------
+
+STEP 3 — COMPILE TYPESCRIPT
+
+Run TypeScript build and ensure there are no compile errors.
+
+If errors appear:
+
+• fix only type errors
+• fix import paths
+• DO NOT change engine formulas
+
+-----------------------------------------------------
+
+STEP 4 — RUN TEST ENDPOINT
+
+Start the server.
+
+Then call this endpoint internally:
+
+GET /api/test-bandarmology
+
+Capture the JSON response.
+
+-----------------------------------------------------
+
+STEP 5 — PRINT OUTPUT
+
+Print the JSON response exactly as returned.
+
+Do not modify it.
+
+The output should contain fields similar to:
+
+{
+  composite: number,
+  M1_accumulationStrength: {...},
+  M6_flowNormalized: {...},
+  M12_rollingAccumulation: {...},
+  M14_campaignDuration: {...},
+  M15_priceElasticity: {...},
+  M16_regimeStability: {...},
+  meta: {
+    engineVersion: "2.0.0"
+  }
+}
+
+-----------------------------------------------------
+
+GOAL
+
+Bandarmology Core v2.0 running and returning a valid JSON response from /api/test-bandarmology.
