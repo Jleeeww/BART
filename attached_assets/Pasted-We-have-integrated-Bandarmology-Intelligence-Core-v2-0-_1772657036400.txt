@@ -1,0 +1,181 @@
+We have integrated Bandarmology Intelligence Core v2.0.
+
+The system currently contains two engines:
+
+v1.1 engine
+- bandarmologyCoreV1.ts
+- used by the existing decision system
+
+v2.0 engine
+- bandarmologyCore.ts
+- institutional model with composite scoring and 12 models
+
+Your job is to verify v2.0 is running and then replace the old decision system with v2.0 composite intelligence.
+
+DO NOT modify formulas or model calculations.
+
+Only modify routing and decision logic.
+
+=====================================================
+
+STEP 1 — VERIFY V2 ENGINE IS RUNNING
+
+Open:
+
+server/routes/testBandarmology.ts
+
+Confirm it imports:
+
+import { computeBandarmologyV2 } from "../engine/bandarmologyCore";
+
+and NOT the v1 engine.
+
+Add a runtime log inside computeBandarmologyV2:
+
+console.log("Bandarmology Engine v2.0 running");
+
+Restart the server and call:
+
+GET /api/test-bandarmology
+
+Confirm the console prints:
+
+Bandarmology Engine v2.0 running
+
+Then capture the JSON response and ensure it contains:
+
+meta.engineVersion = "2.0.0"
+
+=====================================================
+
+STEP 2 — VERIFY MODEL OUTPUT
+
+Ensure the JSON response contains these v2 models:
+
+M1_accumulationStrength
+M2_absorptionScore
+M3_brokerDominance
+M6_flowNormalized
+M7_brokerRotation
+M8_stealthAccumulation
+M9_fakeBreakoutRisk
+M11_flowDecomposition
+M12_rollingAccumulation
+M14_campaignDuration
+M15_priceElasticity
+M16_regimeStability
+
+Also ensure:
+
+integrityReport.isValid = true
+
+=====================================================
+
+STEP 3 — REPLACE OLD DECISION SYSTEM
+
+The existing system uses the v1.1 decision logic:
+
+BUY / WATCHLIST / AVOID
+
+based on v1 scores.
+
+Replace this with a new decision function using the v2 composite score.
+
+Create new file:
+
+server/engine/bandarmologyDecisionV2.ts
+
+Add the function:
+
+export function getBandarmologyDecisionV2(result) {
+
+  const score = result.composite.score;
+  const regime = result.M16_regimeStability.regime;
+
+  if (score >= 70 && regime === "ACCUMULATION") {
+    return "WATCHLIST_PRIORITAS";
+  }
+
+  if (score >= 55) {
+    return "SIAP_DIPANTAU";
+  }
+
+  if (score < 40) {
+    return "HINDARI_DULU";
+  }
+
+  return "NETRAL";
+}
+
+=====================================================
+
+STEP 4 — UPDATE UNIFIED DECISION ENGINE
+
+Open:
+
+server/engine/unifiedDecision.ts
+
+Replace the v1 decision logic with the new v2 logic.
+
+Import:
+
+import { computeBandarmologyV2 } from "./bandarmologyCore";
+import { buildBandarmologyInput } from "./buildBandarmologyInput";
+import { getBandarmologyDecisionV2 } from "./bandarmologyDecisionV2";
+
+Replace the old compute call with:
+
+const m6History = await getM6History(symbol, 5);
+
+const input = buildBandarmologyInput(stock, m6History);
+
+const result = computeBandarmologyV2(input);
+
+const decision = getBandarmologyDecisionV2(result);
+
+Return:
+
+{
+  decision,
+  compositeScore: result.composite.score,
+  regime: result.M16_regimeStability.regime,
+  models: result
+}
+
+=====================================================
+
+STEP 5 — MAINTAIN BACKWARD COMPATIBILITY
+
+Do NOT delete v1.1 engine files yet.
+
+Leave:
+
+bandarmologyCoreV1.ts
+
+until the UI and API are fully migrated.
+
+=====================================================
+
+STEP 6 — FINAL TEST
+
+Run both:
+
+GET /api/test-bandarmology
+
+and the main stock analysis endpoint.
+
+Verify that decisions now depend on:
+
+composite score
+regime detection
+campaign duration
+absorption quality
+
+instead of the v1 scoring system.
+
+=====================================================
+
+GOAL
+
+Bandarmology v2.0 becomes the primary decision engine
+while preserving stability of the existing system.

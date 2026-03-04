@@ -1359,6 +1359,7 @@ export function computeComposite(
 export function computeBandarmologyV2(
   input: BandarmologyInput
 ): BandarmologyV2Result {
+  console.log("Bandarmology Engine v2.0 running");
 
   // ── Phase 0: Data Preparation ──────────────────────────────
   const validatorInput: RawValidatorInput = {

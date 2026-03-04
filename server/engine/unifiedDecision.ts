@@ -2,6 +2,10 @@ import { calculateBrokerStabilityScore } from "./brokerStability";
 import { calculateFlowQualityScore } from "./flowQuality";
 import { getInsiderDirection } from "./insider";
 import { parseForeignData } from "./foreignParser";
+import { computeBandarmologyV2 } from "./bandarmologyCore";
+import { buildBandarmologyInput } from "./buildBandarmologyInput";
+import { getBandarmologyDecisionV2 } from "./bandarmologyDecisionV2";
+import type { BandarmologyV2Result } from "./bandarmologyCore";
 
 export interface StockDecisionInput {
   netFlow: "high" | "medium" | "low";
@@ -24,6 +28,11 @@ export interface StockDecisionResult {
   mainRisk: string;
   failureTrigger: string;
   marketRegime: string;
+  v2?: {
+    compositeScore: number;
+    regime: string | null;
+    engineVersion: string;
+  };
 }
 
 export function getStockDecision(input: StockDecisionInput): StockDecisionResult {
@@ -142,6 +151,139 @@ export function getStockDecision(input: StockDecisionInput): StockDecisionResult
     failureTrigger: "Jika muncul sinyal akumulasi baru dan struktur membaik.",
     marketRegime: input.priceTrend === "down" ? "Distribusi Aktif" : "Netral"
   };
+}
+
+export function getStockDecisionV2(stockData: Record<string, any>): StockDecisionResult {
+  try {
+    const rawStock = {
+      symbol: stockData.symbol || "",
+      brokerData: stockData.brokerData || "[]",
+      foreignActivityData: stockData.foreignActivityData || "{}",
+      close: stockData.price || stockData.close || 0,
+      open: stockData.open || 0,
+      high: stockData.high || 0,
+      low: stockData.low || 0,
+      prevClose: stockData.prevClose || 0,
+      change: stockData.change || 0,
+      changePercent: stockData.changePercent || 0,
+      avgBuyPrice: stockData.avgBuyPrice || 0,
+      avgSellPrice: stockData.avgSellPrice || 0,
+      todayValue: stockData.todayValue || 0,
+      avg20dValue: stockData.avg20dValue || 0,
+      flowBias: stockData.flowBias || "Netral",
+      flowIntensity: stockData.flowIntensity || "",
+      flowReliability: stockData.flowReliability || "Sedang",
+      netFlowHistory: stockData.netFlowHistory || null,
+      priceHistory: stockData.priceHistory || null,
+    };
+
+    const input = buildBandarmologyInput(rawStock);
+    const result = computeBandarmologyV2(input);
+    const v2Decision = getBandarmologyDecisionV2(result);
+
+    const compositeScore = v2Decision.compositeScore;
+    const regime = v2Decision.regime;
+    const decision = v2Decision.decision;
+
+    let action: "BUY" | "WATCHLIST" | "AVOID";
+    let bucket: "Siap Dipantau" | "Watchlist Prioritas" | "Hindari Dulu";
+    let actionState: "AKUMULASI_BERTAHAP" | "WATCHLIST_PRIORITAS" | "HINDARI_DULU";
+    let color: "green" | "yellow" | "red";
+    let shortSummary: string;
+    let whyAction: string[];
+    let mainRisk: string;
+    let failureTrigger: string;
+    let marketRegime: string;
+
+    if (decision === "WATCHLIST_PRIORITAS") {
+      action = "WATCHLIST";
+      bucket = "Watchlist Prioritas";
+      actionState = "WATCHLIST_PRIORITAS";
+      color = "yellow";
+      shortSummary = "Komposit v2.0 tinggi dengan rezim akumulasi aktif. Struktur mendukung, pantau untuk entry.";
+      whyAction = [
+        "Skor komposit v2.0 menunjukkan kesiapan struktural tinggi",
+        "Rezim akumulasi terdeteksi dari M16",
+        "Kampanye institusional tervalidasi"
+      ];
+      mainRisk = "Perubahan rezim ke distribusi dapat mengubah outlook.";
+      failureTrigger = "Jika rezim bergeser atau komposit turun di bawah 55.";
+      marketRegime = "Akumulasi Aktif (v2.0)";
+    } else if (decision === "SIAP_DIPANTAU") {
+      action = "BUY";
+      bucket = "Siap Dipantau";
+      actionState = "AKUMULASI_BERTAHAP";
+      color = "green";
+      shortSummary = "Komposit v2.0 mendukung entry bertahap. Struktur dan aliran selaras.";
+      whyAction = [
+        "Skor komposit v2.0 melewati ambang batas entry",
+        "Model absorpsi dan akumulasi selaras",
+        "Kualitas aliran mendukung posisi bertahap"
+      ];
+      mainRisk = "Koreksi jangka pendek tetap mungkin meski struktur positif.";
+      failureTrigger = "Jika komposit turun di bawah 40 atau distribusi muncul.";
+      marketRegime = "Akumulasi Bertahap (v2.0)";
+    } else if (decision === "HINDARI_DULU") {
+      action = "AVOID";
+      bucket = "Hindari Dulu";
+      actionState = "HINDARI_DULU";
+      color = "red";
+      shortSummary = "Komposit v2.0 rendah. Struktur belum mendukung entry.";
+      whyAction = [
+        "Skor komposit v2.0 di bawah ambang batas aman",
+        "Dukungan institusional tidak terdeteksi",
+        "Risiko distribusi atau stagnasi tinggi"
+      ];
+      mainRisk = "Potensi penurunan harga signifikan tanpa fondasi institusi.";
+      failureTrigger = "Jika komposit naik di atas 55 dan rezim berubah ke akumulasi.";
+      marketRegime = "Distribusi/Netral (v2.0)";
+    } else {
+      action = "WATCHLIST";
+      bucket = "Watchlist Prioritas";
+      actionState = "WATCHLIST_PRIORITAS";
+      color = "yellow";
+      shortSummary = "Komposit v2.0 moderat. Menunggu konfirmasi lebih lanjut.";
+      whyAction = [
+        "Skor komposit v2.0 dalam zona netral",
+        "Sinyal campuran dari model institusional",
+        "Memerlukan data tambahan untuk keputusan definitif"
+      ];
+      mainRisk = "Arah pergerakan belum jelas, volatilitas mungkin meningkat.";
+      failureTrigger = "Jika komposit turun di bawah 40 atau naik di atas 70 dengan rezim akumulasi.";
+      marketRegime = "Transisi (v2.0)";
+    }
+
+    return {
+      readiness: Math.round(compositeScore),
+      action,
+      bucket,
+      actionState,
+      color,
+      shortSummary,
+      whyAction,
+      mainRisk,
+      failureTrigger,
+      marketRegime,
+      v2: {
+        compositeScore,
+        regime,
+        engineVersion: "2.0.0"
+      }
+    };
+  } catch (err) {
+    return {
+      readiness: 0,
+      action: "AVOID",
+      bucket: "Hindari Dulu",
+      actionState: "HINDARI_DULU",
+      color: "red",
+      shortSummary: "Gagal memproses analisis v2.0. Menggunakan fallback.",
+      whyAction: ["Error pada engine v2.0"],
+      mainRisk: "Data tidak dapat diproses.",
+      failureTrigger: "Setelah data diperbaiki.",
+      marketRegime: "Error"
+    };
+  }
 }
 
 export function mapStockDataToInput(stockData: {
