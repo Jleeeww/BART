@@ -1,0 +1,134 @@
+We are implementing the Bandarmology Intelligence Core v2.0.
+
+This is a deterministic financial intelligence engine.  
+Do NOT refactor formulas. Do NOT simplify logic.  
+Only fix TypeScript type errors if necessary.
+
+-----------------------------------------------------
+
+Create the following files exactly:
+
+server/engine/bandarmologyCore.ts
+server/engine/buildBandarmologyInput.ts
+server/engine/bandarmologyHistory.ts
+server/routes/testBandarmology.ts
+
+-----------------------------------------------------
+
+FILE 1
+server/engine/bandarmologyCore.ts
+
+Paste the FULL Bandarmology Core v2.0 code exactly as provided.
+
+Rules:
+
+- Do NOT change formulas
+- Do NOT merge models
+- Do NOT reorder pipeline
+- Do NOT replace safe_* utilities
+- Do NOT introduce randomness
+- Maintain determinism
+
+Critical architecture constraints:
+
+1) M16 MUST read M6 history from storage.
+   It must NOT use the current session's M6 output.
+
+2) netFlowHistory[0] MUST be the OLDEST session.
+   netFlowHistory[last] MUST be the newest.
+
+3) All normalization functions must remain symmetric (-1.0, 1.0).
+
+-----------------------------------------------------
+
+FILE 2
+server/engine/buildBandarmologyInput.ts
+
+Purpose:
+Adapter that converts raw stock DB data into BandarmologyInput.
+
+Create function:
+
+export function buildBandarmologyInput(stock: any): BandarmologyInput
+
+Responsibilities:
+
+- Parse brokerData safely
+- Parse foreignActivityData safely
+- Parse numbers safely
+- Allow null/missing fields
+- Never throw exceptions
+
+If parsing fails:
+return neutral-safe values.
+
+-----------------------------------------------------
+
+FILE 3
+server/engine/bandarmologyHistory.ts
+
+Purpose:
+Persist historical M6 scores for M16 regime stability.
+
+Create:
+
+getM6History(symbol: string, n: number)
+
+saveBandarmologyHistory(symbol: string, result: BandarmologyResult)
+
+Storage fields:
+
+symbol
+date
+m6Score
+netFlow
+closePrice
+
+Rules:
+
+- Return history oldest → newest
+- Safe when empty
+- No crash if record missing
+
+-----------------------------------------------------
+
+FILE 4
+server/routes/testBandarmology.ts
+
+Create endpoint:
+
+GET /api/test-bandarmology
+
+This endpoint:
+
+1) Loads a sample stock
+2) Builds BandarmologyInput
+3) Calls computeBandarmology()
+4) Returns JSON result
+
+Example response:
+
+{
+  composite: 63.2,
+  models: {...},
+  meta: {...}
+}
+
+-----------------------------------------------------
+
+ENGINE RULES
+
+This engine must be:
+
+- Deterministic
+- Crash-safe
+- No external state
+- No Math.random()
+- No Date.now()
+- Same input → same output
+
+-----------------------------------------------------
+
+Goal:
+
+Bandarmology Core v2.0 running successfully with test endpoint.

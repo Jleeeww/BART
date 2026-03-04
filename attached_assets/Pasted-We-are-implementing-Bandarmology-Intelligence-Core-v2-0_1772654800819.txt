@@ -1,0 +1,79 @@
+We are implementing Bandarmology Intelligence Core v2.0.
+
+This is a deterministic institutional-grade financial engine.
+DO NOT refactor logic.
+DO NOT optimize formulas.
+DO NOT simplify models.
+DO NOT introduce randomness.
+DO NOT merge files.
+Only fix TypeScript type errors if absolutely required.
+
+We will paste 4 separate files exactly as provided.
+You must preserve the architecture exactly.
+
+=====================================================
+CREATE FOLDER STRUCTURE
+=====================================================
+
+server/engine/
+server/routes/
+
+=====================================================
+CREATE THESE FILES EXACTLY
+=====================================================
+
+1) server/engine/bandarmologyCore.ts
+2) server/engine/buildBandarmologyInput.ts
+3) server/engine/bandarmologyHistory.ts
+4) server/routes/testBandarmology.ts
+
+=====================================================
+CRITICAL IMPLEMENTATION RULES
+=====================================================
+
+1) Do NOT modify any mathematical formulas.
+2) Do NOT change normalization bounds (-1.0, 1.0).
+3) Do NOT change model weights.
+4) Do NOT reorder pipeline execution.
+5) Do NOT combine models into one.
+6) M16 must read historical M6 scores from storage, not from the current compute cycle.
+7) netFlowHistory[0] must be the OLDEST session.
+8) If any value is NaN or invalid, use safe fallback exactly as defined in the code.
+9) No Math.random().
+10) No Date.now() in scoring logic.
+
+=====================================================
+STEP 1
+=====================================================
+
+Create the 4 files listed above.
+Do not write any code yet.
+Wait for me to paste each file’s full content.
+
+=====================================================
+STEP 2
+=====================================================
+
+After each paste:
+- Insert the content exactly as given.
+- Do not rewrite.
+- Only fix TypeScript import path errors if necessary.
+- Keep exports exactly as defined.
+
+=====================================================
+STEP 3
+=====================================================
+
+After all files are pasted:
+
+- Ensure all imports resolve.
+- Ensure computeBandarmologyV2() is exported.
+- Ensure testBandarmology route calls the engine correctly.
+- Ensure the project compiles.
+
+=====================================================
+GOAL
+=====================================================
+
+Bandarmology Core v2.0 running deterministically
+with zero formula modifications.
