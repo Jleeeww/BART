@@ -234,40 +234,35 @@ export default function StockDashboard() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="bg-card border-b border-border sticky top-0 z-30 shadow-sm backdrop-blur-xl bg-card/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-primary-foreground" />
+      {/* BART Top Nav */}
+      <div className="border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-2 no-underline">
+            <div className="w-7 h-7 rounded-sm bg-primary flex items-center justify-center shrink-0">
+              <span className="text-xs font-black text-primary-foreground leading-none">B</span>
             </div>
-            <span className="font-display font-bold text-xl tracking-tight">BR Trade</span>
-          </div>
-          
+            <div className="flex flex-col leading-none">
+              <span className="text-base font-black text-foreground tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>BART</span>
+              <span className="text-[8px] font-semibold text-muted-foreground tracking-widest uppercase">Bandarmology Intelligence</span>
+            </div>
+          </a>
           <div className="flex items-center gap-4">
             {(() => {
               const dotColor = sessionStatus.color === "green" ? "bg-emerald-500" : 
                                sessionStatus.color === "yellow" ? "bg-amber-500" : "bg-rose-500";
-              const bgColor = sessionStatus.color === "green" ? "bg-emerald-50 dark:bg-emerald-900/20" : 
-                              sessionStatus.color === "yellow" ? "bg-amber-50 dark:bg-amber-900/20" : "bg-rose-50 dark:bg-rose-900/20";
-              const textColor = sessionStatus.color === "green" ? "text-emerald-700 dark:text-emerald-400" : 
-                                sessionStatus.color === "yellow" ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400";
+              const textColor = sessionStatus.color === "green" ? "text-emerald-400" : 
+                                sessionStatus.color === "yellow" ? "text-amber-400" : "text-rose-400";
               return (
-                <div className={`hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${bgColor} ${textColor}`} data-testid="badge-session-status">
-                  <div className={`w-2 h-2 rounded-full ${dotColor} ${sessionStatus.color === "green" ? "animate-pulse" : ""}`} />
+                <div className={`hidden sm:flex items-center gap-2 text-xs font-mono ${textColor}`} data-testid="badge-session-status">
+                  <div className={`w-1.5 h-1.5 rounded-full ${dotColor} ${sessionStatus.color === "green" ? "animate-pulse" : ""}`} />
                   {sessionStatus.label}
                 </div>
               );
             })()}
-            <div className="w-8 h-8 rounded-full bg-secondary border border-border overflow-hidden">
-              <img 
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" 
-                alt="User" 
-                className="w-full h-full object-cover"
-              />
-            </div>
+            <div className="text-xs text-muted-foreground font-mono">IDX</div>
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <motion.div 
@@ -292,7 +287,7 @@ export default function StockDashboard() {
                     { id: "overview", label: "Ringkasan", icon: PieChart },
                     { id: "financials", label: "Keuangan", icon: DollarSign },
                     { id: "valuation", label: "Valuasi", icon: TrendingUp },
-                    { id: "flow", label: "Aliran Dana", icon: Activity },
+                    { id: "flow", label: "Flow", icon: Activity },
                     { id: "news", label: "Berita", icon: Newspaper },
                     { id: "risk", label: "Risiko", icon: AlertTriangle },
                     { id: "insider", label: "Insider", icon: UserCheck },

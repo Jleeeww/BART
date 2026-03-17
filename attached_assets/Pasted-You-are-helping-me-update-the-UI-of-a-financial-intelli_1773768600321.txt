@@ -1,0 +1,167 @@
+You are helping me update the UI of a financial intelligence platform called BART (previously called BR Trade). I need you to make the following changes across these files: Homepage.tsx, StockDashboard.tsx, and index.css. Do NOT change any backend logic, API calls, data fetching, or business logic — only UI and styling.
+
+=== CHANGE 1: index.css — Switch to dark institutional theme ===
+
+Replace the entire :root block and .dark block in index.css with this:
+
+:root {
+  --background: 0 0% 6%;
+  --foreground: 0 0% 95%;
+
+  --primary: 45 100% 55%;
+  --primary-foreground: 0 0% 6%;
+
+  --secondary: 0 0% 11%;
+  --secondary-foreground: 0 0% 90%;
+
+  --muted: 0 0% 13%;
+  --muted-foreground: 0 0% 50%;
+
+  --accent: 0 0% 13%;
+  --accent-foreground: 0 0% 90%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --success: 142 71% 45%;
+  --success-foreground: 0 0% 6%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 0 0% 6%;
+
+  --border: 0 0% 16%;
+  --input: 0 0% 16%;
+  --ring: 45 100% 55%;
+
+  --radius: 0.5rem;
+
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+Also add this utility at the bottom of the @layer utilities block:
+
+  .hover-elevate {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .hover-elevate:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+Also make sure the body in @layer base includes:
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    background-color: #0f0f0f;
+  }
+
+=== CHANGE 2: Homepage.tsx — Add BART logo header and update page header ===
+
+At the very top of the returned JSX in the Homepage component, replace this:
+
+      <div className="min-h-screen bg-background">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <header className="mb-8">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
+              <h1 className="text-2xl font-bold text-foreground" data-testid="text-homepage-title">
+                Peta Kesiapan Saham Hari Ini
+              </h1>
+              <SimulationToggle />
+            </div>
+            <p className="text-sm text-muted-foreground" data-testid="text-homepage-subtitle">
+              Disusun berdasarkan perilaku bandar, struktur pasar, dan risiko distribusi.
+              <br />
+              <span className="italic">Bukan sinyal, melainkan panduan kesiapan.</span>
+            </p>
+          </header>
+
+WITH this new header block:
+
+      <div className="min-h-screen bg-background">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <header className="mb-8">
+            {/* BART Logo + Top Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                {/* BART Wordmark Logo */}
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-sm bg-primary flex items-center justify-center shrink-0">
+                    <span className="text-xs font-black text-primary-foreground tracking-tighter leading-none">B</span>
+                  </div>
+                  <div className="flex flex-col leading-none">
+                    <span className="text-xl font-black text-foreground tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+                      BART
+                    </span>
+                    <span className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">
+                      Bandarmology Intelligence
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <SimulationToggle />
+            </div>
+
+            {/* Page title section */}
+            <div className="border-l-2 border-primary pl-4 mb-4">
+              <h1 className="text-lg font-bold text-foreground" data-testid="text-homepage-title">
+                Peta Kesiapan Saham Hari Ini
+              </h1>
+              <p className="text-xs text-muted-foreground mt-1" data-testid="text-homepage-subtitle">
+                Disusun berdasarkan perilaku bandar, struktur pasar, dan risiko distribusi. <span className="italic">Bukan sinyal — panduan kesiapan.</span>
+              </p>
+            </div>
+          </header>
+
+=== CHANGE 3: StockDashboard.tsx — Add BART logo to the top navbar/header ===
+
+Find the main return JSX in StockDashboard. Look for the outermost <div> that wraps the whole page — it usually contains a <main> tag and a back button or stock symbol header. Add this nav bar right at the very start, as the first child inside the outermost div:
+
+            {/* BART Top Nav */}
+            <div className="border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-10">
+              <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+                <a href="/" className="flex items-center gap-2 no-underline">
+                  <div className="w-7 h-7 rounded-sm bg-primary flex items-center justify-center shrink-0">
+                    <span className="text-xs font-black text-primary-foreground leading-none">B</span>
+                  </div>
+                  <div className="flex flex-col leading-none">
+                    <span className="text-base font-black text-foreground tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>BART</span>
+                    <span className="text-[8px] font-semibold text-muted-foreground tracking-widest uppercase">Bandarmology Intelligence</span>
+                  </div>
+                </a>
+                <div className="text-xs text-muted-foreground font-mono">IDX</div>
+              </div>
+            </div>
+
+=== CHANGE 4: StockDashboard.tsx — Update the four main tabs from English to BART locked design ===
+
+Find the TabsList that contains the four main analysis tabs. It likely has tabs like "overview", "flow", "risk"/"risiko", "insider". Make sure those four tabs are labeled exactly as:
+- Ringkasan  (value="overview")
+- Flow       (value="flow")
+- Risiko     (value="risiko")
+- Insider    (value="insider")
+
+If any tab still shows English labels like "Overview", "Risk", change the display label only (keep the value attribute unchanged if it's already correct). Do not change data-testid attributes.
+
+=== CHANGE 5: Homepage.tsx — Make StockCard look more institutional ===
+
+In the StockCard component, update the Card className line from:
+  className={`p-4 border-l-4 ${colorClasses[displayColor]} hover-elevate transition-all`}
+
+To:
+  className={`p-4 border-l-2 ${colorClasses[displayColor]} hover-elevate transition-all bg-secondary/30 border border-border/40`}
+
+And update the colorClasses object to use more subtle dark-mode-friendly colors:
+  const colorClasses = {
+    green: "border-l-emerald-400 bg-emerald-500/5",
+    yellow: "border-l-amber-400 bg-amber-500/5",
+    red: "border-l-red-400 bg-red-500/5",
+  };
+
+=== IMPORTANT RULES ===
+- Do NOT change any API calls, hooks, data fetching, mutation logic, or backend-facing code
+- Do NOT remove any data-testid attributes
+- Do NOT change route paths in App.tsx
+- Do NOT change import statements unless strictly necessary for the new JSX
+- Keep all existing functionality exactly as-is — only update visual/UI code
+- After making changes, confirm which files were modified

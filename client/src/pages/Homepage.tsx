@@ -53,9 +53,9 @@ function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardD
                        stock.actionColor as "green" | "yellow" | "red";
   
   const colorClasses = {
-    green: "border-l-emerald-500 bg-emerald-500/5",
-    yellow: "border-l-amber-500 bg-amber-500/5",
-    red: "border-l-red-500 bg-red-500/5",
+    green: "border-l-emerald-400 bg-emerald-500/5",
+    yellow: "border-l-amber-400 bg-amber-500/5",
+    red: "border-l-red-400 bg-red-500/5",
   };
 
   const badgeVariants = {
@@ -71,7 +71,7 @@ function StockCard({ stock, onToggleWatchlist, isToggling }: { stock: StockCardD
       transition={{ duration: 0.2 }}
     >
       <Card 
-        className={`p-4 border-l-4 ${colorClasses[displayColor]} hover-elevate transition-all`}
+        className={`p-4 border-l-2 ${colorClasses[displayColor]} hover-elevate transition-all bg-secondary/30 border border-border/40`}
         data-testid={`card-stock-${stock.symbol}`}
       >
         <div className="flex items-start justify-between gap-3">
@@ -291,17 +291,36 @@ export default function Homepage() {
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <header className="mb-8">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
-            <h1 className="text-2xl font-bold text-foreground" data-testid="text-homepage-title">
-              Peta Kesiapan Saham Hari Ini
-            </h1>
+          {/* BART Logo + Top Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div className="flex items-center gap-3">
+              {/* BART Wordmark Logo */}
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-sm bg-primary flex items-center justify-center shrink-0">
+                  <span className="text-xs font-black text-primary-foreground tracking-tighter leading-none">B</span>
+                </div>
+                <div className="flex flex-col leading-none">
+                  <span className="text-xl font-black text-foreground tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+                    BART
+                  </span>
+                  <span className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">
+                    Bandarmology Intelligence
+                  </span>
+                </div>
+              </div>
+            </div>
             <SimulationToggle />
           </div>
-          <p className="text-sm text-muted-foreground" data-testid="text-homepage-subtitle">
-            Disusun berdasarkan perilaku bandar, struktur pasar, dan risiko distribusi.
-            <br />
-            <span className="italic">Bukan sinyal, melainkan panduan kesiapan.</span>
-          </p>
+
+          {/* Page title section */}
+          <div className="border-l-2 border-primary pl-4 mb-4">
+            <h1 className="text-lg font-bold text-foreground" data-testid="text-homepage-title">
+              Peta Kesiapan Saham Hari Ini
+            </h1>
+            <p className="text-xs text-muted-foreground mt-1" data-testid="text-homepage-subtitle">
+              Disusun berdasarkan perilaku bandar, struktur pasar, dan risiko distribusi. <span className="italic">Bukan sinyal — panduan kesiapan.</span>
+            </p>
+          </div>
         </header>
 
         <Tabs defaultValue="siap" className="w-full">
