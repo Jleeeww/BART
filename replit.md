@@ -1,7 +1,7 @@
-# Stock Dashboard Application
+# BART — Bandar Analysis & Research Terminal
 
 ## Overview
-This project is a stock analysis dashboard for the Indonesian market (IDX). It provides detailed stock information, AI-generated insights (summaries, financial metrics, trading flow, corporate actions), and aims to be a comprehensive tool for market analysis. The application targets the Indonesian stock market, offering institutional-grade AI analysis to a broader user base.
+BART is a professional institutional-grade stock analysis terminal for the Indonesian market (IDX). Styled after Bloomberg Terminal / TradingView with a deep black (#0B0B0B) terminal aesthetic. It provides detailed stock information, AI-generated insights (summaries, financial metrics, trading flow, corporate actions), and aims to be a comprehensive tool for market analysis. The application targets the Indonesian stock market, offering institutional-grade AI analysis to a broader user base.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -20,10 +20,13 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 - **Build Tool**: Vite
 - **Routing**: Wouter
 - **State Management**: TanStack React Query
-- **Styling**: Tailwind CSS (with light/dark mode)
+- **Styling**: Tailwind CSS (always-dark terminal theme — no light mode)
 - **UI Components**: shadcn/ui (based on Radix UI)
-- **Charts**: Recharts
+- **Charts**: lightweight-charts (TradingView) for candlestick; Recharts for supplementary charts
 - **Animations**: Framer Motion
+- **Theme**: Terminal dark — #0B0B0B background, #111111 panels, #1F1F1F borders, #4ADE80 green, #EF4444 red, #FACC15 yellow
+- **Layout**: 3-panel terminal (Signal Panel | Main Chart | Market Intelligence)
+- **Font**: Inter (UI), Space Mono (numeric/ticker data)
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express

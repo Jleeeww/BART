@@ -5,64 +5,44 @@
 @tailwind utilities;
 
 :root {
-  /* Clean, professional financial palette */
-  --background: 210 20% 98%;
-  --foreground: 222 47% 11%;
+  /* Terminal Dark Theme - BART */
+  --background: 0 0% 4.3%; /* #0B0B0B */
+  --foreground: 0 0% 91.8%; /* #EAEAEA */
   
-  --primary: 221 83% 53%;
-  --primary-foreground: 210 40% 98%;
+  --card: 0 0% 6.7%; /* #111111 */
+  --card-foreground: 0 0% 91.8%;
   
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222 47% 11%;
+  --popover: 0 0% 6.7%;
+  --popover-foreground: 0 0% 91.8%;
   
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
+  --primary: 142 70% 58%; /* #4ADE80 */
+  --primary-foreground: 0 0% 4%;
   
-  --accent: 210 40% 96%;
-  --accent-foreground: 222 47% 11%;
+  --secondary: 0 0% 8%;
+  --secondary-foreground: 0 0% 85%;
   
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 54.5%; /* #8B8B8B */
+  
+  --accent: 0 0% 10%;
+  --accent-foreground: 0 0% 85%;
+  
+  --destructive: 0 72% 51%; /* #EF4444 */
+  --destructive-foreground: 0 0% 98%;
+  
+  --border: 0 0% 12.2%; /* #1F1F1F */
+  --input: 0 0% 12.2%;
+  --ring: 142 70% 58%;
+  
+  --radius: 0.5rem;
 
-  /* Financial indicators */
-  --success: 142 76% 36%;
-  --success-foreground: 356 100% 97%;
-  --warning: 38 92% 50%;
-  --warning-foreground: 48 96% 89%;
-  
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 221 83% 53%;
-  
-  --radius: 0.75rem;
+  --terminal-green: #4ADE80;
+  --terminal-red: #EF4444;
+  --terminal-yellow: #FACC15;
 
   --font-sans: 'Inter', sans-serif;
-  --font-display: 'Space Grotesk', sans-serif;
+  --font-display: 'Inter', sans-serif;
   --font-mono: 'Space Mono', monospace;
-}
-
-.dark {
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-  
-  --primary: 217 91% 60%;
-  --primary-foreground: 222 47% 11%;
-  
-  --secondary: 217 32% 17%;
-  --secondary-foreground: 210 40% 98%;
-  
-  --muted: 217 32% 17%;
-  --muted-foreground: 215 20% 65%;
-  
-  --accent: 217 32% 17%;
-  --accent-foreground: 210 40% 98%;
-  
-  --destructive: 0 62% 30%;
-  --destructive-foreground: 210 40% 98%;
-  
-  --border: 217 32% 17%;
-  --input: 217 32% 17%;
-  --ring: 224 76% 48%;
 }
 
 @layer base {
@@ -72,7 +52,6 @@
   }
   
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
     @apply font-bold tracking-tight text-foreground;
   }
 
@@ -82,10 +61,22 @@
 }
 
 @layer utilities {
+  .terminal-panel {
+    @apply bg-[#111111] border border-[#1F1F1F];
+  }
+  
+  .terminal-scanner-row {
+    @apply hover:bg-[#1A1A1A] transition-colors cursor-pointer;
+  }
+
+  .score-green { color: var(--terminal-green); }
+  .score-yellow { color: var(--terminal-yellow); }
+  .score-red { color: var(--terminal-red); }
+
   .text-success {
-    color: hsl(var(--success));
+    color: var(--terminal-green);
   }
   .bg-success\/10 {
-    background-color: hsl(var(--success) / 0.1);
+    background-color: rgb(74 222 128 / 0.1);
   }
 }
