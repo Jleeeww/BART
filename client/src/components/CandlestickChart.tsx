@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createChart, ColorType, IChartApi, ISeriesApi, CandlestickData, HistogramData, Time } from 'lightweight-charts';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { createChart, ColorType, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 
 interface CandlestickChartProps {
   symbol: string;
@@ -10,45 +8,50 @@ interface CandlestickChartProps {
 
 type TimePeriod = '1D' | '1W' | '1M' | '3M' | '1Y';
 
-/**
- * Deterministic data generator based on symbol name.
- * Starts in IDX-style range (5000-15000) and produces ~60 bars of fake data.
- */
-function generateDeterministicData(symbol: string, period: TimePeriod): { candlestickData: CandlestickData[], volumeData: HistogramData[] } {
+interface OHLCVBar {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+interface VolumeBar {
+  time: string;
+  value: number;
+  color: string;
+}
+
+function generateDeterministicData(symbol: string, period: TimePeriod): { candlestickData: OHLCVBar[]; volumeData: VolumeBar[] } {
   const seed = symbol.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  
-  // Deterministic "random" based on seed
+
+  const barsMap: Record<TimePeriod, number> = { '1D': 78, '1W': 30, '1M': 60, '3M': 90, '1Y': 252 };
+  const dataPoints = barsMap[period];
+
   let currentVal = 5000 + (seed % 10000);
-  const dataPoints = 60;
-  const candlestickData: CandlestickData[] = [];
-  const volumeData: HistogramData[] = [];
+  const candlestickData: OHLCVBar[] = [];
+  const volumeData: VolumeBar[] = [];
 
   const now = new Date();
-  
+
   for (let i = 0; i < dataPoints; i++) {
     const date = new Date(now);
     date.setDate(date.getDate() - (dataPoints - i));
-    const timeStr = date.toISOString().split('T')[0] as Time;
+    const timeStr = date.toISOString().split('T')[0];
 
-    const changePercent = ((seed + i * 13) % 7 - 3) / 100; // -3% to +3%
+    const changePercent = ((seed + i * 13) % 7 - 3) / 100;
     const open = currentVal;
     const close = open * (1 + changePercent);
-    const high = Math.max(open, close) * (1 + (seed + i * 7) % 2 / 100);
-    const low = Math.min(open, close) * (1 - (seed + i * 11) % 2 / 100);
+    const high = Math.max(open, close) * (1 + ((seed + i * 7) % 2) / 100);
+    const low = Math.min(open, close) * (1 - ((seed + i * 11) % 2) / 100);
 
-    candlestickData.push({
-      time: timeStr,
-      open,
-      high,
-      low,
-      close,
-    });
+    candlestickData.push({ time: timeStr, open, high, low, close });
 
     const volume = 1000000 + ((seed * (i + 1)) % 5000000);
     volumeData.push({
       time: timeStr,
       value: volume,
-      color: close >= open ? 'rgba(74, 222, 128, 0.5)' : 'rgba(239, 68, 68, 0.5)',
+      color: close >= open ? 'rgba(74,222,128,0.4)' : 'rgba(239,68,68,0.4)',
     });
 
     currentVal = close;
@@ -57,23 +60,17 @@ function generateDeterministicData(symbol: string, period: TimePeriod): { candle
   return { candlestickData, volumeData };
 }
 
-export const CandlestickChart = ({ symbol, height = 400 }: CandlestickChartProps) => {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const candlestickSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
-  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+export function CandlestickChart({ symbol, height = 380 }: CandlestickChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<ReturnType<typeof createChart> | null>(null);
+  const candleSeriesRef = useRef<any>(null);
+  const volumeSeriesRef = useRef<any>(null);
   const [period, setPeriod] = useState<TimePeriod>('1M');
 
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    if (!containerRef.current) return;
 
-    const handleResize = () => {
-      if (chartRef.current && chartContainerRef.current) {
-        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth });
-      }
-    };
-
-    const chart = createChart(chartContainerRef.current, {
+    const chart = createChart(containerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: '#0B0B0B' },
         textColor: '#8B8B8B',
@@ -82,15 +79,22 @@ export const CandlestickChart = ({ symbol, height = 400 }: CandlestickChartProps
         vertLines: { color: '#1F1F1F' },
         horzLines: { color: '#1F1F1F' },
       },
-      width: chartContainerRef.current.clientWidth,
-      height: height,
-      timeScale: {
+      crosshair: {
+        vertLine: { color: '#4ADE80', width: 1, style: 3, labelBackgroundColor: '#111111' },
+        horzLine: { color: '#4ADE80', width: 1, style: 3, labelBackgroundColor: '#111111' },
+      },
+      rightPriceScale: {
         borderColor: '#1F1F1F',
       },
+      timeScale: {
+        borderColor: '#1F1F1F',
+        timeVisible: true,
+      },
+      width: containerRef.current.clientWidth,
+      height,
     });
 
-    // @ts-ignore
-    const candlestickSeries = chart.addCandlestickSeries({
+    const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#4ADE80',
       downColor: '#EF4444',
       borderVisible: false,
@@ -98,79 +102,71 @@ export const CandlestickChart = ({ symbol, height = 400 }: CandlestickChartProps
       wickDownColor: '#EF4444',
     });
 
-    // @ts-ignore
-    const volumeSeries = chart.addHistogramSeries({
-      priceFormat: {
-        type: 'volume',
-      },
-      priceScaleId: '', // overlay
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'vol',
     });
 
     volumeSeries.priceScale().applyOptions({
-      scaleMargins: {
-        top: 0.8,
-        bottom: 0,
-      },
+      scaleMargins: { top: 0.82, bottom: 0 },
     });
 
     chartRef.current = chart;
-    candlestickSeriesRef.current = candlestickSeries;
+    candleSeriesRef.current = candleSeries;
     volumeSeriesRef.current = volumeSeries;
 
-    const windowResizeHandler = () => {
-      handleResize();
-    };
-    window.addEventListener('resize', windowResizeHandler);
-
-    const resizeObserver = new ResizeObserver(() => {
-      handleResize();
+    const observer = new ResizeObserver(() => {
+      if (containerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({ width: containerRef.current.clientWidth });
+      }
     });
-    resizeObserver.observe(chartContainerRef.current);
+    observer.observe(containerRef.current);
 
     return () => {
-      window.removeEventListener('resize', windowResizeHandler);
-      resizeObserver.disconnect();
+      observer.disconnect();
       chart.remove();
+      chartRef.current = null;
+      candleSeriesRef.current = null;
+      volumeSeriesRef.current = null;
     };
   }, [height]);
 
   useEffect(() => {
-    if (candlestickSeriesRef.current && volumeSeriesRef.current) {
-      const { candlestickData, volumeData } = generateDeterministicData(symbol, period);
-      candlestickSeriesRef.current.setData(candlestickData);
-      volumeSeriesRef.current.setData(volumeData);
-      chartRef.current?.timeScale().fitContent();
-    }
+    if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
+    const { candlestickData, volumeData } = generateDeterministicData(symbol, period);
+    candleSeriesRef.current.setData(candlestickData);
+    volumeSeriesRef.current.setData(volumeData);
+    chartRef.current?.timeScale().fitContent();
   }, [symbol, period]);
 
   return (
-    <Card className="p-4 bg-[#111111] border-[#1F1F1F] rounded-none">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
+    <div className="bg-[#111111] border border-[#1F1F1F]">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[#1F1F1F]">
+        <div className="flex items-center gap-1">
           {(['1D', '1W', '1M', '3M', '1Y'] as TimePeriod[]).map((p) => (
-            <Button
+            <button
               key={p}
-              variant="ghost"
-              size="sm"
-              className={`h-7 px-2 text-xs font-mono ${
-                period === p ? 'bg-[#1F1F1F] text-[#4ADE80]' : 'text-[#8B8B8B]'
-              }`}
               onClick={() => setPeriod(p)}
               data-testid={`button-period-${p}`}
+              className={`px-2.5 py-1 text-[11px] font-mono rounded transition-colors ${
+                period === p
+                  ? 'bg-[#1F1F1F] text-[#4ADE80]'
+                  : 'text-[#8B8B8B] hover:text-[#EAEAEA]'
+              }`}
             >
               {p}
-            </Button>
+            </button>
           ))}
         </div>
-        <div className="text-xs font-mono text-[#8B8B8B] uppercase">
-          Live Market Data • {symbol}
-        </div>
+        <span className="text-[11px] font-mono text-[#8B8B8B]">
+          {symbol} · IDX
+        </span>
       </div>
-      <div 
-        ref={chartContainerRef} 
-        className="w-full" 
+      <div
+        ref={containerRef}
+        className="w-full"
         data-testid="candlestick-chart-container"
       />
-    </Card>
+    </div>
   );
-};
+}

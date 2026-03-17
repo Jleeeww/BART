@@ -211,14 +211,12 @@ export default function StockDashboard() {
       {/* TERMINAL NAVBAR */}
       <header className="h-14 bg-[#111111] border-b border-[#1F1F1F] sticky top-0 z-50 flex items-center px-4 shrink-0">
         <div className="flex items-center gap-4 w-1/3">
-          <Link href="/">
-            <a className="flex items-center gap-2 group">
-              <ArrowLeft className="w-4 h-4 text-[#8B8B8B] group-hover:text-[#4ADE80] transition-colors" />
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-mono font-bold text-lg text-[#4ADE80] tracking-tighter">BART</span>
-                <span className="text-[10px] font-mono text-[#8B8B8B] uppercase hidden sm:block">Terminal</span>
-              </div>
-            </a>
+          <Link href="/" className="flex items-center gap-2 group">
+            <ArrowLeft className="w-4 h-4 text-[#8B8B8B] group-hover:text-[#4ADE80] transition-colors" />
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-mono font-bold text-lg text-[#4ADE80] tracking-tighter">BART</span>
+              <span className="text-[10px] font-mono text-[#8B8B8B] uppercase hidden sm:block">Terminal</span>
+            </div>
           </Link>
         </div>
         
@@ -651,23 +649,30 @@ export default function StockDashboard() {
                   
                   {/* ... other tabs content similarly styled ... */}
                   <TabsContent value="news" className="mt-0 focus-visible:outline-none space-y-6">
-                    {!aiLoading && aiData?.smartNewsFilter && (
+                    {!aiLoading && aiData?.smartNewsFilter?.news && (
                       <div className="bg-[#111111] border border-[#1F1F1F] rounded-lg overflow-hidden">
-                        <div className="p-4 bg-[#1A1A1A] border-b border-[#1F1F1F]">
-                           <h4 className="text-[10px] font-mono font-bold text-[#8B8B8B] uppercase tracking-widest">Sentiment Intelligence</h4>
+                        <div className="p-4 bg-[#1A1A1A] border-b border-[#1F1F1F] flex items-center justify-between">
+                          <h4 className="text-[10px] font-mono font-bold text-[#8B8B8B] uppercase tracking-widest">Sentiment Intelligence</h4>
+                          {aiData.smartNewsFilter.summary && (
+                            <span className="text-[10px] font-mono text-[#8B8B8B]">{aiData.smartNewsFilter.summary.summaryText}</span>
+                          )}
                         </div>
                         <div className="p-6 space-y-6">
-                          {aiData.smartNewsFilter.map((news: any, idx: number) => (
+                          {aiData.smartNewsFilter.news.map((news: any, idx: number) => (
                             <div key={idx} className="flex gap-4 items-start group">
-                               <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${news.sentiment === 'positive' ? 'bg-[#4ADE80]' : news.sentiment === 'negative' ? 'bg-[#EF4444]' : 'bg-[#FACC15]'}`} />
-                               <div className="space-y-1">
-                                 <h5 className="text-sm font-bold text-[#EAEAEA] group-hover:text-[#4ADE80] transition-colors cursor-pointer">{news.headline}</h5>
-                                 <p className="text-xs text-[#8B8B8B] leading-relaxed line-clamp-2">{news.aiReasoning}</p>
-                                 <div className="flex items-center gap-3 pt-2 text-[9px] font-mono text-[#8B8B8B] uppercase">
-                                   <span className="bg-[#1F1F1F] px-1.5 py-0.5 rounded text-[#EAEAEA]">IMPACT: {news.relevanceScore}%</span>
-                                   <span>{news.source} • {news.time}</span>
-                                 </div>
+                              <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${
+                                news.category === 'fundamental' ? 'bg-[#4ADE80]' :
+                                news.category === 'sentiment' ? 'bg-[#FACC15]' : 'bg-[#8B8B8B]'
+                              }`} />
+                              <div className="space-y-1 flex-1">
+                                <h5 className="text-sm font-bold text-[#EAEAEA] group-hover:text-[#4ADE80] transition-colors">{news.headline}</h5>
+                                <p className="text-xs text-[#8B8B8B] leading-relaxed line-clamp-2">{news.aiInterpretation}</p>
+                                <div className="flex items-center gap-3 pt-1 text-[9px] font-mono text-[#8B8B8B] uppercase flex-wrap">
+                                  <span className="bg-[#1F1F1F] px-1.5 py-0.5 rounded text-[#EAEAEA]">{news.categoryLabel}</span>
+                                  <span>{news.source} • {news.date}</span>
+                                  {news.contextTag && <span className="text-[#FACC15]">{news.contextTag}</span>}
                                 </div>
+                              </div>
                             </div>
                           ))}
                         </div>
