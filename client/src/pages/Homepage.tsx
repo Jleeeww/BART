@@ -293,22 +293,12 @@ export default function Homepage() {
         <header className="mb-8">
           {/* BART Logo + Top Bar */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-3">
-              {/* BART Wordmark Logo */}
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-sm bg-primary flex items-center justify-center shrink-0">
-                  <span className="text-xs font-black text-primary-foreground tracking-tighter leading-none">B</span>
-                </div>
-                <div className="flex flex-col leading-none">
-                  <span className="text-xl font-black text-foreground tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
-                    BART
-                  </span>
-                  <span className="text-[9px] font-semibold text-muted-foreground tracking-widest uppercase">
-                    Bandarmology Intelligence
-                  </span>
-                </div>
-              </div>
-            </div>
+            <span
+              className="text-2xl font-black tracking-tight"
+              style={{ fontFamily: 'var(--font-display)', color: '#38BDF8' }}
+            >
+              BART
+            </span>
             <SimulationToggle />
           </div>
 

@@ -237,14 +237,13 @@ export default function StockDashboard() {
       {/* BART Top Nav */}
       <div className="border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-2 no-underline">
-            <div className="w-7 h-7 rounded-sm bg-primary flex items-center justify-center shrink-0">
-              <span className="text-xs font-black text-primary-foreground leading-none">B</span>
-            </div>
-            <div className="flex flex-col leading-none">
-              <span className="text-base font-black text-foreground tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>BART</span>
-              <span className="text-[8px] font-semibold text-muted-foreground tracking-widest uppercase">Bandarmology Intelligence</span>
-            </div>
+          <a href="/" style={{ textDecoration: 'none' }}>
+            <span
+              className="text-xl font-black tracking-tight"
+              style={{ fontFamily: 'var(--font-display)', color: '#38BDF8' }}
+            >
+              BART
+            </span>
           </a>
           <div className="flex items-center gap-4">
             {(() => {
