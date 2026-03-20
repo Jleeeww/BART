@@ -1,0 +1,324 @@
+# BART — Session Context Document
+
+> Upload this file to Claude at the start of each session instead of sharing individual files.
+> Sections 6, 7, and 8 are meant to be filled in by hand as you work.
+
+---
+
+## 1. Project Overview
+
+BART is an AI-powered Indonesian stock market intelligence platform focused on bandarmology, broker flow analysis, institutional behavior detection, and Bahasa Indonesia–localized insights for retail investors. Target user: Indonesian retail investor trying to avoid pump-and-dump and time entries intelligently. Primary use case: helping users decide when to enter a position.
+
+---
+
+## 2. Locked Design Decisions
+
+- UI sections: Ringkasan, Flow, Keuangan, Valuasi, Berita, Risiko, Insider
+- Market Regime (Rezim Pasar) is the core engine
+- Bandarmology-first performance focus
+- Insider vs bandar alignment as a key signal
+- Risk framed as failure conditions, not probability scores
+- Bahasa Indonesia throughout
+- No indicator overcrowding
+
+Additional locked constraints (do not change without explicit discussion):
+- Dark terminal theme is permanent — no light mode toggle; `index.css` has no `.dark` block
+- `--primary` = sky blue `199 89% 60%` (`#38BDF8`)
+- BART logo = plain text only, sky blue, no icon, no subtitle (applied in both Homepage and StockDashboard nav)
+- Gorengan Detector is a hard safety override: always forces HINDARI_DULU and caps readiness ≤ 59
+- v1.1 engine (`getStockDecision()`) must remain untouched — routes.ts uses it for all existing endpoints
+- v2.0 engine entry point is `getStockDecisionV2()` in `unifiedDecision.ts`
+- Locked calibration values: BBCA=77/WATCHLIST_PRIORITAS, UNVR=5/HINDARI_DULU — verified by test suite in `runTests.ts`
+- No `Math.random()` anywhere in the engine layer — fully deterministic
+- `netFlowHistory[0]` = OLDEST session, `netFlowHistory[N-1]` = TODAY — never reversed
+- M16 reads stored prior-session M6 scores via `getM6History()` — never today's M6 (circular dependency)
+
+---
+
+## 3. Current UI Structure
+
+### Homepage (`client/src/pages/Homepage.tsx`)
+Route: `/`
+
+- **Header**: BART wordmark (sky blue, text-only) on the left; `SimulationToggle` switch on the right
+- **Page title block**: Left-border accent, title "Peta Kesiapan Saham Hari Ini", subtitle explaining bandarmology basis
+- **3-tab layout** (driven by `homepageBucket` from `/api/stocks`):
+  - `Siap Dipantau` — readiness ≥ 80, emerald accent, "struktur siap"
+  - `Watchlist Prioritas` — readiness 60–79, amber accent, "sedang dipersiapkan"
+  - `Hindari Dulu` — readiness < 60 or gorengan, red accent
+- Each tab renders a list of **`StockCard`** components showing:
+  - Symbol (link to `/stock/:symbol`), readiness score badge, watchlist badge, gorengan pulse badge
+  - Company name, price, % change (colored with TrendingUp/TrendingDown icons)
+  - Market regime badge, action guidance badge
+  - AI sentence (one-line insight)
+  - Star (watchlist toggle) and Detail button
+- `StockCard` uses `border-l-2` left accent (emerald/amber/red), `bg-secondary/30 border border-border/40`
+- Console audit runs on every render to verify all 12 stocks are bucketed (no silent drops)
+
+### StockDashboard (`client/src/pages/StockDashboard.tsx`)
+Route: `/stock/:symbol`
+
+- **Sticky top nav**: BART text logo (links to `/`), IDX session status dot + label (WIB-aware), "IDX" monospace badge
+- **`StockHeader`** component: Symbol (large), company name, IDX index badges (IDX30/LQ45/etc.), sector badge, stock tags, price, change %, lot value (price × 100 shares)
+- **Layout**: 2-column grid — left is 2/3 width (chart + tabs), right is 1/3 (AI sidebar)
+- **`PriceChart`** (left, top): lightweight-charts v5 interactive chart
+- **7-tab analysis panel** (left, below chart):
+
+  | Tab ID | Label | Icon | Content |
+  |---|---|---|---|
+  | overview | Ringkasan | PieChart | Action Guidance card, Decision Engine hero, ConvictionTimeline, AI summary, description |
+  | financials | Keuangan | DollarSign | 3-year financials table (revenue, net profit, assets, liabilities, OCF), analyst view |
+  | valuation | Valuasi | TrendingUp | PE ratio, dividend yield, ROE, net margin, YoY growth (MetricCard components) |
+  | flow | Flow | Activity | Flow bias/intensity/reliability, broker table, foreign vs domestic split, trading summary |
+  | news | Berita | Newspaper | News feed items, corporate actions, event analysis, investor interpretation |
+  | risk | Risiko | AlertTriangle | Risk framework (failure conditions), risk analyst view |
+  | insider | Insider | UserCheck | Insider transactions, direction signal (BUY/SELL/NEUTRAL) |
+
+- **Ringkasan sub-sections** (most important):
+  - **Action Guidance card** (`card-action-guidance`): colored border (green/amber/orange/red/slate), combined status badge, primary action label, confidence badge (Tinggi/Sedang/Rendah), short AI summary, collapsible "Lihat Alasan & Risiko" (whyAction list, mainRisk, failureTrigger, disclaimer)
+  - **ConvictionTimeline**: 5-phase progress bar — Penempatan → Konfirmasi → Kepadatan → Distribusi → Reset — with explanation text
+  - **`AIStockSummary`**: Indigo gradient card with Sparkles icon and confidence badge
+
+- **AI data flow**: On stock load, `fetchAIAnalysis()` POSTs to `/api/ai` with stock context, price context, flow signals, and fundamentals; response populates `aiData` state used by Ringkasan
+
+### PriceChart (`client/src/components/PriceChart.tsx`)
+
+- **Toolbar row 1**: "Grafik" label, Line/Candle toggle buttons (sky blue when active), timeframe buttons (1D / 1W / 1M / 3M / 1Y / YTD)
+- **Toolbar row 2**: Indicator toggles — MA (amber, MA20+MA50), EMA (green dashed, EMA9+EMA21), BB (indigo dotted, Bollinger Bands), RSI (violet) — each lights up with its own color when active; crosshair price shows "IDR xxx,xxx" on right
+- **Main chart** (340px): `createChart()` from lightweight-charts v5; line series (sky blue, 2px) or candlestick (green/red TradingView colors); volume histogram always rendered (lower 20%, alpha-colored bars)
+- **RSI sub-chart** (100px): expands below main chart when RSI toggled; separate `createChart()` instance; shows "RSI (14) — Overbought: 70 | Oversold: 30" label
+- When `data` prop is empty/absent: generates 90 weekdays of synthetic OHLCV starting 2024-09-01
+
+### Supporting Components
+
+| Component | File | Role |
+|---|---|---|
+| `StockHeader` | `components/StockHeader.tsx` | Symbol/name/price block with IDX index and sector badges |
+| `AIStockSummary` | `components/AIStockSummary.tsx` | Indigo gradient card for AI-generated text summary |
+| `MetricCard` | `components/MetricCard.tsx` | Reusable single-metric display card |
+| `SimulationToggle` | `components/SimulationToggle.tsx` | Switch to enable Market Replay Simulation mode |
+| `SimulationBanner` | `components/SimulationBanner.tsx` | Banner displayed when simulation mode is active |
+
+---
+
+## 4. Current Codebase Structure
+
+### Frontend (`client/src/`)
+
+| File | Description |
+|---|---|
+| `App.tsx` | Wouter router: `/` → Homepage, `/stock/:symbol` → StockDashboard, `*` → 404 |
+| `main.tsx` | React 18 entry point; wraps app in QueryClientProvider, TooltipProvider, SimulationProvider |
+| `index.css` | CSS custom properties (dark terminal theme, sky blue primary), `body` bg `#0f0f0f`, `.hover-elevate` utility |
+| `pages/Homepage.tsx` | Landing page: BART wordmark, 3-bucket tabs (Siap/Watchlist/Hindari), StockCard list, watchlist mutations |
+| `pages/StockDashboard.tsx` | Individual stock page: sticky nav, StockHeader, PriceChart, 7-tab analysis panel, AI data fetch |
+| `pages/not-found.tsx` | 404 fallback page |
+| `components/PriceChart.tsx` | Interactive lightweight-charts v5 chart with Line/Candle toggle, MA/EMA/BB/RSI indicators, RSI sub-chart |
+| `components/StockHeader.tsx` | Stock symbol + name header with price/change, IDX index badges, sector badge, lot value |
+| `components/AIStockSummary.tsx` | Indigo gradient card rendering AI-generated stock summary with confidence badge |
+| `components/MetricCard.tsx` | Generic card for a single labeled financial metric value |
+| `components/SimulationToggle.tsx` | FlaskConical icon + Switch for toggling Market Replay Simulation mode |
+| `components/SimulationBanner.tsx` | Top banner shown while simulation mode is active |
+| `contexts/SimulationContext.tsx` | React context providing `isSimulationMode` state and `toggleSimulationMode` |
+| `hooks/use-mobile.tsx` | Breakpoint hook returning `true` on mobile screens |
+| `components/ui/` | shadcn/ui component library (accordion, badge, button, card, collapsible, dialog, skeleton, tabs, tooltip, etc.) |
+
+### Backend (`server/`)
+
+| File | Description |
+|---|---|
+| `index.ts` | Express app bootstrap: connects Neon DB, registers routes, starts server on port 5000 |
+| `routes.ts` | All REST endpoints: `GET /api/stocks`, `GET /api/stock/:symbol`, `POST /api/ai`, `GET/POST/DELETE /api/watchlist`, simulation endpoints; seeds BBCA/UNVR on startup |
+| `storage.ts` | Drizzle ORM storage layer: CRUD for stocks, watchlist, historicalSnapshots, simulationAuditLog; `IStorage` interface |
+| `db.ts` | Neon serverless PostgreSQL connection via `@neondatabase/serverless`; exports `db` |
+| `vite.ts` | Vite dev server integration (do not modify) |
+| `static.ts` | Static file serving for production builds |
+
+### Engine (`server/engine/`)
+
+| File | Description |
+|---|---|
+| `bandarmologyCore.ts` | **v2.0 core engine** — 12-model, 5-phase pipeline; all mathematical primitives, model implementations (M1–M16), composite formula, calendar safety |
+| `bandarmologyCoreV1.ts` | **v1.1 legacy engine** — kept untouched; used by `routes.ts` for existing endpoints; includes Gorengan Detector |
+| `bandarmologyDecisionV2.ts` | Maps v2.0 composite score + M16 regime → decision label (WATCHLIST_PRIORITAS / SIAP_DIPANTAU / HINDARI_DULU / NETRAL) |
+| `unifiedDecision.ts` | Single entry point: `getStockDecision()` (v1.1), `getStockDecisionV2()` (v2.0), `mapStockDataToInput()` (DB row → v1.1 input) |
+| `bandarmologyHistory.ts` | Persistent M6 score history storage for M16 RegimeStability; in-memory Map fallback; `getM6History()` returns OLDEST→NEWEST |
+| `buildBandarmologyInput.ts` | Transforms raw stock DB record into typed `BandarmologyInput` for v2.0 engine |
+| `brokerStability.ts` | `calculateBrokerStabilityScore()` — broker concentration/consistency metric used by v1.1 |
+| `flowQuality.ts` | `calculateFlowQualityScore()` — flow quality from foreign/domestic ratio, intensity, and reliability |
+| `phaseDetection.ts` | `detectAccumulationPhase()` — simple rule-based phase label from flowBias/intensity/reliability |
+| `insider.ts` | `getInsiderDirection()` — parses insider transaction JSON, returns BUY/SELL/NEUTRAL |
+| `newsClassifier.ts` | Classifies news impact into Low / Medium / High |
+| `tapeControl.ts` | Tape control pattern detection (price control by large players) |
+| `parseBrokerIDR.ts` | Parses IDR value strings ("125.5B IDR", "1.2T IDR") to numeric amounts |
+| `foreignParser.ts` | `parseForeignData()` — extracts netForeignFlow/netDomesticFlow from foreignActivityData JSON |
+| `runTests.ts` | Engine test runner — verifies BBCA=77/WATCHLIST_PRIORITAS and UNVR=5/HINDARI_DULU locked values |
+| `testScenarios.ts` | Test scenario definitions for engine validation |
+| `routes/testBandarmology.ts` | Debug API routes for v2.0 engine inspection and test execution |
+
+### Shared (`shared/`)
+
+| File | Description |
+|---|---|
+| `schema.ts` | Drizzle ORM table definitions + Zod insert schemas for: `stocks`, `watchlist`, `historicalSnapshots`, `simulationAuditLog` |
+| `shared/routes.ts` | API route type contracts and `StockResponse` interface |
+
+### Config/Root
+
+| File | Description |
+|---|---|
+| `vite.config.ts` | Vite config (do not modify) |
+| `drizzle.config.ts` | Drizzle ORM config for migrations (do not modify) |
+| `tsconfig.json` | TypeScript config with path aliases (`@/` → `client/src/`, `@shared/` → `shared/`) |
+| `replit.md` | Living project summary for agent memory (keep updated after architecture changes) |
+
+---
+
+## 5. Key Logic Summary
+
+### A. v1.1 Unified Decision — `getStockDecision()` in `unifiedDecision.ts`
+
+Simple additive readiness scoring:
+
+```
+readiness = 0
++ netFlow:        high=+25, medium=+12, low=+0
++ brokerStability: high=+20, medium=+10, low=+0
++ flowQuality:    high=+20, medium=+10, low=+0
++ priceTrend:     up=+20, sideways=+5, down=+0
++ volatility:     low=+10, medium=+5, high=+0
++ insider:        buy=+5, sell=−5, neutral=+0
+```
+
+Decision thresholds:
+- `readiness ≥ 80` AND `priceTrend = up` → BUY (Siap Dipantau)
+- `readiness ≥ 80` AND `priceTrend ≠ up` → WATCHLIST (Watchlist Prioritas) — "structural but no momentum"
+- `readiness ≥ 60` → WATCHLIST (Watchlist Prioritas)
+- `readiness < 60` → AVOID (Hindari Dulu)
+- `isGorengan = true` → forces AVOID, caps readiness at 59, regardless of any score
+
+### B. v2.0 Bandarmology Engine — `computeBandarmologyV2()` in `bandarmologyCore.ts`
+
+**5-Phase Pipeline:**
+
+**Phase 0 — Data Prep**
+- `validateInputs()`: 6 corruption categories (E001–E005), 7 warning types (W001–W007)
+- `getLiquidityTier()`: tier 1 (≥50B IDR), tier 2 (10–50B), tier 3 (2–10B), tier 4 (<2B → invalid)
+
+**Phase 1 — Foundation Models** (read only raw inputs, no inter-model deps)
+- **M1 AccumulationStrength** (weight 0.12): brokerConsistency×0.45 + flowDirection×0.35 + volConfirm×0.20
+- **M2 AbsorptionScore** (weight 0.10): rangeCompression×0.40 + volSignal×0.30 + priceControl×0.30 — detects "high volume, narrow range"
+- **M3 BrokerDominance** (weight 0.10): HHI-inspired concentration of top-3 accumulator brokers
+- **M6 FlowNormalized** (weight 0.15): `safe_normalize(netTotalFlow / avg20dValue, −1.0, 1.0)` — symmetric so neutral flow = 50
+- **M9 FakeBreakoutRisk** (weight 0.05, risk penalty only): detects retail pump patterns; applied as penalty = max(0, (M9−50)×0.15)
+
+**Phase 2 — Pattern Models**
+- **M7 BrokerRotation** (weight 0.08): top-3 buyer volume concentration as rotation proxy
+- **M8 StealthAccumulation** (weight 0.10): `persistence × consistency` from netFlowHistory; reads M3.score
+- **M11 FlowDecomposition** (weight 0.10): foreign score + domestic score + alignment score (foreign/domestic consistency)
+- **M12 RollingAccumulation** (weight 0.12): recency-weighted sum of netFlowHistory with weights [1,2,3,4,5] (OLDEST→NEWEST)
+- **M14 CampaignDuration** (weight 0.06): trailing streak of positive flow sessions; maturity: FORMING(<3d) / ACTIVE(3–7d) / MATURE(7–15d) / EXTENDED(>15d)
+
+**Phase 3 — Regime Model**
+- **M15 PriceElasticity** (weight 0.04): elasticity = |priceChange%| / |flowRatio|; inverted score = low elasticity → institutional (score→100); special case: positive flow + flat price → perfect absorption → score=90
+- **M16 RegimeStability** (`computeM16()`): requires 5+ prior-session M6 scores (OLDEST→NEWEST, NEVER today's M6)
+  - Computes: `flowMean`, `flowStd` (population std), `flowTrend` (least-squares linear slope)
+  - Regime classification (deterministic thresholds):
+    - `mean>60 AND std<15 AND trend≥0` → ACCUMULATION (+3)
+    - `mean>60 AND std<15 AND trend<−2` → ACCUMULATION_FADING (−2)
+    - `mean<40 AND std<15 AND trend≤0` → DISTRIBUTION (−3)
+    - `mean<40 AND std<15 AND trend>2` → RECOVERY (0)
+    - `std>25` → VOLATILE (−8)
+    - `35≤mean≤65` → TRANSITION (−2)
+    - else → NOISE (−5)
+
+**Phase 4 — Calendar Safety (M13 filter)**
+
+Sets `isReliable=false` without reading model scores:
+- Ex-dividend: suppresses M6, M11, M12
+- Rebalance day (LQ45/IDX30/MSCI): suppresses M7, M11
+- Rights issue period: suppresses M6, M11, M12
+- Post-suspension (first session after halt): suppresses M6, M12
+- Year-end window dressing (late Dec): suppresses M14
+
+**Phase 5 — Composite**
+
+```
+active = models where score ≠ null AND isReliable = true (M9 excluded)
+rawScore = Σ(score × weight) / Σ(weight)  ← renormalized over ACTIVE weight only
+riskPenalty = max(0, (M9.score − 50) × 0.15)  ← max 7.5 pts
+finalScore = clamp(rawScore + regimeModifier − riskPenalty, 0, 100)
+confidence = activeWeight / totalDeclaredWeight × 100%
+```
+
+Key fix vs v1.x: null models excluded from denominator (v1.x counted null as zero → systematic understatement of up to 20 pts).
+
+### C. v2.0 Decision Mapping — `getBandarmologyDecisionV2()` in `bandarmologyDecisionV2.ts`
+
+```
+score ≥ 70 AND regime = ACCUMULATION  → WATCHLIST_PRIORITAS
+score ≥ 55                            → SIAP_DIPANTAU
+score < 40                            → HINDARI_DULU
+else                                  → NETRAL
+```
+
+### D. Stock Input Mapping — `mapStockDataToInput()` in `unifiedDecision.ts`
+
+Maps DB stock row → `StockDecisionInput` for v1.1:
+- `netFlow`: reads flowBias + flowIntensity
+- `brokerStability`: calls `calculateBrokerStabilityScore(brokerArr)`
+- `flowQuality`: calls `calculateFlowQualityScore()` with foreign/domestic flow
+- `priceTrend`: from `changePercent` > 0.5 (up) / < −0.5 (down) / else sideways; growth > 10% can push sideways → up
+- `volatility`: from flowBias+intensity and |changePercent| > 5
+- `insider`: calls `getInsiderDirection(insiderData)`
+
+### E. IDX Session Status — `getIDXSessionStatus()` in `StockDashboard.tsx`
+
+WIB (UTC+7) time-based:
+- 08:45–08:59 → "Pra-Pembukaan" (yellow)
+- 09:00–12:00 → "Sesi 1 Berlangsung" (green, animated dot)
+- 12:00–13:30 → "Istirahat" (yellow)
+- 13:30–15:49 → "Sesi 2 Berlangsung" (green, animated dot)
+- 15:50–16:00 → "Pra-Penutupan" (yellow)
+- Weekend or outside hours → "Pasar Tutup" (red)
+
+### F. Homepage Bucketing — `Homepage.tsx`
+
+- Reads `homepageBucket` from `/api/stocks` response (server is single source of truth)
+- Three buckets: `siap_dipantau`, `watchlist_prioritas`, `hindari_dulu`
+- All 12 stocks must appear in exactly one bucket (console audit asserts this every render)
+
+### G. Mathematical Primitives — `bandarmologyCore.ts`
+
+All models are composed exclusively of four primitives:
+- `clamp(value, lo, hi)`: clamps to [lo, hi]; NaN/Infinity → lo
+- `safe_normalize(value, lo, hi)`: maps [lo, hi] → [0, 100]; nanDefault=50 (neutral)
+- `safe_div(num, denom)`: division with full null/NaN/Inf/zero guards; nanDefault=null means "no signal"
+- `clean_history(history, minLength)`: filters NaN/null/Inf, returns null if < minLength valid entries
+- `linear_slope(values)`: least-squares linear slope; returns 0 on degenerate input
+
+### H. Database Schema — `shared/schema.ts`
+
+Four tables:
+- **`stocks`**: Full stock profile — price, OHLCV, financials (3yr), flow data, broker JSON, foreign/domestic JSON, news JSON, risk JSON, insider JSON, AI fields
+- **`watchlist`**: `symbol` + `addedAt` timestamp
+- **`historicalSnapshots`**: Daily OHLCV + broker/flow data for simulation replay
+- **`simulationAuditLog`**: Per-run simulation results with consistency/safety/UX sanity check results
+
+---
+
+## 6. Current Open Issues
+
+[Add issues here]
+
+---
+
+## 7. Recent Changes
+
+[Log changes here as you build]
+
+---
+
+## 8. Session Notes
+
+[Paste session-specific questions or context here]
