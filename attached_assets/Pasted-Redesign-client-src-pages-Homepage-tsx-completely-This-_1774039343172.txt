@@ -1,0 +1,195 @@
+Redesign client/src/pages/Homepage.tsx completely. This is a full visual overhaul — 
+do not change any data fetching logic, API calls, bucket logic, watchlist mutations, 
+or the SimulationToggle. Only change the visual layer. All existing functionality 
+must work identically after the redesign.
+
+LOCKED CONSTRAINTS — never violate these:
+- Background: #0f0f0f (do not change)
+- Primary accent: #38BDF8 (sky blue)
+- No light mode, no theme toggle on this page
+- BART logo: plain text only, sky blue, no icon
+- Bahasa Indonesia throughout — do not translate any existing strings
+- Console audit (the one verifying all 12 stocks are bucketed) must remain untouched
+- SimulationToggle stays in the top right of the nav
+
+---
+
+AESTHETIC DIRECTION — Bloomberg Terminal meets Indonesian fintech:
+- Dark, dense, institutional — like a professional trading terminal
+- Data feels live and precise, not decorative
+- Monospace font for all numbers and scores (use IBM Plex Mono from Google Fonts)
+- Display/heading font: Sora from Google Fonts (import both)
+- Subtle scanline texture on the hero area (use a CSS repeating-linear-gradient 
+  with very low opacity lines, ~1px every 3px, opacity 0.03)
+- Sky blue (#38BDF8) used sparingly as the signal color — not everywhere
+- Depth through layering: cards sit on slightly lighter surfaces (#161616) 
+  on top of the base (#0f0f0f)
+- Borders: #ffffff08 (very subtle, almost invisible)
+- Muted text: #6b7280
+- No rounded corners larger than rounded-md (6px) — sharp and precise
+
+---
+
+SECTION 1 — Top Navigation Bar
+Height: 48px, bg-[#0a0a0a], border-b border-[#ffffff08]
+Left: "BART" in IBM Plex Mono, font-bold, text-[#38BDF8], text-lg, tracking-wider
+Center: Nothing
+Right: SimulationToggle (keep existing component, no changes)
+
+---
+
+SECTION 2 — Hero Block
+Full width, bg-[#0f0f0f], pt-10 pb-6, px-6
+Has the subtle scanline texture as a ::before or inline style overlay
+
+Left side (60% width, inline-block):
+  - Small label above title: "BANDARMOLOGY INTELLIGENCE" in IBM Plex Mono, 
+    text-[10px], tracking-[0.2em], text-[#38BDF8], uppercase, mb-2
+  - Main title: "Peta Kesiapan Saham" in Sora, text-3xl, font-bold, 
+    text-white, leading-tight
+  - Subtitle: "Hari Ini" in Sora, text-3xl, font-bold, text-[#38BDF8]
+  - Description below: existing subtitle text from the current page 
+    ("Disusun berdasarkan perilaku bandar..."), text-sm, text-[#6b7280], mt-3, 
+    max-w-lg
+
+Right side (40% width, inline-block, align top):
+  - IDX Session Status block — show the same session status logic already 
+    used in StockDashboard (copy the getIDXSessionStatus() logic inline or 
+    import it). Display as:
+    - Small dot (animated pulse if session active, static if closed)
+    - "IDX" label in IBM Plex Mono text-xs text-[#6b7280]
+    - Session status text in IBM Plex Mono text-sm font-medium
+    - Color: green #22c55e if active, yellow #f59e0b if pre/post, red #ef4444 if closed
+
+---
+
+SECTION 3 — Aggregate Stats Bar
+Full width, bg-[#111111], border-y border-[#ffffff08], py-3 px-6
+A horizontal row of 4 stat blocks separated by vertical dividers (border-r border-[#ffffff08])
+Each stat block: px-6, flex flex-col gap-0.5
+
+Stat 1: Total stocks being tracked
+  Label: "SAHAM DIPANTAU" — IBM Plex Mono text-[10px] tracking-widest text-[#6b7280]
+  Value: total count of all stocks across all 3 buckets — IBM Plex Mono text-xl 
+         font-bold text-white
+
+Stat 2: Siap Dipantau count
+  Label: "SIAP DIPANTAU" — IBM Plex Mono text-[10px] tracking-widest text-[#6b7280]
+  Value: count — IBM Plex Mono text-xl font-bold text-emerald-400
+
+Stat 3: Watchlist Prioritas count  
+  Label: "WATCHLIST" — IBM Plex Mono text-[10px] tracking-widest text-[#6b7280]
+  Value: count — IBM Plex Mono text-xl font-bold text-amber-400
+
+Stat 4: Hindari Dulu count
+  Label: "HINDARI DULU" — IBM Plex Mono text-[10px] tracking-widest text-[#6b7280]
+  Value: count — IBM Plex Mono text-xl font-bold text-red-400
+
+---
+
+SECTION 4 — Radar Placeholder Banner
+Full width, mx-6 my-4, rounded-md
+bg-[#0d1a2a], border border-[#38BDF8]/20, px-5 py-4
+Layout: flex justify-between items-center
+
+Left:
+  - Label: "BANDARMOLOGY RADAR" IBM Plex Mono text-[10px] tracking-[0.2em] 
+    text-[#38BDF8] uppercase mb-1
+  - Text: "Pemindaian institusional di seluruh IDX — segera hadir" 
+    Sora text-sm text-[#6b7280]
+
+Right:
+  - Badge: "SEGERA" — bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/30 
+    text-[10px] IBM Plex Mono tracking-widest px-3 py-1 rounded-sm
+
+---
+
+SECTION 5 — Bucket Tabs + Stock Cards
+px-6 pb-10
+
+Tab bar redesign:
+- Tabs sit on bg-[#0f0f0f], no background on the tab bar itself
+- Each tab: px-4 py-2, IBM Plex Mono text-xs tracking-wide, uppercase
+- Active tab: text-white, border-b-2 border-[#38BDF8], bg-transparent
+- Inactive tab: text-[#6b7280], border-b-2 border-transparent
+- Count badge next to tab label: bg-[#ffffff08] text-[#6b7280] rounded-sm 
+  px-1.5 py-0.5 text-[10px] IBM Plex Mono ml-2
+- Active tab count badge matches tab accent color (emerald/amber/red)
+- Full-width border-b border-[#ffffff08] under the tab row
+
+Tab accent colors:
+- Siap Dipantau: emerald-400
+- Watchlist Prioritas: amber-400  
+- Hindari Dulu: red-400
+
+Description bar below tabs (the existing colored description text):
+- Keep the text content exactly as is
+- Style: text-xs, IBM Plex Mono, matching tab accent color, 
+  bg-[#161616] px-4 py-2.5 rounded-sm mt-3 mb-4
+
+Stock Cards redesign:
+Replace the existing card style with this design for each StockCard:
+
+Outer container: 
+  bg-[#161616] border border-[#ffffff08] rounded-md mb-2 
+  hover:border-[#38BDF8]/30 hover:bg-[#1a1a1a] transition-all duration-150 cursor-pointer
+  Left accent: border-l-2 (emerald-400 / amber-400 / red-400 depending on bucket)
+
+Inner layout: px-4 py-3, flex items-center gap-4
+
+Column 1 — Symbol + Name (flex-shrink-0, w-32):
+  Symbol: Sora font-bold text-white text-base
+  Company name: IBM Plex Mono text-[10px] text-[#6b7280] truncate mt-0.5
+
+Column 2 — Score (flex-shrink-0, w-16, text-center):
+  Score number: IBM Plex Mono text-xl font-bold (emerald/amber/red matching bucket)
+  Label below: IBM Plex Mono text-[9px] text-[#6b7280] tracking-widest "SKOR"
+
+Column 3 — Regime + Action (flex-1):
+  Regime badge: bg-[#ffffff06] border border-[#ffffff10] text-[10px] 
+                IBM Plex Mono px-2 py-0.5 rounded-sm text-[#38BDF8]
+  Action text below: text-[11px] text-[#6b7280] Sora mt-1 truncate
+
+Column 4 — Price + Change (flex-shrink-0, w-24, text-right):
+  Price: IBM Plex Mono text-sm font-medium text-white
+  Change: IBM Plex Mono text-xs (green if positive, red if negative) mt-0.5
+
+Column 5 — Actions (flex-shrink-0, w-20, flex gap-2 justify-end):
+  Star button: keep existing watchlist toggle, style as icon-only 
+               text-[#6b7280] hover:text-amber-400 transition-colors
+  Detail button: bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] 
+                 text-[10px] IBM Plex Mono px-2 py-1 rounded-sm border 
+                 border-[#38BDF8]/20 transition-all
+                 Text: "DETAIL →"
+
+Empty state:
+  bg-[#161616] border border-[#ffffff08] rounded-md px-4 py-8 text-center
+  Text: IBM Plex Mono text-sm text-[#6b7280]
+  Keep existing "Tidak ada saham dalam kategori ini saat ini." text
+
+---
+
+ANIMATIONS:
+Add to index.css if not already present:
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+Apply to each stock card: animation: fadeInUp 0.2s ease forwards
+Stagger by index: style={{ animationDelay: `${index * 40}ms`, opacity: 0 }}
+
+---
+
+SAFETY RULES:
+1. Only modify client/src/pages/Homepage.tsx and add @keyframes to index.css if needed
+2. Do not touch any other file
+3. Do not change any data fetching, API logic, bucket assignment, or console audit
+4. Do not change SimulationToggle or SimulationBanner components
+5. All 3 bucket tabs must still work and show correct stock counts
+6. The watchlist star toggle must still function
+7. The Detail button must still navigate to /stock/:symbol
+8. After changes, verify the page loads without console errors
+9. Do not install any new packages — use only what is already installed
+10. Import IBM Plex Mono and Sora from Google Fonts by adding a <link> tag 
+    inside the component using a helmet or directly in index.html if accessible,
+    otherwise use @import in index.css at the very top

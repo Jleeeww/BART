@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Space+Mono:wght@400;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -70,4 +70,20 @@
     transform: translateY(-1px);
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
   }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.stock-card-animate {
+  opacity: 0;
+  animation: fadeInUp 0.2s ease forwards;
+}
+.stock-card-row {
+  border: 1px solid rgba(255,255,255,0.03);
+}
+.stock-card-row:hover {
+  border-color: rgba(56,189,248,0.3);
+  background: #1a1a1a !important;
 }
