@@ -81,13 +81,39 @@ Route: `/stock/:symbol`
 
 - **AI data flow**: On stock load, `fetchAIAnalysis()` POSTs to `/api/ai` with stock context, price context, flow signals, and fundamentals; response populates `aiData` state used by Ringkasan
 
-### PriceChart (`client/src/components/PriceChart.tsx`)
+### PriceChart (`client/src/components/PriceChart.tsx`) — TradingView-style v2
 
-- **Toolbar row 1**: "Grafik" label, Line/Candle toggle buttons (sky blue when active), timeframe buttons (1D / 1W / 1M / 3M / 1Y / YTD)
-- **Toolbar row 2**: Indicator toggles — MA (amber, MA20+MA50), EMA (green dashed, EMA9+EMA21), BB (indigo dotted, Bollinger Bands), RSI (violet) — each lights up with its own color when active; crosshair price shows "IDR xxx,xxx" on right
-- **Main chart** (340px): `createChart()` from lightweight-charts v5; line series (sky blue, 2px) or candlestick (green/red TradingView colors); volume histogram always rendered (lower 20%, alpha-colored bars)
-- **RSI sub-chart** (100px): expands below main chart when RSI toggled; separate `createChart()` instance; shows "RSI (14) — Overbought: 70 | Oversold: 30" label
-- When `data` prop is empty/absent: generates 90 weekdays of synthetic OHLCV starting 2024-09-01
+Professional TradingView/Stockbit-style chart using lightweight-charts v5. Props: `data?: any[], symbol?: string` (both optional with fallback).
+
+- **Left drawing toolbar** (42px wide, `bg-[#0d0d0d]`): 11 tools grouped by separators —
+  - Navigation: Kursor (↖), Crosshair (⊕)
+  - Lines: Garis Tren (╱), Garis Horizontal (─), Garis Vertikal (│), Ray (→)
+  - Shapes: Fibonacci (ϕ), Rectangle (▭), Teks (T)
+  - Utility: Ukur (↔), Hapus (⌫)
+  - Active tool highlighted in sky blue `bg-[#38BDF8] text-black`
+- **Top toolbar** (`bg-[#0d0d0d]`, border-b):
+  - Left side: Symbol (white bold) · Timeframe · IDX · live OHLC readout (O white, H green `#26a69a`, L red `#ef5350`, C white, ±change colored)
+  - Right side: 4 chart type buttons (candle 🕯 / bar ▮ / line ∿ / area ◿) in bordered group; "Indikator" dropdown button with active count badge
+- **Indikator dropdown panel** (absolute, z-50, `w-64 bg-[#111]`):
+  - **Overlay group**: MA 20 (`#f59e0b`), MA 50 (`#8b5cf6`), EMA 9 (`#34d399` dashed), EMA 21 (`#f97316` dashed), Bollinger Bands (`#6366f1` dotted upper/lower + solid mid), VWAP (`#ec4899` large-dashed)
+  - **Oscillator group**: RSI 14 (`#a78bfa`), MACD 12/26/9 (`#38BDF8`), Stochastic 14 (`#fb923c`)
+  - Each row: color dot + label + checkbox toggle (sky blue when active)
+  - Footer: "Reset Semua" button to clear all indicators
+- **Main chart** (420px): `createChart()` from lightweight-charts v5
+  - Candlestick: green `#26a69a` up / red `#ef5350` down (body + border + wick)
+  - Bar: same green/red coloring
+  - Line: sky blue `#38BDF8`, 2px
+  - Area: sky blue line + `#38BDF820` → `#38BDF805` gradient fill
+  - Volume histogram always rendered (bottom 18%, alpha-colored `#26a69a33` / `#ef535033`)
+  - Crosshair: dashed `#444` lines with `#333` label bg
+  - Grid: `#161616` on `#0a0a0a` background
+- **RSI sub-chart** (110px): violet line, dotted red 70 (OB) + green 30 (OS) reference lines, ✕ close button, label "RSI (14) — OB: 70 · OS: 30"
+- **MACD sub-chart** (110px): sky blue MACD line + orange dashed signal line + colored histogram (green positive / red negative), label "MACD (12, 26, 9) — Biru: MACD · Oranye: Signal · Histogram"
+- **Stochastic sub-chart** (110px): orange %K line, dotted red 80 (OB) + green 20 (OS) reference lines, label "Stochastic (14) — OB: 80 · OS: 20"
+- **Bottom timeframe bar** (`bg-[#0d0d0d]`): 1D / 5D / 1M / 3M / 6M / 1Y / 5Y / All (sky blue active); right side shows active overlay indicator legend (colored line + label)
+- **Fallback data**: When `data` prop is empty/absent, generates 120 weekdays of realistic OHLCV starting 2024-09-01; `symbol` defaults to "DEMO"
+- **Technical helpers** (all inline in the file): `toOHLCV()`, `calcSMA()`, `calcEMA()`, `calcEMAGeneric()`, `calcBB()`, `calcRSI()`, `calcMACD()`, `calcStoch()`, `generateFallbackData()`
+- **ResizeObserver** on every chart instance for responsive width; all sub-charts have `timeScale.visible: false` to save space
 
 ### Supporting Components
 
@@ -315,7 +341,7 @@ Four tables:
 
 ## 7. Recent Changes
 
-[Log changes here as you build]
+- **PriceChart v2 rewrite** (Session 3): Replaced entire `PriceChart.tsx` with TradingView/Stockbit-style chart. Added left drawing toolbar (11 tools), 4 chart types (candle/bar/line/area), top toolbar with live OHLC readout, "Indikator" dropdown panel with 6 overlay indicators (MA20/MA50/EMA9/EMA21/BB/VWAP) and 3 oscillator sub-charts (RSI/MACD/Stochastic each 110px), bottom timeframe bar (1D–All) with active indicator color legend. Props made optional with fallback data generator. Using lightweight-charts v5. Only `PriceChart.tsx` was changed — no other files touched.
 
 ---
 
