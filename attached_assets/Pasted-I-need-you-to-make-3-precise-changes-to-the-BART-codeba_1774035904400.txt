@@ -1,0 +1,223 @@
+I need you to make 3 precise changes to the BART codebase. These are surgical fixes only — do not touch any file not explicitly mentioned. After all changes are made, run runTests.ts and confirm BBCA=77/WATCHLIST_PRIORITAS and UNVR=5/HINDARI_DULU still pass. If either test fails, revert all changes immediately and tell me what went wrong.
+
+---
+
+CHANGE 1 — Replace server/engine/bandarmologyDecisionV2.ts entirely
+
+Delete the current contents and replace with exactly this:
+
+import type { BandarmologyV2Result } from './bandarmologyCore';
+
+export type DecisionLabel =
+  | 'WATCHLIST_PRIORITAS'
+  | 'SIAP_DIPANTAU'
+  | 'HINDARI_DULU'
+  | 'NETRAL';
+
+export type CyclePosition =
+  | 'TERLALU_DINI'
+  | 'KONFIRMASI_MULAI'
+  | 'ENTRY_WINDOW'
+  | 'WASPADAI_DISTRIBUSI';
+
+export type ConcentrationType =
+  | 'KENDALI_BANDAR'
+  | 'JEBAKAN_DISTRIBUSI'
+  | 'TERSEBAR';
+
+export interface ConfirmationStatus {
+  met: boolean;
+  criteriaMetCount: number;
+  details: {
+    campaignActive: boolean;
+    flowStrong: boolean;
+    priceResponding: boolean;
+    rollingStrong: boolean;
+  };
+}
+
+export interface DecisionV2Output {
+  label: DecisionLabel;
+  cyclePosition: CyclePosition | null;
+  concentrationType: ConcentrationType;
+  confirmation: ConfirmationStatus;
+  actionText: string;
+  urgency: 'RENDAH' | 'SEDANG' | 'TINGGI';
+}
+
+function getCyclePosition(result: BandarmologyV2Result): CyclePosition | null {
+  const m14 = result.models?.M14;
+  if (!m14 || m14.score === null) return null;
+  const maturity: string = (m14 as any).maturity ?? '';
+  if (maturity === 'FORMING')  return 'TERLALU_DINI';
+  if (maturity === 'ACTIVE')   return 'KONFIRMASI_MULAI';
+  if (maturity === 'MATURE')   return 'ENTRY_WINDOW';
+  if (maturity === 'EXTENDED') return 'WASPADAI_DISTRIBUSI';
+  return null;
+}
+
+function getConcentrationType(result: BandarmologyV2Result): ConcentrationType {
+  const m3 = result.models?.M3;
+  if (!m3 || m3.score === null) return 'TERSEBAR';
+  const score = m3.score;
+  const m6 = result.models?.M6;
+  const netFlowScore = m6?.score ?? 50;
+  if (score < 40) return 'TERSEBAR';
+  if (score >= 40 && netFlowScore < 35) return 'JEBAKAN_DISTRIBUSI';
+  return 'KENDALI_BANDAR';
+}
+
+function evaluateConfirmation(result: BandarmologyV2Result): ConfirmationStatus {
+  const m6Score  = result.models?.M6?.score  ?? 0;
+  const m12Score = result.models?.M12?.score ?? 0;
+  const m15Score = result.models?.M15?.score ?? 0;
+  const cyclePos = getCyclePosition(result);
+  const campaignActive = cyclePos === 'KONFIRMASI_MULAI'
+    || cyclePos === 'ENTRY_WINDOW'
+    || cyclePos === 'WASPADAI_DISTRIBUSI';
+  const flowStrong      = m6Score  >= 65;
+  const priceResponding = m15Score >= 65;
+  const rollingStrong   = m12Score >= 65;
+  const criteriaMetCount = [campaignActive, flowStrong, priceResponding, rollingStrong]
+    .filter(Boolean).length;
+  return {
+    met: criteriaMetCount >= 2,
+    criteriaMetCount,
+    details: { campaignActive, flowStrong, priceResponding, rollingStrong },
+  };
+}
+
+function buildActionText(
+  label: DecisionLabel,
+  confirmation: ConfirmationStatus,
+  cyclePos: CyclePosition | null,
+  concentrationType: ConcentrationType,
+): string {
+  if (label === 'HINDARI_DULU') return 'Hindari — struktur tidak mendukung';
+  if (label === 'NETRAL')       return 'Pantau — belum ada sinyal jelas';
+  if (label === 'SIAP_DIPANTAU') {
+    if (cyclePos === 'ENTRY_WINDOW') return 'Entry bertahap dapat dipertimbangkan';
+    return 'Pantau konfirmasi aliran dana';
+  }
+  if (concentrationType === 'JEBAKAN_DISTRIBUSI') {
+    return 'Waspadai — konsentrasi tinggi tapi aliran berbalik';
+  }
+  if (!confirmation.met) {
+    const missing = 2 - confirmation.criteriaMetCount;
+    return `Tunggu Konfirmasi — butuh ${missing} kriteria lagi terpenuhi`;
+  }
+  if (cyclePos === 'ENTRY_WINDOW')        return 'Akumulasi bertahap — entry window terbuka';
+  if (cyclePos === 'WASPADAI_DISTRIBUSI') return 'Hati-hati — kampanye memanjang, pantau distribusi';
+  if (cyclePos === 'KONFIRMASI_MULAI')    return 'Mulai akumulasi kecil — konfirmasi sedang terbentuk';
+  return 'Akumulasi bertahap direkomendasikan';
+}
+
+function buildUrgency(
+  label: DecisionLabel,
+  cyclePos: CyclePosition | null,
+  confirmation: ConfirmationStatus,
+): 'RENDAH' | 'SEDANG' | 'TINGGI' {
+  if (label === 'HINDARI_DULU') return 'RENDAH';
+  if (label === 'NETRAL')       return 'RENDAH';
+  if (cyclePos === 'ENTRY_WINDOW' && confirmation.met)       return 'TINGGI';
+  if (cyclePos === 'KONFIRMASI_MULAI' && confirmation.met)   return 'SEDANG';
+  return 'RENDAH';
+}
+
+export function getBandarmologyDecisionV2(result: BandarmologyV2Result): DecisionV2Output {
+  const { finalScore: score, regime } = result;
+  let label: DecisionLabel;
+  if (score >= 70 && regime === 'ACCUMULATION') label = 'WATCHLIST_PRIORITAS';
+  else if (score >= 55)                          label = 'SIAP_DIPANTAU';
+  else if (score < 40)                           label = 'HINDARI_DULU';
+  else                                           label = 'NETRAL';
+  const cyclePos          = getCyclePosition(result);
+  const concentrationType = getConcentrationType(result);
+  const confirmation      = evaluateConfirmation(result);
+  const actionText        = buildActionText(label, confirmation, cyclePos, concentrationType);
+  const urgency           = buildUrgency(label, cyclePos, confirmation);
+  return { label, cyclePosition: cyclePos, concentrationType, confirmation, actionText, urgency };
+}
+
+---
+
+CHANGE 2 — Patch server/engine/bandarmologyCore.ts
+
+Find the M14 model result object (the return statement inside the M14 computation block). Check if it already includes a `maturity` field on the returned object. If it does NOT, add `maturity` to the return object so the value is exposed. Do not change the maturity calculation logic — only ensure the field is present on the returned object. Example of what the return should look like:
+
+return {
+  score: <existing score value>,
+  maturity,         // ADD if missing
+  isReliable: true,
+};
+
+Do not touch any other part of bandarmologyCore.ts.
+
+---
+
+CHANGE 3 — Patch client/src/pages/StockDashboard.tsx
+
+3a. Find where DecisionV2Output (or the v2 decision result) is used in the Ringkasan tab. Locate the ConvictionTimeline component. Directly after the ConvictionTimeline component, insert this JSX block:
+
+{decisionV2?.cyclePosition && (
+  <div className="mt-3 flex items-center gap-2 text-sm">
+    <span className="text-muted-foreground">Posisi Siklus:</span>
+    <span className={`font-medium ${
+      decisionV2.cyclePosition === 'ENTRY_WINDOW'         ? 'text-emerald-400' :
+      decisionV2.cyclePosition === 'KONFIRMASI_MULAI'     ? 'text-sky-400' :
+      decisionV2.cyclePosition === 'WASPADAI_DISTRIBUSI'  ? 'text-amber-400' :
+      'text-slate-400'
+    }`}>
+      {decisionV2.cyclePosition === 'TERLALU_DINI'        && 'Terlalu Dini — kampanye baru terbentuk'}
+      {decisionV2.cyclePosition === 'KONFIRMASI_MULAI'    && 'Konfirmasi Mulai — 3–7 hari akumulasi'}
+      {decisionV2.cyclePosition === 'ENTRY_WINDOW'        && 'Entry Window Terbuka — 7–15 hari'}
+      {decisionV2.cyclePosition === 'WASPADAI_DISTRIBUSI' && 'Kampanye Memanjang — waspadai distribusi'}
+    </span>
+  </div>
+)}
+
+{decisionV2?.label === 'WATCHLIST_PRIORITAS' && (
+  <div className="mt-3 p-3 rounded-md bg-secondary/40 border border-border/40">
+    <p className="text-xs text-muted-foreground mb-2">
+      Kriteria Konfirmasi ({decisionV2.confirmation.criteriaMetCount}/4 terpenuhi):
+    </p>
+    <div className="grid grid-cols-2 gap-1 text-xs">
+      {([
+        ['Kampanye Aktif (≥3 hari)',     decisionV2.confirmation.details.campaignActive],
+        ['Aliran Dana Kuat (M6 ≥65)',    decisionV2.confirmation.details.flowStrong],
+        ['Harga Merespon (M15 ≥65)',     decisionV2.confirmation.details.priceResponding],
+        ['Akumulasi Bergulir (M12 ≥65)', decisionV2.confirmation.details.rollingStrong],
+      ] as [string, boolean][]).map(([label, met]) => (
+        <div key={label} className="flex items-center gap-1">
+          <span className={met ? 'text-emerald-400' : 'text-slate-500'}>{met ? '✓' : '○'}</span>
+          <span className={met ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+3b. In the Flow tab, find the Konsentrasi Kendali badge. It currently shows a static red badge. Replace that badge with:
+
+<Badge variant="outline" className={`text-xs ${
+  concentrationType === 'JEBAKAN_DISTRIBUSI' ? 'border-red-500 text-red-400' :
+  concentrationType === 'KENDALI_BANDAR'     ? 'border-emerald-500 text-emerald-400' :
+  'border-slate-500 text-slate-400'
+}`}>
+  {concentrationType === 'JEBAKAN_DISTRIBUSI' && 'Jebakan Distribusi'}
+  {concentrationType === 'KENDALI_BANDAR'     && 'Kendali Bandar'}
+  {concentrationType === 'TERSEBAR'           && 'Tersebar'}
+</Badge>
+
+Where `concentrationType` comes from the v2 decision result. Make sure it is destructured or accessed from the same decision object used elsewhere in the Flow tab.
+
+---
+
+SAFETY RULES — follow these strictly:
+1. Only touch the 3 files listed above
+2. Do not modify bandarmologyCoreV1.ts or unifiedDecision.ts under any circumstance
+3. Do not change any scoring thresholds, weights, or calibration values
+4. After all changes, run runTests.ts
+5. If BBCA ≠ 77 or BBCA decision ≠ WATCHLIST_PRIORITAS, revert everything
+6. If UNVR ≠ 5 or UNVR decision ≠ HINDARI_DULU, revert everything
+7. Report back: which changes succeeded, test results, and any errors encountered

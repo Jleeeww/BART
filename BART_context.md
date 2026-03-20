@@ -281,12 +281,21 @@ Key fix vs v1.x: null models excluded from denominator (v1.x counted null as zer
 
 ### C. v2.0 Decision Mapping — `getBandarmologyDecisionV2()` in `bandarmologyDecisionV2.ts`
 
+**Primary decision thresholds** (unchanged):
 ```
 score ≥ 70 AND regime = ACCUMULATION  → WATCHLIST_PRIORITAS
 score ≥ 55                            → SIAP_DIPANTAU
 score < 40                            → HINDARI_DULU
 else                                  → NETRAL
 ```
+
+**Extended v2 output** (new fields):
+- **CyclePosition** (from M14 maturity): TERLALU_DINI (FORMING) → KONFIRMASI_MULAI (ACTIVE) → ENTRY_WINDOW (MATURE) → WASPADAI_DISTRIBUSI (EXTENDED)
+- **ConcentrationType** (from M3 + M6): KENDALI_BANDAR (M3≥40 AND M6≥35), JEBAKAN_DISTRIBUSI (M3≥40 AND M6<35), TERSEBAR (M3<40)
+- **ConfirmationStatus**: 4 criteria — campaignActive (cycle≥KONFIRMASI), flowStrong (M6≥65), priceResponding (M15≥65), rollingStrong (M12≥65); met when ≥2 criteria pass
+- **actionText**: Bahasa Indonesia contextual guidance string
+- **urgency**: TINGGI (ENTRY_WINDOW+confirmed), SEDANG (KONFIRMASI+confirmed), RENDAH (else)
+- Backward-compatible fields: `decision` (= label), `compositeScore`, `regime` — for `unifiedDecision.ts` consumption
 
 ### D. Stock Input Mapping — `mapStockDataToInput()` in `unifiedDecision.ts`
 
@@ -342,6 +351,8 @@ Four tables:
 ## 7. Recent Changes
 
 - **PriceChart v2 rewrite** (Session 3): Replaced entire `PriceChart.tsx` with TradingView/Stockbit-style chart. Added left drawing toolbar (11 tools), 4 chart types (candle/bar/line/area), top toolbar with live OHLC readout, "Indikator" dropdown panel with 6 overlay indicators (MA20/MA50/EMA9/EMA21/BB/VWAP) and 3 oscillator sub-charts (RSI/MACD/Stochastic each 110px), bottom timeframe bar (1D–All) with active indicator color legend. Props made optional with fallback data generator. Using lightweight-charts v5. Only `PriceChart.tsx` was changed — no other files touched.
+- **Decision v2 extended output** (Session 3): Rewrote `bandarmologyDecisionV2.ts` with CyclePosition (M14 maturity mapping), ConcentrationType (M3+M6 concentration logic), ConfirmationStatus (4-criteria checklist), actionText, urgency. Added backward-compatible `decision`/`compositeScore`/`regime` fields so `unifiedDecision.ts` remains untouched. M14 in `bandarmologyCore.ts` already had `maturity` on return — no change needed.
+- **StockDashboard v2 decision UI** (Session 3): Added derived `decisionV2` via `useMemo` in StockDashboard. Inserted "Posisi Siklus" cycle position display (color-coded: emerald/sky/amber/slate) and "Kriteria Konfirmasi" checklist card (4 criteria with ✓/○ indicators) in Ringkasan tab. Replaced Konsentrasi Kendali badge in Flow tab with v2 concentration type badge (Kendali Bandar / Jebakan Distribusi / Tersebar). Engine tests verified: BBCA=77/WATCHLIST_PRIORITAS ✓, UNVR=5/HINDARI_DULU ✓.
 
 ---
 

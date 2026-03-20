@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
 import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp, EyeOff, Eye, HelpCircle, BarChart3, Info } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -131,6 +132,37 @@ export default function StockDashboard() {
   const [aiData, setAIData] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [sessionStatus, setSessionStatus] = useState(getIDXSessionStatus());
+
+  const decisionV2 = useMemo(() => {
+    if (!aiData?.actionGuidance) return null;
+    const label = aiData.actionGuidance.combinedStatus || 'NETRAL';
+    const brokerScore = aiData.brokerControlScore?.score ?? 0;
+    const flowQuality = aiData.flowQualityScore ?? 50;
+    let concentrationType: 'KENDALI_BANDAR' | 'JEBAKAN_DISTRIBUSI' | 'TERSEBAR' = 'TERSEBAR';
+    if (brokerScore >= 40 && flowQuality < 35) concentrationType = 'JEBAKAN_DISTRIBUSI';
+    else if (brokerScore >= 40) concentrationType = 'KENDALI_BANDAR';
+    const phase = aiData.convictionPhase || '';
+    let cyclePosition: string | null = null;
+    if (phase === 'Penempatan' || phase === 'Positioning') cyclePosition = 'TERLALU_DINI';
+    else if (phase === 'Konfirmasi' || phase === 'Confirmation') cyclePosition = 'KONFIRMASI_MULAI';
+    else if (phase === 'Kepadatan' || phase === 'Density') cyclePosition = 'ENTRY_WINDOW';
+    else if (phase === 'Distribusi' || phase === 'Distribution') cyclePosition = 'WASPADAI_DISTRIBUSI';
+    const campaignActive = cyclePosition === 'KONFIRMASI_MULAI' || cyclePosition === 'ENTRY_WINDOW' || cyclePosition === 'WASPADAI_DISTRIBUSI';
+    const flowStrong = flowQuality >= 65;
+    const priceResponding = aiData.controlQualityScore?.score >= 65;
+    const rollingStrong = aiData.brokerStabilityScore?.score >= 65;
+    const criteriaMetCount = [campaignActive, flowStrong, priceResponding, rollingStrong].filter(Boolean).length;
+    return {
+      label,
+      cyclePosition,
+      concentrationType,
+      confirmation: {
+        met: criteriaMetCount >= 2,
+        criteriaMetCount,
+        details: { campaignActive, flowStrong, priceResponding, rollingStrong },
+      },
+    };
+  }, [aiData]);
 
   // Update session status every minute
   useEffect(() => {
@@ -727,6 +759,44 @@ export default function StockDashboard() {
                       </Card>
                     )}
 
+                    {decisionV2?.cyclePosition && (
+                      <div className="mt-3 flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Posisi Siklus:</span>
+                        <span className={`font-medium ${
+                          decisionV2.cyclePosition === 'ENTRY_WINDOW'         ? 'text-emerald-400' :
+                          decisionV2.cyclePosition === 'KONFIRMASI_MULAI'     ? 'text-sky-400' :
+                          decisionV2.cyclePosition === 'WASPADAI_DISTRIBUSI'  ? 'text-amber-400' :
+                          'text-slate-400'
+                        }`}>
+                          {decisionV2.cyclePosition === 'TERLALU_DINI'        && 'Terlalu Dini — kampanye baru terbentuk'}
+                          {decisionV2.cyclePosition === 'KONFIRMASI_MULAI'    && 'Konfirmasi Mulai — 3–7 hari akumulasi'}
+                          {decisionV2.cyclePosition === 'ENTRY_WINDOW'        && 'Entry Window Terbuka — 7–15 hari'}
+                          {decisionV2.cyclePosition === 'WASPADAI_DISTRIBUSI' && 'Kampanye Memanjang — waspadai distribusi'}
+                        </span>
+                      </div>
+                    )}
+
+                    {decisionV2?.label === 'WATCHLIST_PRIORITAS' && (
+                      <div className="mt-3 p-3 rounded-md bg-secondary/40 border border-border/40">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Kriteria Konfirmasi ({decisionV2.confirmation.criteriaMetCount}/4 terpenuhi):
+                        </p>
+                        <div className="grid grid-cols-2 gap-1 text-xs">
+                          {([
+                            ['Kampanye Aktif (≥3 hari)',     decisionV2.confirmation.details.campaignActive],
+                            ['Aliran Dana Kuat (M6 ≥65)',    decisionV2.confirmation.details.flowStrong],
+                            ['Harga Merespon (M15 ≥65)',     decisionV2.confirmation.details.priceResponding],
+                            ['Akumulasi Bergulir (M12 ≥65)', decisionV2.confirmation.details.rollingStrong],
+                          ] as [string, boolean][]).map(([label, met]) => (
+                            <div key={label} className="flex items-center gap-1">
+                              <span className={met ? 'text-emerald-400' : 'text-slate-500'}>{met ? '✓' : '○'}</span>
+                              <span className={met ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Company Profile - Simplified */}
                     <Card className="p-6 border-border/50 shadow-sm">
                       <h3 className="text-lg font-bold font-display mb-4">Profil Perusahaan</h3>
@@ -978,15 +1048,16 @@ export default function StockDashboard() {
                             <h4 className="text-sm font-bold text-foreground">Konsentrasi Kendali</h4>
                             <p className="text-xs text-muted-foreground">Top 3 broker menguasai {aiData.brokerControlScore.score}% akumulasi</p>
                           </div>
-                          <span className={`text-xs font-bold px-2 py-1 rounded ${
-                            aiData.brokerControlScore.score >= 70 
-                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' 
-                              : aiData.brokerControlScore.score >= 40 
-                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' 
-                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                          <Badge variant="outline" className={`text-xs ${
+                            decisionV2?.concentrationType === 'JEBAKAN_DISTRIBUSI' ? 'border-red-500 text-red-400' :
+                            decisionV2?.concentrationType === 'KENDALI_BANDAR'     ? 'border-emerald-500 text-emerald-400' :
+                            'border-slate-500 text-slate-400'
                           }`} data-testid="badge-broker-control-level">
-                            {aiData.brokerControlScore.level}
-                          </span>
+                            {decisionV2?.concentrationType === 'JEBAKAN_DISTRIBUSI' && 'Jebakan Distribusi'}
+                            {decisionV2?.concentrationType === 'KENDALI_BANDAR'     && 'Kendali Bandar'}
+                            {decisionV2?.concentrationType === 'TERSEBAR'           && 'Tersebar'}
+                            {!decisionV2 && aiData.brokerControlScore.level}
+                          </Badge>
                         </div>
                       </Card>
                     )}
