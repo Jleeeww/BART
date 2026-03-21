@@ -75,6 +75,25 @@ function getIDXSessionStatus(): { label: string; color: "green" | "yellow" | "re
   return { label: "Pasar Tutup", color: "red" };
 }
 
+function getNextSessionLabel(): string | null {
+  const now = new Date();
+  const wibOffset = 7 * 60;
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const wibMinutes = (utcMinutes + wibOffset) % (24 * 60);
+  const totalMinutes = Math.floor(wibMinutes / 60) * 60 + (wibMinutes % 60);
+  const wibDate = new Date(now.getTime() + wibOffset * 60 * 1000);
+  const dayOfWeek = wibDate.getUTCDay();
+
+  if (dayOfWeek === 0 || dayOfWeek === 6) return "Senin 08:45 WIB";
+  if (totalMinutes < 8 * 60 + 45) return "08:45 WIB";
+  if (totalMinutes >= 9 * 60 && totalMinutes < 12 * 60) return null;
+  if (totalMinutes >= 12 * 60 && totalMinutes < 13 * 60 + 30) return "13:30 WIB";
+  if (totalMinutes >= 13 * 60 + 30 && totalMinutes < 15 * 60 + 50) return null;
+  if (totalMinutes >= 15 * 60 + 50 && totalMinutes < 16 * 60) return null;
+  if (dayOfWeek === 5) return "Senin 08:45 WIB";
+  return "08:45 WIB";
+}
+
 const sessionColorMap = {
   green: "#22c55e",
   yellow: "#f59e0b",
@@ -384,6 +403,7 @@ export default function Homepage() {
   const session = getIDXSessionStatus();
   const isSessionActive = session.color === "green";
   const wibTime = useWIBClock();
+  const nextSession = getNextSessionLabel();
   const activeStocks = bucketStocks[activeTab];
   const activeConfig = tabConfig.find(t => t.key === activeTab)!;
 
@@ -405,7 +425,7 @@ export default function Homepage() {
 
       {/* SECTION 2 — Hero Block */}
       <section
-        className="relative w-full px-6 pt-10 pb-6"
+        className="relative w-full"
         style={{ background: "#0f0f0f" }}
       >
         <div
@@ -414,8 +434,8 @@ export default function Homepage() {
             backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 3px)",
           }}
         />
-        <div className="relative flex flex-wrap justify-between items-start gap-6">
-          <div className="flex-1 min-w-[280px] max-w-[60%]">
+        <div className="relative flex items-start justify-between gap-8 px-6 pt-10 pb-6">
+          <div className="flex-1">
             <p
               className="text-[10px] tracking-[0.2em] uppercase mb-2"
               style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#38BDF8" }}
@@ -446,15 +466,15 @@ export default function Homepage() {
           </div>
 
           <div
-            className="flex-shrink-0 w-48 rounded-md p-4"
-            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
+            className="flex-shrink-0 w-52 rounded-md p-4 mt-2"
+            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.06)" }}
           >
-            <p
-              className="text-[9px] tracking-[0.2em] uppercase mb-2"
+            <span
+              className="block text-[9px] tracking-[0.2em] uppercase mb-3"
               style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
             >
               STATUS PASAR
-            </p>
+            </span>
             <div className="flex items-center gap-2">
               <span
                 className="relative inline-block w-2 h-2 rounded-full flex-shrink-0"
@@ -483,17 +503,33 @@ export default function Homepage() {
             >
               {wibTime}
             </p>
+            {nextSession && (
+              <div style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }} className="mt-3 pt-3">
+                <p
+                  className="text-[9px] tracking-wider"
+                  style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
+                >
+                  SESI BERIKUTNYA
+                </p>
+                <p
+                  className="text-sm text-white mt-0.5"
+                  style={{ fontFamily: "'IBM Plex Mono', monospace" }}
+                >
+                  {nextSession}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>
 
       {/* SECTION 3 — Aggregate Stats Bar */}
       <section
-        className="w-full px-6 py-3 flex items-stretch gap-0 overflow-x-auto"
+        className="w-full py-4 px-6 flex items-center overflow-x-auto"
         style={{
           background: "#111111",
-          borderTop: "1px solid rgba(255,255,255,0.06)",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          borderTop: "1px solid rgba(255,255,255,0.08)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
         }}
       >
         {[
@@ -501,28 +537,28 @@ export default function Homepage() {
           { label: "SIAP DIPANTAU", value: readyStocks.length, color: "#34d399" },
           { label: "WATCHLIST", value: watchlistStocks.length, color: "#fbbf24" },
           { label: "HINDARI DULU", value: avoidStocks.length, color: "#f87171" },
-        ].map((stat, i, arr) => (
-          <div
-            key={stat.label}
-            className="flex flex-col gap-0.5 px-6"
-            style={{
-              borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
-            }}
-          >
-            <span
-              className="text-[10px] tracking-widest whitespace-nowrap"
-              style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
-            >
-              {stat.label}
-            </span>
-            <span
-              className="text-xl font-bold"
-              style={{ fontFamily: "'IBM Plex Mono', monospace", color: stat.color }}
-            >
-              {isLoading ? "—" : stat.value}
-            </span>
-          </div>
-        ))}
+        ].flatMap((stat, i, arr) => {
+          const block = (
+            <div key={stat.label} className="flex-1 flex flex-col gap-1">
+              <span
+                className="text-[10px] tracking-widest whitespace-nowrap"
+                style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
+              >
+                {stat.label}
+              </span>
+              <span
+                className="text-xl font-bold"
+                style={{ fontFamily: "'IBM Plex Mono', monospace", color: stat.color }}
+              >
+                {isLoading ? "—" : stat.value}
+              </span>
+            </div>
+          );
+          if (i < arr.length - 1) {
+            return [block, <div key={`div-${i}`} className="w-px h-8 bg-[#ffffff15] mx-6 flex-shrink-0" />];
+          }
+          return [block];
+        })}
       </section>
 
       {/* SECTION 4 — Radar Placeholder Banner */}
