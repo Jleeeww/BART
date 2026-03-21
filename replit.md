@@ -40,6 +40,7 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
   - `client/src/components/Sidebar.tsx`: Fixed left sidebar navigation (200px, persistent)
   - `client/src/pages/Homepage.tsx`: Main dashboard ("Peta Kesiapan")
   - `client/src/pages/RadarPage.tsx`: Institutional radar table ("/radar")
+  - `client/src/pages/WatchlistPage.tsx`: Watchlist page ("/watchlist")
   - `client/src/pages/StockDashboard.tsx`: Individual stock detail ("/stock/:symbol")
 - `server/`: Node.js/Express backend
 - `shared/`: Shared code (DB schema, API contracts)
@@ -47,8 +48,8 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 
 ### Navigation
 - App uses a persistent left sidebar (Sidebar.tsx) with AppLayout wrapper in App.tsx
-- Routes: `/` (Homepage), `/radar` (RadarPage), `/stock/:symbol` (StockDashboard)
-- 4 locked nav items (Watchlist, Screener, Pasar, Pengaturan) show "Segera" badge
+- Routes: `/` (Homepage), `/radar` (RadarPage), `/watchlist` (WatchlistPage), `/stock/:symbol` (StockDashboard)
+- 3 locked nav items (Screener, Pasar, Pengaturan) show "Segera" badge
 
 ### Key Design Patterns
 - **Shared Types**: Centralized definition of database schemas and API contracts for type safety.

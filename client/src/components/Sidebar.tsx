@@ -13,7 +13,7 @@ import {
 const navItems = [
   { icon: LayoutGrid, label: "Beranda", route: "/", exact: true },
   { icon: Radio, label: "Radar", route: "/radar" },
-  { icon: Star, label: "Watchlist", route: "/watchlist", locked: true },
+  { icon: Star, label: "Watchlist", route: "/watchlist" },
   { icon: SlidersHorizontal, label: "Screener", route: "/screener", locked: true },
   { icon: BarChart2, label: "Pasar", route: "/pasar", locked: true },
   { icon: Settings, label: "Pengaturan", route: "/pengaturan", locked: true },

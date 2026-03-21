@@ -1,6 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { Star } from "lucide-react";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface StockData {
   symbol: string;
@@ -64,12 +66,47 @@ function bucketAccent(bucket: string) {
 const mono = "'IBM Plex Mono', monospace";
 const sora = "'Sora', sans-serif";
 
+interface WatchlistItem {
+  id: number;
+  symbol: string;
+  addedAt: string | null;
+}
+
 export default function RadarPage() {
   const [filter, setFilter] = useState<FilterType>("semua");
+  const [optimisticOverrides, setOptimisticOverrides] = useState<Record<string, boolean>>({});
 
   const { data: stocks, isLoading } = useQuery<StockData[]>({
     queryKey: ["/api/stocks"],
   });
+
+  const { data: watchlistData } = useQuery<WatchlistItem[]>({
+    queryKey: ["/api/watchlist"],
+  });
+
+  const watchlistedSymbols = useMemo(() => {
+    const base = new Set(watchlistData?.map((w) => w.symbol) ?? []);
+    for (const [sym, added] of Object.entries(optimisticOverrides)) {
+      if (added) base.add(sym);
+      else base.delete(sym);
+    }
+    return base;
+  }, [watchlistData, optimisticOverrides]);
+
+  const toggleWatchlist = useCallback(async (symbol: string) => {
+    const isStarred = watchlistedSymbols.has(symbol);
+    setOptimisticOverrides((prev) => ({ ...prev, [symbol]: !isStarred }));
+    try {
+      if (isStarred) {
+        await apiRequest("DELETE", `/api/watchlist/${symbol}`);
+      } else {
+        await apiRequest("POST", `/api/watchlist/${symbol}`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+    } catch {
+      setOptimisticOverrides((prev) => ({ ...prev, [symbol]: isStarred }));
+    }
+  }, [watchlistedSymbols]);
 
   const filtered = useMemo(() => {
     if (!stocks) return [];
@@ -277,21 +314,41 @@ export default function RadarPage() {
                       <ConcentrationBadge type={v2.concentrationType} />
                     </td>
 
-                    <td className="px-4 py-3 w-24 text-right">
-                      <Link href={`/stock/${stock.symbol}`}>
+                    <td className="px-4 py-3 w-32 text-right">
+                      <div className="flex items-center justify-end gap-2">
                         <button
-                          className="text-[10px] px-3 py-1.5 rounded-sm transition-all"
-                          style={{
-                            fontFamily: mono,
-                            background: "rgba(56,189,248,0.1)",
-                            color: "#38BDF8",
-                            border: "1px solid rgba(56,189,248,0.2)",
-                          }}
-                          data-testid={`radar-detail-${stock.symbol}`}
+                          onClick={(e) => { e.stopPropagation(); toggleWatchlist(stock.symbol); }}
+                          className={`p-1.5 rounded-sm border transition-all duration-150 ${
+                            watchlistedSymbols.has(stock.symbol)
+                              ? "border-amber-500/40 bg-amber-500/10 hover:border-amber-500/60 hover:bg-amber-500/20"
+                              : "border-[#ffffff10] bg-transparent hover:border-amber-500/30"
+                          }`}
+                          data-testid={`radar-star-${stock.symbol}`}
                         >
-                          DETAIL →
+                          <Star
+                            size={14}
+                            className={
+                              watchlistedSymbols.has(stock.symbol)
+                                ? "fill-amber-400 text-amber-400"
+                                : "text-[#ffffff30] hover:text-amber-400/60"
+                            }
+                          />
                         </button>
-                      </Link>
+                        <Link href={`/stock/${stock.symbol}`}>
+                          <button
+                            className="text-[10px] px-3 py-1.5 rounded-sm transition-all"
+                            style={{
+                              fontFamily: mono,
+                              background: "rgba(56,189,248,0.1)",
+                              color: "#38BDF8",
+                              border: "1px solid rgba(56,189,248,0.2)",
+                            }}
+                            data-testid={`radar-detail-${stock.symbol}`}
+                          >
+                            DETAIL →
+                          </button>
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 );

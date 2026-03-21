@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Homepage from "@/pages/Homepage";
 import StockDashboard from "@/pages/StockDashboard";
 import RadarPage from "@/pages/RadarPage";
+import WatchlistPage from "@/pages/WatchlistPage";
 import { SimulationProvider } from "@/contexts/SimulationContext";
 import { SimulationBanner } from "@/components/SimulationBanner";
 import { Sidebar } from "@/components/Sidebar";
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/" component={Homepage} />
       <Route path="/stock/:symbol" component={StockDashboard} />
       <Route path="/radar" component={RadarPage} />
+      <Route path="/watchlist" component={WatchlistPage} />
       <Route component={NotFound} />
     </Switch>
   );
