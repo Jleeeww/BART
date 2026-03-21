@@ -229,16 +229,21 @@ export default function RadarPage() {
                     }}
                     data-testid={`radar-row-${stock.symbol}`}
                   >
-                    <td className="px-4 py-3 w-32">
-                      <p className="text-sm font-bold text-white" style={{ fontFamily: sora }}>
-                        {stock.symbol}
-                      </p>
-                      <p
-                        className="text-[10px] truncate mt-0.5"
-                        style={{ fontFamily: mono, color: "#6b7280", maxWidth: 120 }}
-                      >
-                        {stock.name}
-                      </p>
+                    <td className="px-4 py-3 w-48">
+                      <div className="flex items-center gap-3 py-1">
+                        <StockLogo symbol={stock.symbol} />
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-base font-bold text-white" style={{ fontFamily: sora }}>
+                            {stock.symbol}
+                          </p>
+                          <p
+                            className="text-[11px] truncate"
+                            style={{ fontFamily: mono, color: "#6b7280", maxWidth: 160 }}
+                          >
+                            {stock.name}
+                          </p>
+                        </div>
+                      </div>
                     </td>
 
                     <td className="px-4 py-3 w-28">
@@ -303,6 +308,31 @@ export default function RadarPage() {
       >
         Radar menampilkan saham dengan kepercayaan sinyal ≥ 60% · Data live IDX akan aktif setelah lisensi PT Berkat Digital Investasi
       </p>
+    </div>
+  );
+}
+
+function StockLogo({ symbol }: { symbol: string }) {
+  const [failed, setFailed] = useState(false);
+  const src = `https://assets.stockbit.com/logos/companies/${symbol}.png`;
+
+  return (
+    <div
+      className="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden"
+      style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
+    >
+      {failed ? (
+        <span className="text-[10px] font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>
+          {symbol.slice(0, 2)}
+        </span>
+      ) : (
+        <img
+          src={src}
+          alt={symbol}
+          className="w-6 h-6 object-contain rounded-sm"
+          onError={() => setFailed(true)}
+        />
+      )}
     </div>
   );
 }
