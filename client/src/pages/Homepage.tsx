@@ -1,10 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { SimulationToggle } from "@/components/SimulationToggle";
 import { Star, StarOff, AlertTriangle } from "lucide-react";
+
+function useWIBClock() {
+  const [time, setTime] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+      setTime(
+        `${String(wib.getUTCHours()).padStart(2, "0")}:${String(wib.getUTCMinutes()).padStart(2, "0")}:${String(wib.getUTCSeconds()).padStart(2, "0")} WIB`
+      );
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return time;
+}
 
 interface StockCardData {
   symbol: string;
@@ -366,6 +383,7 @@ export default function Homepage() {
   const totalStocks = (stocks?.length) || 0;
   const session = getIDXSessionStatus();
   const isSessionActive = session.color === "green";
+  const wibTime = useWIBClock();
   const activeStocks = bucketStocks[activeTab];
   const activeConfig = tabConfig.find(t => t.key === activeTab)!;
 
@@ -427,25 +445,28 @@ export default function Homepage() {
             </p>
           </div>
 
-          <div className="flex items-start gap-2 pt-1">
-            <span
-              className="relative inline-block w-2 h-2 rounded-full mt-1.5 flex-shrink-0"
-              style={{ background: sessionColorMap[session.color] }}
+          <div
+            className="flex-shrink-0 w-48 rounded-md p-4"
+            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
+          >
+            <p
+              className="text-[9px] tracking-[0.2em] uppercase mb-2"
+              style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
             >
-              {isSessionActive && (
-                <span
-                  className="absolute inset-0 rounded-full animate-ping"
-                  style={{ background: sessionColorMap[session.color], opacity: 0.5 }}
-                />
-              )}
-            </span>
-            <div>
-              <p
-                className="text-xs"
-                style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
+              STATUS PASAR
+            </p>
+            <div className="flex items-center gap-2">
+              <span
+                className="relative inline-block w-2 h-2 rounded-full flex-shrink-0"
+                style={{ background: sessionColorMap[session.color] }}
               >
-                IDX
-              </p>
+                {isSessionActive && (
+                  <span
+                    className="absolute inset-0 rounded-full animate-ping"
+                    style={{ background: sessionColorMap[session.color], opacity: 0.5 }}
+                  />
+                )}
+              </span>
               <p
                 className="text-sm font-medium"
                 style={{
@@ -456,6 +477,12 @@ export default function Homepage() {
                 {session.label}
               </p>
             </div>
+            <p
+              className="text-xs mt-2"
+              style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
+            >
+              {wibTime}
+            </p>
           </div>
         </div>
       </section>
@@ -465,8 +492,8 @@ export default function Homepage() {
         className="w-full px-6 py-3 flex items-stretch gap-0 overflow-x-auto"
         style={{
           background: "#111111",
-          borderTop: "1px solid rgba(255,255,255,0.03)",
-          borderBottom: "1px solid rgba(255,255,255,0.03)",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
         }}
       >
         {[
@@ -479,7 +506,7 @@ export default function Homepage() {
             key={stat.label}
             className="flex flex-col gap-0.5 px-6"
             style={{
-              borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none",
+              borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
             }}
           >
             <span
@@ -598,17 +625,24 @@ export default function Homepage() {
             </div>
           ) : activeStocks.length === 0 ? (
             <div
-              className="rounded-md px-4 py-8 text-center"
+              className="rounded-md px-6 py-12 text-center"
               style={{
                 background: "#161616",
-                border: "1px solid rgba(255,255,255,0.03)",
+                border: "1px dashed rgba(255,255,255,0.06)",
               }}
             >
+              <p className="text-3xl mb-3" style={{ color: "rgba(255,255,255,0.06)" }}>◎</p>
               <p
                 className="text-sm"
                 style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
               >
-                Tidak ada saham dalam kategori ini saat ini.
+                Tidak ada saham terdeteksi
+              </p>
+              <p
+                className="text-[10px] mt-1"
+                style={{ fontFamily: "'IBM Plex Mono', monospace", color: "rgba(255,255,255,0.12)" }}
+              >
+                Radar sedang memindai pasar IDX
               </p>
             </div>
           ) : (
