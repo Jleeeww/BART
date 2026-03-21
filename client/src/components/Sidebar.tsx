@@ -17,7 +17,7 @@ const navItems = [
   { icon: Radio, label: "Radar", route: "/radar" },
   { icon: Star, label: "Watchlist", route: "/watchlist" },
   { icon: SlidersHorizontal, label: "Screener", route: "/screener" },
-  { icon: BarChart2, label: "Pasar", route: "/pasar", locked: true },
+  { icon: BarChart2, label: "Pasar", route: "/pasar" },
   { icon: Settings, label: "Pengaturan", route: "/pengaturan", locked: true },
 ] as const;
 

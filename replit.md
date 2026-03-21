@@ -48,8 +48,8 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 
 ### Navigation
 - App uses a collapsible left sidebar (Sidebar.tsx) with AppLayout wrapper in App.tsx; collapsed state managed in AppLayout, passed as props
-- Routes: `/` (Homepage), `/radar` (RadarPage), `/watchlist` (WatchlistPage), `/screener` (ScreenerPage), `/stock/:symbol` (StockDashboard)
-- 2 locked nav items (Pasar, Pengaturan) show "Segera" badge
+- Routes: `/` (Homepage), `/radar` (RadarPage), `/watchlist` (WatchlistPage), `/screener` (ScreenerPage), `/pasar` (PasarPage), `/stock/:symbol` (StockDashboard)
+- 1 locked nav item (Pengaturan) shows "Segera" badge
 
 ### AI Engine Files
 - `server/engine/bandarmologyCore.ts`: 12-model bandarmology engine (DO NOT MODIFY)

@@ -11,6 +11,7 @@ import StockDashboard from "@/pages/StockDashboard";
 import RadarPage from "@/pages/RadarPage";
 import WatchlistPage from "@/pages/WatchlistPage";
 import ScreenerPage from "@/pages/ScreenerPage";
+import PasarPage from "@/pages/PasarPage";
 import { SimulationProvider } from "@/contexts/SimulationContext";
 import { SimulationBanner } from "@/components/SimulationBanner";
 import { Sidebar } from "@/components/Sidebar";
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/radar" component={RadarPage} />
       <Route path="/watchlist" component={WatchlistPage} />
       <Route path="/screener" component={ScreenerPage} />
+      <Route path="/pasar" component={PasarPage} />
       <Route component={NotFound} />
     </Switch>
   );
