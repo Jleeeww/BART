@@ -213,7 +213,7 @@ export default function RadarPage() {
         <table className="w-full min-w-[900px]">
           <thead>
             <tr style={{ background: "#111111", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-              {["SAHAM", "SEKTOR", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "AKSI"].map((h) => (
+              {["SAHAM", "SEKTOR", "SKOR", "PERGERAKAN", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "AKSI"].map((h) => (
                 <th
                   key={h}
                   className="text-left px-4 py-2"
@@ -235,7 +235,7 @@ export default function RadarPage() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} style={{ background: "#161616", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                  {Array.from({ length: 8 }).map((_, j) => (
+                  {Array.from({ length: 9 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 w-16 rounded bg-[#222] animate-pulse" />
                     </td>
@@ -244,7 +244,7 @@ export default function RadarPage() {
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center">
+                <td colSpan={9} className="py-16 text-center">
                   <p className="text-4xl mb-3" style={{ color: "rgba(255,255,255,0.06)" }}>◎</p>
                   <p className="text-sm" style={{ fontFamily: mono, color: "#6b7280" }}>
                     Tidak ada saham terdeteksi pada filter ini
@@ -296,6 +296,33 @@ export default function RadarPage() {
                       >
                         {stock.readinessScore}
                       </span>
+                    </td>
+
+                    <td className="px-4 py-3 w-28">
+                      <div className="flex flex-col gap-0.5">
+                        <span
+                          className="text-sm font-medium text-white"
+                          style={{ fontFamily: mono }}
+                        >
+                          Rp {parseFloat(String(stock.price).replace(/[^0-9.-]/g, "") || "0").toLocaleString("id-ID")}
+                        </span>
+                        <span
+                          className={`text-xs font-medium ${
+                            parseFloat(stock.changePercent) > 0
+                              ? "text-emerald-400"
+                              : parseFloat(stock.changePercent) < 0
+                                ? "text-red-400"
+                                : "text-[#6b7280]"
+                          }`}
+                          style={{ fontFamily: mono }}
+                        >
+                          {parseFloat(stock.changePercent) > 0
+                            ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
+                            : parseFloat(stock.changePercent) < 0
+                              ? `▼ ${parseFloat(stock.changePercent).toFixed(2)}%`
+                              : `— 0.00%`}
+                        </span>
+                      </div>
                     </td>
 
                     <td className="px-4 py-3 w-32">
