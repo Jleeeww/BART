@@ -1,689 +1,284 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
-import { Skeleton } from "@/components/ui/skeleton";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { SimulationToggle } from "@/components/SimulationToggle";
-import { Star, StarOff, AlertTriangle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { Activity, Radio, ShieldCheck } from "lucide-react";
 
-function useWIBClock() {
-  const [time, setTime] = useState("");
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-      setTime(
-        `${String(wib.getUTCHours()).padStart(2, "0")}:${String(wib.getUTCMinutes()).padStart(2, "0")}:${String(wib.getUTCSeconds()).padStart(2, "0")} WIB`
-      );
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
-  return time;
-}
-
-interface StockCardData {
+interface StockData {
   symbol: string;
   name: string;
-  price: string;
-  change: string;
-  changePercent: string;
-  sector: string;
-  sectorBadge: string | null;
   readinessScore: number;
   marketRegime: string;
-  actionGuidance: string;
-  actionColor: "green" | "yellow" | "blue" | "red" | "black";
-  actionState: string;
-  homepageBucket: "siap_dipantau" | "watchlist_prioritas" | "hindari_dulu";
-  aiSentence: string;
-  isInWatchlist: boolean;
+  homepageBucket: string;
+  sector: string | null;
   isGorengan?: boolean;
-  gorenganWarning?: string | null;
-  riskOverride?: string | null;
 }
 
-function getIDXSessionStatus(): { label: string; color: "green" | "yellow" | "red" } {
-  const now = new Date();
-  const wibOffset = 7 * 60;
-  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const wibMinutes = (utcMinutes + wibOffset) % (24 * 60);
-  const totalMinutes = Math.floor(wibMinutes / 60) * 60 + (wibMinutes % 60);
+const mono = "'IBM Plex Mono', monospace";
+const sora = "'Sora', sans-serif";
 
-  const wibDate = new Date(now.getTime() + wibOffset * 60 * 1000);
-  const dayOfWeek = wibDate.getUTCDay();
-
-  if (dayOfWeek === 0 || dayOfWeek === 6) {
-    return { label: "Pasar Tutup", color: "red" };
-  }
-  if (totalMinutes >= 8 * 60 + 45 && totalMinutes < 9 * 60) {
-    return { label: "Pra-Pembukaan", color: "yellow" };
-  }
-  if (totalMinutes >= 9 * 60 && totalMinutes < 12 * 60) {
-    return { label: "Sesi 1 Berlangsung", color: "green" };
-  }
-  if (totalMinutes >= 12 * 60 && totalMinutes < 13 * 60 + 30) {
-    return { label: "Istirahat", color: "yellow" };
-  }
-  if (totalMinutes >= 13 * 60 + 30 && totalMinutes < 15 * 60 + 50) {
-    return { label: "Sesi 2 Berlangsung", color: "green" };
-  }
-  if (totalMinutes >= 15 * 60 + 50 && totalMinutes < 16 * 60) {
-    return { label: "Pra-Penutupan", color: "yellow" };
-  }
-  return { label: "Pasar Tutup", color: "red" };
+function scoreColor(score: number) {
+  if (score >= 80) return "#34d399";
+  if (score >= 60) return "#fbbf24";
+  return "#f87171";
 }
 
-function getNextSessionLabel(): string | null {
-  const now = new Date();
-  const wibOffset = 7 * 60;
-  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const wibMinutes = (utcMinutes + wibOffset) % (24 * 60);
-  const totalMinutes = Math.floor(wibMinutes / 60) * 60 + (wibMinutes % 60);
-  const wibDate = new Date(now.getTime() + wibOffset * 60 * 1000);
-  const dayOfWeek = wibDate.getUTCDay();
-
-  if (dayOfWeek === 0 || dayOfWeek === 6) return "Senin 08:45 WIB";
-  if (totalMinutes < 8 * 60 + 45) return "08:45 WIB";
-  if (totalMinutes >= 9 * 60 && totalMinutes < 12 * 60) return null;
-  if (totalMinutes >= 12 * 60 && totalMinutes < 13 * 60 + 30) return "13:30 WIB";
-  if (totalMinutes >= 13 * 60 + 30 && totalMinutes < 15 * 60 + 50) return null;
-  if (totalMinutes >= 15 * 60 + 50 && totalMinutes < 16 * 60) return null;
-  if (dayOfWeek === 5) return "Senin 08:45 WIB";
-  return "08:45 WIB";
+function bucketAccent(bucket: string) {
+  if (bucket === "siap_dipantau") return "#34d399";
+  if (bucket === "watchlist_prioritas") return "#fbbf24";
+  return "#f87171";
 }
-
-const sessionColorMap = {
-  green: "#22c55e",
-  yellow: "#f59e0b",
-  red: "#ef4444",
-};
-
-type BucketType = "siap_dipantau" | "watchlist_prioritas" | "hindari_dulu";
-
-const bucketAccent: Record<BucketType, string> = {
-  siap_dipantau: "#34d399",
-  watchlist_prioritas: "#fbbf24",
-  hindari_dulu: "#f87171",
-};
-
-function StockCard({ stock, bucket, index, onToggleWatchlist, isToggling }: {
-  stock: StockCardData;
-  bucket: BucketType;
-  index: number;
-  onToggleWatchlist: (symbol: string, isAdding: boolean) => void;
-  isToggling: boolean;
-}) {
-  const [, navigate] = useLocation();
-  const isPositive = parseFloat(stock.change) >= 0;
-  const accent = bucketAccent[bucket];
-
-  return (
-    <div
-      className="stock-card-animate"
-      style={{ animationDelay: `${index * 40}ms` }}
-    >
-      <div
-        onClick={() => navigate(`/stock/${stock.symbol}`)}
-        className="stock-card-row flex items-center gap-4 px-4 py-3 mb-2 rounded-md transition-all duration-150 cursor-pointer"
-        style={{
-          background: "#161616",
-          borderLeft: `2px solid ${accent}`,
-        }}
-        data-testid={`card-stock-${stock.symbol}`}
-      >
-        <div className="flex-shrink-0 w-32">
-          <Link href={`/stock/${stock.symbol}`}>
-            <span
-              className="font-bold text-white text-base hover:text-[#38BDF8] transition-colors cursor-pointer"
-              style={{ fontFamily: "'Sora', sans-serif" }}
-              data-testid={`link-stock-${stock.symbol}`}
-            >
-              {stock.symbol}
-            </span>
-          </Link>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <p
-              className="text-[10px] text-[#6b7280] truncate"
-              style={{ fontFamily: "'IBM Plex Mono', monospace" }}
-            >
-              {stock.name}
-            </p>
-            {stock.isGorengan && (
-              <span className="flex items-center text-[9px] text-red-400 font-bold" data-testid={`badge-gorengan-${stock.symbol}`}>
-                <AlertTriangle className="w-2.5 h-2.5 mr-0.5" />
-                GOR
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex-shrink-0 w-16 text-center">
-          <span
-            className="text-xl font-bold"
-            style={{ fontFamily: "'IBM Plex Mono', monospace", color: accent }}
-            data-testid={`badge-score-${stock.symbol}`}
-          >
-            {stock.readinessScore}
-          </span>
-          <p
-            className="text-[9px] text-[#6b7280] tracking-widest"
-            style={{ fontFamily: "'IBM Plex Mono', monospace" }}
-          >
-            SKOR
-          </p>
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <span
-            className="inline-block text-[10px] px-2 py-0.5 rounded-sm text-[#38BDF8]"
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid rgba(255,255,255,0.06)",
-            }}
-          >
-            {stock.marketRegime}
-          </span>
-          <p
-            className="text-[11px] text-[#6b7280] mt-1 truncate"
-            style={{ fontFamily: "'Sora', sans-serif" }}
-            data-testid={`badge-action-${stock.symbol}`}
-          >
-            {stock.actionGuidance}
-          </p>
-        </div>
-
-        <div className="flex-shrink-0 w-24 text-right">
-          <p
-            className="text-sm font-medium text-white"
-            style={{ fontFamily: "'IBM Plex Mono', monospace" }}
-          >
-            {parseInt(stock.price).toLocaleString("id-ID")}
-          </p>
-          <p
-            className="text-xs mt-0.5"
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              color: isPositive ? "#22c55e" : "#ef4444",
-            }}
-          >
-            {isPositive ? "+" : ""}
-            {stock.changePercent}%
-          </p>
-        </div>
-
-        <div className="flex-shrink-0 w-20 flex gap-2 justify-end items-center">
-          <button
-            disabled={isToggling}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleWatchlist(stock.symbol, !stock.isInWatchlist);
-            }}
-            className="text-[#6b7280] hover:text-amber-400 transition-colors disabled:opacity-50"
-            data-testid={`button-watchlist-${stock.symbol}`}
-          >
-            {stock.isInWatchlist ? (
-              <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-            ) : (
-              <StarOff className="w-4 h-4" />
-            )}
-          </button>
-          <Link href={`/stock/${stock.symbol}`}>
-            <button
-              className="text-[10px] px-2 py-1 rounded-sm transition-all"
-              style={{
-                fontFamily: "'IBM Plex Mono', monospace",
-                background: "rgba(56,189,248,0.1)",
-                color: "#38BDF8",
-                border: "1px solid rgba(56,189,248,0.2)",
-              }}
-              data-testid={`button-detail-${stock.symbol}`}
-            >
-              DETAIL →
-            </button>
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StockCardSkeleton() {
-  return (
-    <div
-      className="flex items-center gap-4 px-4 py-3 mb-2 rounded-md"
-      style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-    >
-      <div className="w-32 space-y-1">
-        <Skeleton className="h-4 w-16 bg-[#222]" />
-        <Skeleton className="h-3 w-28 bg-[#222]" />
-      </div>
-      <div className="w-16 flex flex-col items-center gap-1">
-        <Skeleton className="h-6 w-10 bg-[#222]" />
-        <Skeleton className="h-2 w-8 bg-[#222]" />
-      </div>
-      <div className="flex-1 space-y-1">
-        <Skeleton className="h-4 w-24 bg-[#222]" />
-        <Skeleton className="h-3 w-36 bg-[#222]" />
-      </div>
-      <div className="w-24 space-y-1 flex flex-col items-end">
-        <Skeleton className="h-4 w-16 bg-[#222]" />
-        <Skeleton className="h-3 w-10 bg-[#222]" />
-      </div>
-      <div className="w-20 flex gap-2 justify-end">
-        <Skeleton className="h-6 w-6 rounded bg-[#222]" />
-        <Skeleton className="h-6 w-14 rounded bg-[#222]" />
-      </div>
-    </div>
-  );
-}
-
-const tabConfig: { key: BucketType; label: string; tabLabel: string; description: string }[] = [
-  {
-    key: "siap_dipantau",
-    label: "SIAP DIPANTAU",
-    tabLabel: "Siap Dipantau",
-    description: "Saham dengan Smart Money Readiness Score ≥ 80 — struktur siap dengan momentum yang mulai selaras.",
-  },
-  {
-    key: "watchlist_prioritas",
-    label: "WATCHLIST",
-    tabLabel: "Watchlist Prioritas",
-    description: "Saham dengan Readiness Score 60-79 — sedang dipersiapkan, tapi belum waktunya masuk.",
-  },
-  {
-    key: "hindari_dulu",
-    label: "HINDARI DULU",
-    tabLabel: "Hindari Dulu",
-    description: "Saham dengan Readiness Score < 60 — risiko tinggi, hindari entry baru.",
-  },
-];
 
 export default function Homepage() {
-  const [activeTab, setActiveTab] = useState<BucketType>("siap_dipantau");
-  const [togglingSymbols, setTogglingSymbols] = useState<Set<string>>(new Set());
-
-  const { data: stocks, isLoading } = useQuery<StockCardData[]>({
+  const { data: stocks } = useQuery<StockData[]>({
     queryKey: ["/api/stocks"],
   });
 
-  const addToWatchlistMutation = useMutation({
-    mutationFn: async (symbol: string) => {
-      await apiRequest("POST", `/api/watchlist/${symbol}`);
-    },
-    onMutate: async (symbol) => {
-      setTogglingSymbols(prev => new Set(prev).add(symbol));
-      await queryClient.cancelQueries({ queryKey: ["/api/stocks"] });
-      const previousStocks = queryClient.getQueryData<StockCardData[]>(["/api/stocks"]);
-      queryClient.setQueryData<StockCardData[]>(["/api/stocks"], (old) =>
-        old?.map((s) => (s.symbol === symbol ? { ...s, isInWatchlist: true } : s))
-      );
-      return { previousStocks };
-    },
-    onError: (_err, _symbol, context) => {
-      if (context?.previousStocks) {
-        queryClient.setQueryData(["/api/stocks"], context.previousStocks);
-      }
-    },
-    onSettled: (_data, _error, symbol) => {
-      setTogglingSymbols(prev => {
-        const next = new Set(prev);
-        next.delete(symbol);
-        return next;
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/stocks"] });
-    },
-  });
-
-  const removeFromWatchlistMutation = useMutation({
-    mutationFn: async (symbol: string) => {
-      await apiRequest("DELETE", `/api/watchlist/${symbol}`);
-    },
-    onMutate: async (symbol) => {
-      setTogglingSymbols(prev => new Set(prev).add(symbol));
-      await queryClient.cancelQueries({ queryKey: ["/api/stocks"] });
-      const previousStocks = queryClient.getQueryData<StockCardData[]>(["/api/stocks"]);
-      queryClient.setQueryData<StockCardData[]>(["/api/stocks"], (old) =>
-        old?.map((s) => (s.symbol === symbol ? { ...s, isInWatchlist: false } : s))
-      );
-      return { previousStocks };
-    },
-    onError: (_err, _symbol, context) => {
-      if (context?.previousStocks) {
-        queryClient.setQueryData(["/api/stocks"], context.previousStocks);
-      }
-    },
-    onSettled: (_data, _error, symbol) => {
-      setTogglingSymbols(prev => {
-        const next = new Set(prev);
-        next.delete(symbol);
-        return next;
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/stocks"] });
-    },
-  });
-
-  const handleToggleWatchlist = (symbol: string, isAdding: boolean) => {
-    if (togglingSymbols.has(symbol)) return;
-    if (isAdding) {
-      addToWatchlistMutation.mutate(symbol);
-    } else {
-      removeFromWatchlistMutation.mutate(symbol);
-    }
-  };
-
-  const readyStocks = stocks?.filter(s => s.homepageBucket === "siap_dipantau") || [];
-  const watchlistStocks = stocks?.filter(s => s.homepageBucket === "watchlist_prioritas") || [];
-  const avoidStocks = stocks?.filter(s => s.homepageBucket === "hindari_dulu") || [];
-
-  if (stocks && stocks.length > 0) {
-    const totalBucketed = readyStocks.length + watchlistStocks.length + avoidStocks.length;
-    const unbucketedStocks = stocks.filter(
-      s => !["siap_dipantau", "watchlist_prioritas", "hindari_dulu"].includes(s.homepageBucket)
-    );
-    console.log(`[HOMEPAGE AUDIT] totalUniverseCount: ${stocks.length}`);
-    console.log(`[HOMEPAGE AUDIT] totalRenderedCount: ${totalBucketed}`);
-    if (unbucketedStocks.length > 0) {
-      const missing = unbucketedStocks.map(s => `${s.symbol}(bucket=${s.homepageBucket})`);
-      console.warn(`[HOMEPAGE AUDIT] missingFromBuckets: ${missing.join(", ")}`);
-    } else {
-      console.log(`[HOMEPAGE AUDIT] missingSymbols: none — all stocks bucketed`);
-    }
-  }
-
-  const bucketStocks: Record<BucketType, StockCardData[]> = {
-    siap_dipantau: readyStocks,
-    watchlist_prioritas: watchlistStocks,
-    hindari_dulu: avoidStocks,
-  };
-
-  const totalStocks = (stocks?.length) || 0;
-  const session = getIDXSessionStatus();
-  const isSessionActive = session.color === "green";
-  const wibTime = useWIBClock();
-  const nextSession = getNextSessionLabel();
-  const activeStocks = bucketStocks[activeTab];
-  const activeConfig = tabConfig.find(t => t.key === activeTab)!;
-
   return (
-    <div className="min-h-screen" style={{ background: "#0f0f0f" }}>
-      {/* SECTION 2 — Hero Block */}
-      <section
-        className="relative w-full"
-        style={{ background: "#0f0f0f" }}
-      >
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 3px)",
-          }}
-        />
-        <div className="relative px-6 pt-6 pb-6">
-          <div className="flex justify-end mb-4">
-            <SimulationToggle />
+    <div style={{ background: "#0f0f0f" }}>
+      {/* SECTION 1 — Full viewport hero */}
+      <section className="relative min-h-screen flex flex-col overflow-hidden" style={{ background: "#0f0f0f" }}>
+        {/* BACKGROUND LAYER */}
+        <div className="absolute inset-0 z-0">
+          {/* Layer A — Blurred Radar preview */}
+          <div
+            className="absolute inset-0 pt-32 overflow-hidden pointer-events-none select-none"
+            style={{ opacity: 0.2, filter: "blur(2px)" }}
+          >
+            {stocks && stocks.length > 0 && (
+              <table className="w-full" style={{ minWidth: 800 }}>
+                <thead>
+                  <tr style={{ background: "#111111" }}>
+                    {["SAHAM", "SEKTOR", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "AKSI"].map((h) => (
+                      <th
+                        key={h}
+                        className="text-left px-4 py-2"
+                        style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.1em", color: "#6b7280", fontWeight: 400 }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {stocks.slice(0, 12).map((stock) => {
+                    const accent = bucketAccent(stock.homepageBucket);
+                    return (
+                      <tr
+                        key={stock.symbol}
+                        style={{ background: "#161616", borderBottom: "1px solid rgba(255,255,255,0.03)", borderLeft: `2px solid ${accent}` }}
+                      >
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-bold text-white" style={{ fontFamily: sora }}>{stock.symbol}</p>
+                          <p className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>{stock.name}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>{stock.sector || "—"}</span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="text-lg font-bold" style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}>{stock.readinessScore}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 rounded-sm text-[10px]" style={{ fontFamily: mono, color: "#6b7280", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>{stock.marketRegime}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-[11px]" style={{ fontFamily: mono, color: "#94a3b8" }}>—</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-[11px]" style={{ fontFamily: mono, color: "#6b7280" }}>→ Netral</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-[10px]" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>—</span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="text-[10px] px-3 py-1.5 rounded-sm" style={{ fontFamily: mono, background: "rgba(56,189,248,0.1)", color: "#38BDF8", border: "1px solid rgba(56,189,248,0.2)" }}>DETAIL →</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
-          <div className="flex items-start justify-between gap-8">
-          <div className="flex-1">
-            <p
-              className="text-[10px] tracking-[0.2em] uppercase mb-2"
-              style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#38BDF8" }}
-            >
-              BANDARMOLOGY INTELLIGENCE
-            </p>
-            <h1
-              className="text-3xl font-bold text-white leading-tight"
-              style={{ fontFamily: "'Sora', sans-serif" }}
-              data-testid="text-homepage-title"
-            >
-              Peta Kesiapan Saham
-            </h1>
-            <h2
-              className="text-3xl font-bold leading-tight"
-              style={{ fontFamily: "'Sora', sans-serif", color: "#38BDF8" }}
-            >
-              Hari Ini
-            </h2>
-            <p
-              className="text-sm mt-3 max-w-lg"
-              style={{ color: "#6b7280" }}
-              data-testid="text-homepage-subtitle"
-            >
-              Disusun berdasarkan perilaku bandar, struktur pasar, dan risiko distribusi.{" "}
-              <span className="italic">Bukan sinyal — panduan kesiapan.</span>
-            </p>
+
+          {/* Layer B — Gradient overlay */}
+          <div
+            className="absolute inset-0"
+            style={{ background: "linear-gradient(to bottom, #0f0f0f 0%, #0f0f0f40 30%, #0f0f0f10 60%, #0f0f0f 100%)" }}
+          />
+
+          {/* Layer C — Scanline texture */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.016) 2px, rgba(255,255,255,0.016) 3px)" }}
+          />
+        </div>
+
+        {/* FOREGROUND CONTENT */}
+        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-8 text-center">
+          <p
+            className="text-[10px] tracking-[0.3em] uppercase mb-6 opacity-80"
+            style={{ fontFamily: mono, color: "#38BDF8" }}
+          >
+            BANDARMOLOGY ANALYSIS & RESEARCH TERMINAL
+          </p>
+
+          <h1 style={{ fontFamily: sora }} className="text-5xl font-bold text-white leading-tight mb-4">
+            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "0ms" }}>
+              Baca Pasar
+            </div>
+            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "100ms" }}>
+              Sebelum Harga
+            </div>
+            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "200ms", color: "#38BDF8" }}>
+              Bergerak.
+            </div>
+          </h1>
+
+          <p
+            className="text-lg max-w-lg mx-auto mt-2 mb-8 leading-relaxed"
+            style={{
+              fontFamily: sora,
+              color: "#6b7280",
+              opacity: 0,
+              animation: "fadeInUp 0.4s ease forwards",
+              animationDelay: "350ms",
+            }}
+            data-testid="text-homepage-subtitle"
+          >
+            BART mendeteksi perilaku institusi dan bandar di seluruh IDX
+            sebelum pergerakan harga terjadi.
+          </p>
+
+          <div
+            style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "500ms" }}
+            className="flex flex-col items-center"
+          >
+            <Link href="/radar">
+              <button
+                className="font-bold text-sm tracking-wider px-8 py-3.5 rounded-md transition-all duration-200 hover:scale-[1.02]"
+                style={{
+                  fontFamily: mono,
+                  background: "#38BDF8",
+                  color: "#000",
+                  boxShadow: "0 10px 25px -5px rgba(56,189,248,0.2)",
+                }}
+                data-testid="button-open-radar"
+              >
+                BUKA RADAR →
+              </button>
+            </Link>
+            <Link href="/stock/BBCA">
+              <span
+                className="text-[11px] mt-3 block transition-colors cursor-pointer hover:text-[#ffffff60]"
+                style={{ fontFamily: mono, color: "rgba(255,255,255,0.19)" }}
+                data-testid="link-example-analysis"
+              >
+                Lihat contoh analisis saham →
+              </span>
+            </Link>
           </div>
 
           <div
-            className="flex-shrink-0 w-52 rounded-md p-4 mt-2"
-            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.06)" }}
+            className="flex gap-12 justify-center mt-16 items-center"
+            style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "600ms" }}
           >
-            <span
-              className="block text-[9px] tracking-[0.2em] uppercase mb-3"
-              style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
-            >
-              STATUS PASAR
-            </span>
-            <div className="flex items-center gap-2">
-              <span
-                className="relative inline-block w-2 h-2 rounded-full flex-shrink-0"
-                style={{ background: sessionColorMap[session.color] }}
-              >
-                {isSessionActive && (
-                  <span
-                    className="absolute inset-0 rounded-full animate-ping"
-                    style={{ background: sessionColorMap[session.color], opacity: 0.5 }}
-                  />
-                )}
-              </span>
-              <p
-                className="text-sm font-medium"
-                style={{
-                  fontFamily: "'IBM Plex Mono', monospace",
-                  color: sessionColorMap[session.color],
-                }}
-              >
-                {session.label}
-              </p>
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white" style={{ fontFamily: mono }}>12+</p>
+              <p className="text-[10px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>Model Deteksi</p>
             </div>
-            <p
-              className="text-xs mt-2"
-              style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
-            >
-              {wibTime}
-            </p>
-            {nextSession && (
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }} className="mt-3 pt-3">
-                <p
-                  className="text-[9px] tracking-wider"
-                  style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
+            <div className="w-px h-8 self-center" style={{ background: "rgba(255,255,255,0.06)" }} />
+            <div className="text-center">
+              <p className="text-2xl font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>v2.0</p>
+              <p className="text-[10px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>Engine Bandarmologi</p>
+            </div>
+            <div className="w-px h-8 self-center" style={{ background: "rgba(255,255,255,0.06)" }} />
+            <div className="text-center">
+              <p className="text-2xl font-bold text-white" style={{ fontFamily: mono }}>IDX</p>
+              <p className="text-[10px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>Seluruh Pasar</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 2 — Feature strip */}
+      <section className="py-12 px-8" style={{ background: "#0a0a0a", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+        <h2
+          className="text-xl font-bold text-white text-center mb-8"
+          style={{ fontFamily: sora }}
+        >
+          Dirancang untuk investor yang berpikir seperti institusi.
+        </h2>
+
+        <div className="grid grid-cols-3 gap-6 max-w-4xl mx-auto">
+          {[
+            {
+              icon: Activity,
+              title: "Bandarmology Engine",
+              desc: "12 model deteksi perilaku institusi. Dari akumulasi stealth hingga stabilitas rezim pasar.",
+            },
+            {
+              icon: Radio,
+              title: "Radar IDX",
+              desc: "Pemindaian seluruh pasar secara bersamaan. Temukan kampanye akumulasi sebelum harga bergerak.",
+            },
+            {
+              icon: ShieldCheck,
+              title: "Bukan Sinyal Jual Beli",
+              desc: "BART membantu Anda berpikir seperti pro. Bukan robot trading — panduan analisis berbasis data.",
+            },
+          ].map((f) => {
+            const Icon = f.icon;
+            return (
+              <div
+                key={f.title}
+                className="p-6 rounded-md transition-all duration-200 hover:border-[rgba(56,189,248,0.2)]"
+                style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
+              >
+                <div
+                  className="w-8 h-8 rounded-sm flex items-center justify-center mb-4"
+                  style={{ background: "rgba(56,189,248,0.1)" }}
                 >
-                  SESI BERIKUTNYA
-                </p>
-                <p
-                  className="text-sm text-white mt-0.5"
-                  style={{ fontFamily: "'IBM Plex Mono', monospace" }}
-                >
-                  {nextSession}
+                  <Icon style={{ width: 16, height: 16, color: "#38BDF8" }} />
+                </div>
+                <h3 className="text-sm font-bold text-white mb-2" style={{ fontFamily: sora }}>
+                  {f.title}
+                </h3>
+                <p className="text-[11px] leading-relaxed" style={{ fontFamily: mono, color: "#6b7280" }}>
+                  {f.desc}
                 </p>
               </div>
-            )}
-          </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 3 — Aggregate Stats Bar */}
-      <section
-        className="w-full py-4 px-6 flex items-center overflow-x-auto"
-        style={{
-          background: "#111111",
-          borderTop: "1px solid rgba(255,255,255,0.08)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-        }}
-      >
-        {[
-          { label: "SAHAM DIPANTAU", value: totalStocks, color: "#fff" },
-          { label: "SIAP DIPANTAU", value: readyStocks.length, color: "#34d399" },
-          { label: "WATCHLIST", value: watchlistStocks.length, color: "#fbbf24" },
-          { label: "HINDARI DULU", value: avoidStocks.length, color: "#f87171" },
-        ].flatMap((stat, i, arr) => {
-          const block = (
-            <div key={stat.label} className="flex-1 flex flex-col gap-1">
-              <span
-                className="text-[10px] tracking-widest whitespace-nowrap"
-                style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
-              >
-                {stat.label}
-              </span>
-              <span
-                className="text-xl font-bold"
-                style={{ fontFamily: "'IBM Plex Mono', monospace", color: stat.color }}
-              >
-                {isLoading ? "—" : stat.value}
-              </span>
-            </div>
-          );
-          if (i < arr.length - 1) {
-            return [block, <div key={`div-${i}`} className="w-px h-8 bg-[#ffffff15] mx-6 flex-shrink-0" />];
-          }
-          return [block];
-        })}
-      </section>
-
-      {/* SECTION 4 — Radar Placeholder Banner */}
-      <div className="mx-6 my-4">
-        <div
-          className="flex justify-between items-center px-5 py-4 rounded-md"
-          style={{
-            background: "#0d1a2a",
-            border: "1px solid rgba(56,189,248,0.2)",
-          }}
-        >
-          <div>
-            <p
-              className="text-[10px] tracking-[0.2em] uppercase mb-1"
-              style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#38BDF8" }}
-            >
-              BANDARMOLOGY RADAR
-            </p>
-            <p
-              className="text-sm"
-              style={{ fontFamily: "'Sora', sans-serif", color: "#6b7280" }}
-            >
-              Pemindaian institusional di seluruh IDX — segera hadir
-            </p>
-          </div>
-          <span
-            className="text-[10px] tracking-widest px-3 py-1 rounded-sm flex-shrink-0"
-            style={{
-              fontFamily: "'IBM Plex Mono', monospace",
-              background: "rgba(56,189,248,0.1)",
-              color: "#38BDF8",
-              border: "1px solid rgba(56,189,248,0.3)",
-            }}
-          >
-            SEGERA
-          </span>
-        </div>
-      </div>
-
-      {/* SECTION 5 — Bucket Tabs + Stock Cards */}
-      <section className="px-6 pb-10">
-        <div
-          className="flex gap-0"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
-          data-testid="tabs-homepage"
-        >
-          {tabConfig.map((tab) => {
-            const isActive = activeTab === tab.key;
-            const accent = bucketAccent[tab.key];
-            const count = bucketStocks[tab.key].length;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className="px-4 py-2 flex items-center gap-2 transition-colors"
-                style={{
-                  fontFamily: "'IBM Plex Mono', monospace",
-                  fontSize: 12,
-                  letterSpacing: "0.05em",
-                  textTransform: "uppercase" as const,
-                  color: isActive ? "#fff" : "#6b7280",
-                  borderBottom: isActive ? `2px solid ${accent}` : "2px solid transparent",
-                  background: "transparent",
-                }}
-                data-testid={`tab-${tab.key === "siap_dipantau" ? "siap" : tab.key === "watchlist_prioritas" ? "watchlist" : "hindari"}`}
-              >
-                {tab.tabLabel}
-                <span
-                  className="px-1.5 py-0.5 rounded-sm text-[10px]"
-                  style={{
-                    fontFamily: "'IBM Plex Mono', monospace",
-                    background: isActive ? `${accent}20` : "rgba(255,255,255,0.03)",
-                    color: isActive ? accent : "#6b7280",
-                  }}
-                >
-                  {isLoading ? "—" : count}
-                </span>
-              </button>
             );
           })}
         </div>
+      </section>
 
-        <div
-          className="text-xs px-4 py-2.5 rounded-sm mt-3 mb-4"
-          style={{
-            fontFamily: "'IBM Plex Mono', monospace",
-            background: "#161616",
-            color: bucketAccent[activeTab],
-          }}
-        >
-          {activeConfig.description}
-        </div>
-
-        <div data-testid={`content-${activeTab === "siap_dipantau" ? "siap" : activeTab === "watchlist_prioritas" ? "watchlist" : "hindari"}`}>
-          {isLoading ? (
-            <div>
-              <StockCardSkeleton />
-              <StockCardSkeleton />
-              <StockCardSkeleton />
-            </div>
-          ) : activeStocks.length === 0 ? (
-            <div
-              className="rounded-md px-6 py-12 text-center"
+      {/* SECTION 3 — Bottom CTA strip */}
+      <section
+        className="py-10 px-8"
+        style={{ background: "#0f0f0f", borderTop: "1px solid rgba(255,255,255,0.03)" }}
+      >
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <div>
+            <p className="text-lg font-bold text-white" style={{ fontFamily: sora }}>
+              Siap memindai pasar?
+            </p>
+            <p className="text-xs mt-1" style={{ fontFamily: mono, color: "#6b7280" }}>
+              Data IDX live segera hadir via PT Berkat Digital Investasi
+            </p>
+          </div>
+          <Link href="/radar">
+            <button
+              className="font-bold text-sm tracking-wider px-8 py-3.5 rounded-md transition-all duration-200 hover:scale-[1.02]"
               style={{
-                background: "#161616",
-                border: "1px dashed rgba(255,255,255,0.06)",
+                fontFamily: mono,
+                background: "#38BDF8",
+                color: "#000",
+                boxShadow: "0 10px 25px -5px rgba(56,189,248,0.2)",
               }}
+              data-testid="button-bottom-radar"
             >
-              <p className="text-3xl mb-3" style={{ color: "rgba(255,255,255,0.06)" }}>◎</p>
-              <p
-                className="text-sm"
-                style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
-              >
-                Tidak ada saham terdeteksi
-              </p>
-              <p
-                className="text-[10px] mt-1"
-                style={{ fontFamily: "'IBM Plex Mono', monospace", color: "rgba(255,255,255,0.12)" }}
-              >
-                Radar sedang memindai pasar IDX
-              </p>
-            </div>
-          ) : (
-            activeStocks.map((stock, index) => (
-              <StockCard
-                key={stock.symbol}
-                stock={stock}
-                bucket={activeTab}
-                index={index}
-                onToggleWatchlist={handleToggleWatchlist}
-                isToggling={togglingSymbols.has(stock.symbol)}
-              />
-            ))
-          )}
+              BUKA RADAR →
+            </button>
+          </Link>
         </div>
       </section>
     </div>

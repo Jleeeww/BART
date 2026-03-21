@@ -1,0 +1,219 @@
+Rebuild client/src/pages/Homepage.tsx from scratch as a landing page.
+The old bucket-tab Peta Kesiapan layout is completely replaced.
+Do not touch any other file except Homepage.tsx.
+All existing data fetching from /api/stocks can stay — we use it 
+for the background preview. All other files untouched.
+
+---
+
+CONCEPT:
+Professional dark landing page for BART — Bandarmology Analysis & Research Terminal.
+Feels like Bloomberg Terminal meets a stealth fintech product launch.
+Monospace numbers, sharp edges, sky blue accents used sparingly.
+One job: make the user want to open the Radar immediately.
+
+---
+
+FONTS (already imported via index.css):
+- IBM Plex Mono — all labels, numbers, badges, metadata
+- Sora — all headlines and body copy
+
+---
+
+SECTION 1 — Full viewport hero
+
+Outer: relative min-h-screen flex flex-col overflow-hidden bg-[#0f0f0f]
+
+BACKGROUND LAYER (z-0, absolute inset-0):
+  Two visual layers stacked:
+
+  Layer A — Blurred Radar table preview:
+    Render a simplified non-interactive version of the Radar table
+    using live data from /api/stocks (same fetch as before).
+    Style it exactly like the real Radar table in RadarPage.tsx
+    but with these modifications:
+      - pointer-events-none, select-none
+      - opacity-20
+      - filter: blur(2px)
+      - overflow hidden, no scrollbar
+      - position absolute, inset-0, pt-32
+      - Show max 12 rows, no pagination
+    This gives the impression of a live institutional dashboard
+    running in the background.
+
+  Layer B — Gradient overlay on top of Layer A:
+    absolute inset-0
+    background: linear-gradient(
+      to bottom,
+      #0f0f0f 0%,
+      #0f0f0f40 30%,
+      #0f0f0f10 60%,
+      #0f0f0f 100%
+    )
+    This fades the table at top and bottom so it feels atmospheric
+    rather than distracting.
+
+  Layer C — Scanline texture:
+    absolute inset-0 pointer-events-none
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      #ffffff04 2px,
+      #ffffff04 3px
+    )
+
+FOREGROUND CONTENT (z-10, relative):
+  flex flex-col items-center justify-center min-h-screen px-8 text-center
+
+  TOP LABEL:
+    IBM Plex Mono text-[10px] tracking-[0.3em] text-[#38BDF8] uppercase
+    mb-6 opacity-80
+    "BANDARMOLOGY ANALYSIS & RESEARCH TERMINAL"
+
+  MAIN HEADLINE:
+    Sora text-5xl font-bold text-white leading-tight mb-4
+    Line 1: "Baca Pasar"
+    Line 2: "Sebelum Harga" 
+    Line 3: "Bergerak." — this word in text-[#38BDF8]
+    
+    Each line on its own <div> or <span> with display block
+    Animate in with staggered fadeInUp:
+      Line 1: animationDelay 0ms
+      Line 2: animationDelay 100ms  
+      Line 3: animationDelay 200ms
+    Use the existing fadeInUp keyframe from index.css
+
+  SUBHEADLINE:
+    Sora text-lg text-[#6b7280] max-w-lg mx-auto mt-2 mb-8
+    leading-relaxed
+    "BART mendeteksi perilaku institusi dan bandar di seluruh IDX
+     sebelum pergerakan harga terjadi."
+    Animate in: animationDelay 350ms, same fadeInUp
+
+  CTA BUTTON:
+    Navigate to /radar on click (use wouter useLocation or Link)
+    
+    Primary button:
+      bg-[#38BDF8] hover:bg-[#7dd3fc] text-black font-bold
+      IBM Plex Mono text-sm tracking-wider px-8 py-3.5 rounded-md
+      transition-all duration-200 hover:scale-[1.02]
+      shadow-lg shadow-[#38BDF8]/20
+      "BUKA RADAR →"
+    
+    Secondary link below button:
+      IBM Plex Mono text-[11px] text-[#ffffff30] mt-3 block
+      hover:text-[#ffffff60] transition-colors cursor-pointer
+      Navigate to /stock/BBCA
+      "Lihat contoh analisis saham →"
+    
+    Animate both in: animationDelay 500ms, fadeInUp
+
+  STAT ROW:
+    flex gap-12 justify-center mt-16
+    3 stats side by side with vertical dividers between them
+
+    Stat 1:
+      Top: IBM Plex Mono text-2xl font-bold text-white "12+"
+      Bottom: IBM Plex Mono text-[10px] tracking-widest text-[#6b7280] 
+              uppercase "Model Deteksi"
+
+    Stat 2:
+      Top: IBM Plex Mono text-2xl font-bold text-[#38BDF8] "v2.0"
+      Bottom: IBM Plex Mono text-[10px] tracking-widest text-[#6b7280] 
+              uppercase "Engine Bandarmologi"
+
+    Stat 3:
+      Top: IBM Plex Mono text-2xl font-bold text-white "IDX"
+      Bottom: IBM Plex Mono text-[10px] tracking-widest text-[#6b7280] 
+              uppercase "Seluruh Pasar"
+
+    Dividers between stats:
+      w-px h-8 bg-[#ffffff10] self-center mx-2
+
+    Animate in: animationDelay 600ms, fadeInUp
+
+---
+
+SECTION 2 — Feature strip (below hero, not full viewport)
+
+bg-[#0a0a0a] border-t border-[#ffffff08] py-12 px-8
+
+Title: Sora text-xl font-bold text-white text-center mb-8
+"Dirancang untuk investor yang berpikir seperti institusi."
+
+3-column grid: grid grid-cols-3 gap-6 max-w-4xl mx-auto
+
+Each feature card:
+  bg-[#161616] border border-[#ffffff08] rounded-md p-6
+  hover:border-[#38BDF8]/20 transition-all duration-200
+
+  Icon area: 
+    w-8 h-8 rounded-sm bg-[#38BDF8]/10 flex items-center justify-center mb-4
+    Icon from lucide-react, 16px, text-[#38BDF8]
+
+  Title: Sora text-sm font-bold text-white mb-2
+
+  Description: IBM Plex Mono text-[11px] text-[#6b7280] leading-relaxed
+
+Feature 1:
+  Icon: Activity
+  Title: "Bandarmology Engine"
+  Desc: "12 model deteksi perilaku institusi. Dari akumulasi stealth 
+         hingga stabilitas rezim pasar."
+
+Feature 2:
+  Icon: Radio
+  Title: "Radar IDX"
+  Desc: "Pemindaian seluruh pasar secara bersamaan. Temukan kampanye 
+         akumulasi sebelum harga bergerak."
+
+Feature 3:
+  Icon: ShieldCheck
+  Title: "Bukan Sinyal Jual Beli"
+  Desc: "BART membantu Anda berpikir seperti pro. Bukan robot trading — 
+         panduan analisis berbasis data."
+
+---
+
+SECTION 3 — Bottom CTA strip
+
+bg-[#0f0f0f] border-t border-[#ffffff08] py-10 px-8
+flex items-center justify-between max-w-4xl mx-auto
+
+Left:
+  Sora text-lg font-bold text-white "Siap memindai pasar?"
+  IBM Plex Mono text-xs text-[#6b7280] mt-1 
+  "Data IDX live segera hadir via PT Berkat Digital Investasi"
+
+Right:
+  Same CTA button as hero: "BUKA RADAR →"
+  Same styling, same navigation to /radar
+
+---
+
+REMOVE FROM HOMEPAGE:
+- All bucket tab logic (siap_dipantau / watchlist_prioritas / hindari_dulu)
+- SimulationToggle (remove from homepage entirely — it lives in StockDashboard)
+- SimulationBanner (same)
+- The top nav bar (sidebar handles navigation)
+- The old stats bar
+- The old Radar placeholder banner
+- The stock card list
+
+KEEP:
+- The /api/stocks fetch (used for background Radar preview)
+- The console audit can be removed since buckets no longer exist on homepage
+
+---
+
+SAFETY RULES:
+1. Only modify client/src/pages/Homepage.tsx
+2. Do not touch any engine files, routes.ts, or backend
+3. Do not touch RadarPage.tsx, StockDashboard.tsx, or Sidebar.tsx
+4. Do not install new packages
+5. Use only: wouter (Link/useLocation), lucide-react, existing UI components
+6. Verify the page loads at / without console errors
+7. Verify clicking "BUKA RADAR →" navigates to /radar
+8. Verify clicking "Lihat contoh analisis saham →" navigates to /stock/BBCA
+9. Report all changes made
