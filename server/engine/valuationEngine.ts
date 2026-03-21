@@ -232,11 +232,11 @@ function scoreFundamentalQuality(
   let label: QualityLabel;
   let interpretation: string;
 
-  if (score >= 65) {
+  if (score >= 55) {
     label = 'KUAT';
     interpretation = `Fundamental bisnis kuat dibanding rata-rata sektor ${benchmark.displayName}. ` +
       `ROE dan margin laba berada di atas rata-rata industri.`;
-  } else if (score >= 40) {
+  } else if (score >= 35) {
     label = 'SEDANG';
     interpretation = `Fundamental bisnis rata-rata untuk sektor ${benchmark.displayName}. ` +
       `Tidak ada kelemahan signifikan, namun juga tidak menonjol.`;
