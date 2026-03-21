@@ -1,35 +1,23 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Star } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
-interface RadarStockResult {
+interface StockData {
   symbol: string;
-  companyName: string;
+  name: string;
+  price: string;
+  change: string;
+  changePercent: string;
   sector: string | null;
-  price: number;
-  changePercent: number;
-  compositeScore: number;
-  confidence: number;
-  regime: string | null;
-  cyclePosition: string | null;
-  concentrationType: string;
-  flowBias: string | null;
-  homepageBucket: string;
-  isGorengan: boolean;
-  dataQuality: string;
-  processedAt: string;
-}
-
-interface RadarResult {
-  stocks: RadarStockResult[];
-  hiddenCount: number;
-  errorCount: number;
-  totalProcessed: number;
-  cacheTimestamp: string;
-  isStale: boolean;
-  nextRefreshAt: string;
+  readinessScore: number;
+  marketRegime: string;
+  actionGuidance: string;
+  actionState: string;
+  homepageBucket: "siap_dipantau" | "watchlist_prioritas" | "hindari_dulu";
+  aiSentence: string;
+  isGorengan?: boolean;
 }
 
 type FilterType = "semua" | "akumulasi" | "distribusi" | "waspadai";
@@ -40,6 +28,28 @@ const filterPills: { key: FilterType; label: string }[] = [
   { key: "distribusi", label: "Distribusi" },
   { key: "waspadai", label: "Waspadai" },
 ];
+
+function deriveV2(stock: StockData) {
+  const score = stock.readinessScore;
+  let cyclePosition: string | null = null;
+  const regime = stock.marketRegime?.toLowerCase() || "";
+  if (regime.includes("akumulasi") && score >= 80) cyclePosition = "ENTRY_WINDOW";
+  else if (regime.includes("akumulasi") && score >= 60) cyclePosition = "KONFIRMASI_MULAI";
+  else if (regime.includes("akumulasi")) cyclePosition = "TERLALU_DINI";
+  else if (regime.includes("distribusi") || regime.includes("spekulatif")) cyclePosition = "WASPADAI_DISTRIBUSI";
+
+  let concentrationType: string | null = null;
+  if (score >= 70) concentrationType = "KENDALI_BANDAR";
+  else if (score >= 40 && score < 60) concentrationType = "TERSEBAR";
+  else if (stock.isGorengan || score < 40) concentrationType = "JEBAKAN_DISTRIBUSI";
+
+  let flowBias: string | null = null;
+  if (stock.homepageBucket === "siap_dipantau") flowBias = "Akumulasi";
+  else if (stock.homepageBucket === "hindari_dulu") flowBias = "Distribusi";
+  else flowBias = "Netral";
+
+  return { cyclePosition, concentrationType, flowBias };
+}
 
 function scoreColor(score: number) {
   if (score >= 80) return "#34d399";
@@ -56,19 +66,6 @@ function bucketAccent(bucket: string) {
 const mono = "'IBM Plex Mono', monospace";
 const sora = "'Sora', sans-serif";
 
-function formatCacheTime(iso: string) {
-  try {
-    return new Date(iso).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-  } catch { return iso; }
-}
-
-function formatRefreshTime(iso: string) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) + ' WIB';
-  } catch { return iso; }
-}
-
 interface WatchlistItem {
   id: number;
   symbol: string;
@@ -78,49 +75,10 @@ interface WatchlistItem {
 export default function RadarPage() {
   const [filter, setFilter] = useState<FilterType>("semua");
   const [optimisticOverrides, setOptimisticOverrides] = useState<Record<string, boolean>>({});
-  const [radarData, setRadarData] = useState<RadarResult | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
-    fetch('/api/radar')
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then(data => {
-        if (!data || !Array.isArray(data.stocks)) throw new Error('Invalid response');
-        setRadarData(data);
-        setError(null);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError('Gagal memuat data radar');
-        setLoading(false);
-      });
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetch('/api/radar')
-        .then(r => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        })
-        .then(data => {
-          if (data && Array.isArray(data.stocks)) {
-            setRadarData(data);
-            setError(null);
-          }
-        })
-        .catch(() => {});
-    }, 15 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const stocks = radarData?.stocks ?? [];
+  const { data: stocks, isLoading } = useQuery<StockData[]>({
+    queryKey: ["/api/stocks"],
+  });
 
   const { data: watchlistData } = useQuery<WatchlistItem[]>({
     queryKey: ["/api/watchlist"],
@@ -151,13 +109,14 @@ export default function RadarPage() {
   }, [watchlistedSymbols]);
 
   const filtered = useMemo(() => {
+    if (!stocks) return [];
     let list = stocks;
     if (filter === "akumulasi") {
       list = list.filter(s => s.homepageBucket === "siap_dipantau" || s.homepageBucket === "watchlist_prioritas");
     } else if (filter === "distribusi") {
       list = list.filter(s => s.homepageBucket === "hindari_dulu");
     } else if (filter === "waspadai") {
-      list = list.filter(s => s.compositeScore >= 40 && s.compositeScore <= 59);
+      list = list.filter(s => s.readinessScore >= 40 && s.readinessScore <= 59);
     }
     return list;
   }, [stocks, filter]);
@@ -170,28 +129,6 @@ export default function RadarPage() {
       dipantau: filtered.filter(s => s.homepageBucket === "watchlist_prioritas").length,
     };
   }, [filtered]);
-
-  if (loading) {
-    return (
-      <div className="px-6 py-6 min-h-screen flex items-center justify-center" style={{ background: "#0f0f0f" }}>
-        <div className="text-center">
-          <p className="text-4xl animate-pulse mb-3" style={{ color: "rgba(56,189,248,0.3)" }}>◎</p>
-          <p className="text-sm" style={{ fontFamily: mono, color: "#6b7280" }}>Radar sedang memindai pasar...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="px-6 py-6 min-h-screen flex items-center justify-center" style={{ background: "#0f0f0f" }}>
-        <div className="text-center">
-          <p className="text-3xl mb-3" style={{ color: "rgba(248,113,113,0.5)" }}>⚠</p>
-          <p className="text-sm" style={{ fontFamily: mono, color: "rgba(248,113,113,0.7)" }}>{error}</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="px-6 py-6 min-h-screen" style={{ background: "#0f0f0f" }}>
@@ -258,21 +195,6 @@ export default function RadarPage() {
         </div>
       </div>
 
-      {radarData && (
-        <div
-          className="flex items-center justify-between px-4 py-1.5 mb-2"
-          style={{ background: "#0d0d0d", borderBottom: "1px solid rgba(255,255,255,0.024)" }}
-          data-testid="radar-cache-info"
-        >
-          <span style={{ fontFamily: mono, fontSize: 9, color: "rgba(255,255,255,0.125)" }}>
-            Diperbarui: {formatCacheTime(radarData.cacheTimestamp)}
-          </span>
-          <span style={{ fontFamily: mono, fontSize: 9, color: "rgba(255,255,255,0.125)" }}>
-            {radarData.totalProcessed} saham diproses · {radarData.errorCount} gagal · Refresh: {formatRefreshTime(radarData.nextRefreshAt)}
-          </span>
-        </div>
-      )}
-
       {/* SECTION C — Confidence notice */}
       <div
         className="px-4 py-2 mb-3 rounded-sm"
@@ -282,7 +204,7 @@ export default function RadarPage() {
         }}
       >
         <p className="text-[10px]" style={{ fontFamily: mono, color: "rgba(245,158,11,0.7)" }}>
-          {radarData?.hiddenCount ?? 0} saham disembunyikan karena kepercayaan sinyal di bawah 60%
+          0 saham disembunyikan karena kepercayaan sinyal di bawah 60%
         </p>
       </div>
 
@@ -310,7 +232,17 @@ export default function RadarPage() {
             </tr>
           </thead>
           <tbody>
-            {filtered.length === 0 ? (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <tr key={i} style={{ background: "#161616", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                  {Array.from({ length: 8 }).map((_, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <div className="h-4 w-16 rounded bg-[#222] animate-pulse" />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-16 text-center">
                   <p className="text-4xl mb-3" style={{ color: "rgba(255,255,255,0.06)" }}>◎</p>
@@ -321,6 +253,7 @@ export default function RadarPage() {
               </tr>
             ) : (
               filtered.map((stock) => {
+                const v2 = deriveV2(stock);
                 const accent = bucketAccent(stock.homepageBucket);
                 return (
                   <tr
@@ -344,7 +277,7 @@ export default function RadarPage() {
                             className="text-[11px] truncate"
                             style={{ fontFamily: mono, color: "#6b7280", maxWidth: 160 }}
                           >
-                            {stock.companyName}
+                            {stock.name}
                           </p>
                         </div>
                       </div>
@@ -359,26 +292,26 @@ export default function RadarPage() {
                     <td className="px-4 py-3 w-20 text-center">
                       <span
                         className="text-lg font-bold"
-                        style={{ fontFamily: mono, color: scoreColor(stock.compositeScore) }}
+                        style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}
                       >
-                        {stock.compositeScore}
+                        {stock.readinessScore}
                       </span>
                     </td>
 
                     <td className="px-4 py-3 w-32">
-                      <RegimeBadge regime={stock.regime || ""} />
+                      <RegimeBadge regime={stock.marketRegime} />
                     </td>
 
                     <td className="px-4 py-3 w-40">
-                      <CycleLabel position={stock.cyclePosition} />
+                      <CycleLabel position={v2.cyclePosition} />
                     </td>
 
                     <td className="px-4 py-3 w-28 text-right">
-                      <FlowLabel bias={stock.flowBias} />
+                      <FlowLabel bias={v2.flowBias} />
                     </td>
 
                     <td className="px-4 py-3 w-32">
-                      <ConcentrationBadge type={stock.concentrationType} />
+                      <ConcentrationBadge type={v2.concentrationType} />
                     </td>
 
                     <td className="px-4 py-3 w-32 text-right">
