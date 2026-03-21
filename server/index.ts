@@ -93,6 +93,10 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+
+      import('./engine/altDataFetcher')
+        .then(({ warmAltDataCaches }) => warmAltDataCaches())
+        .catch(err => console.warn('[startup] altDataFetcher warmup error:', err));
     },
   );
 })();

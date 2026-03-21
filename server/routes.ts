@@ -2231,5 +2231,24 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/alt-data/status', async (req, res) => {
+    try {
+      const { getAltDataStatus } = await import('./engine/altDataFetcher');
+      res.status(200).json(getAltDataStatus());
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.get('/api/alt-data/snapshot', async (req, res) => {
+    try {
+      const { getAltDataSnapshot } = await import('./engine/altDataFetcher');
+      const snapshot = await getAltDataSnapshot();
+      res.status(200).json(snapshot);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   return httpServer;
 }

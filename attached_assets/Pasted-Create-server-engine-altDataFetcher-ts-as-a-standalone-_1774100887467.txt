@@ -1,0 +1,596 @@
+Create server/engine/altDataFetcher.ts as a standalone module.
+Do not wire it into any existing file yet.
+Do not touch any engine files, routes, or frontend.
+
+---
+
+PURPOSE:
+Fetches and caches alternative data from three Indonesian public 
+sources on a schedule. Provides clean typed interfaces for when 
+M17/M18/M19 models are wired in after live IDX data arrives.
+
+---
+
+/**
+ * ============================================================
+ * ALTERNATIVE DATA FETCHER v1.0
+ * ============================================================
+ * server/engine/altDataFetcher.ts
+ *
+ * Fetches and caches public Indonesian alternative data:
+ *   Source 1 — BMKG (Badan Meteorologi, Klimatologi, Geofisika)
+ *              Weather anomalies for key production regions
+ *              API: https://data.bmkg.go.id (free, public JSON)
+ *
+ *   Source 2 — KPBN/CPO Reference Price
+ *              Indonesian CPO benchmark price (IDR/kg)
+ *              Source: ESDM Ministry public data + scrape fallback
+ *
+ *   Source 3 — HBA Coal Index
+ *              Indonesian coal reference price (USD/ton)
+ *              Source: minerba.esdm.go.id (public monthly)
+ *
+ * DESIGN RULES:
+ *   - Never throws — all fetches wrapped in try/catch
+ *   - Returns stale cache on fetch failure (never null)
+ *   - Each source has independent TTL and failure counter
+ *   - Max 3 consecutive failures before source is marked degraded
+ *   - All data tagged with fetchedAt timestamp
+ *   - No external dependencies beyond built-in fetch
+ *   - Safe to call from radarEngine.ts batch pipeline
+ *
+ * SHADOW MODE:
+ *   Data is fetched and cached but not yet used by the engine.
+ *   Call getAltDataStatus() to inspect cached values.
+ *   Models M17/M18/M19 will read from this cache when wired in.
+ * ============================================================
+ */
+
+// ── Types ─────────────────────────────────────────────────────
+
+export interface WeatherRegion {
+  regionId: string;        // BMKG province/area code
+  regionName: string;      // Human readable name
+  sector: string;          // Which IDX sector this region affects
+  rainfallMm: number | null;      // Current rainfall mm/day
+  rainfallAnomaly: number | null; // % deviation from 30yr average
+  weatherCode: string | null;     // BMKG weather description code
+  temperature: number | null;     // Celsius
+  fetchedAt: string;
+}
+
+export interface CPOPriceData {
+  priceIDR: number | null;        // IDR per kg (KPBN Franco Dumai)
+  priceMYR: number | null;        // MYR per ton (Bursa Malaysia, reference)
+  priceUSD: number | null;        // USD per ton (government reference HR)
+  changePercent30d: number | null; // 30-day price change %
+  trend: 'NAIK' | 'TURUN' | 'STABIL' | null;
+  fetchedAt: string;
+  source: string;
+}
+
+export interface CoalPriceData {
+  hba1USD: number | null;  // HBA1 GAR 6322 USD/ton
+  hba2USD: number | null;  // HBA2 GAR 5300 USD/ton
+  hba3USD: number | null;  // HBA3 GAR 4100 USD/ton
+  changePercent30d: number | null;
+  trend: 'NAIK' | 'TURUN' | 'STABIL' | null;
+  fetchedAt: string;
+  source: string;
+}
+
+export interface AltDataSnapshot {
+  weather: WeatherRegion[];
+  cpo: CPOPriceData;
+  coal: CoalPriceData;
+  lastFullRefresh: string | null;
+  degradedSources: string[];  // sources with 3+ consecutive failures
+}
+
+// ── Cache ─────────────────────────────────────────────────────
+
+interface SourceCache<T> {
+  data: T | null;
+  fetchedAt: number;
+  consecutiveFailures: number;
+  isDegraded: boolean;
+}
+
+const WEATHER_TTL  = 3  * 60 * 60 * 1000;  // 3 hours
+const CPO_TTL      = 6  * 60 * 60 * 1000;  // 6 hours
+const COAL_TTL     = 24 * 60 * 60 * 1000;  // 24 hours (monthly data)
+const MAX_FAILURES = 3;
+
+const FETCH_TIMEOUT_MS = 8000;
+
+let _weatherCache: SourceCache<WeatherRegion[]> = {
+  data: null, fetchedAt: 0,
+  consecutiveFailures: 0, isDegraded: false,
+};
+let _cpoCache: SourceCache<CPOPriceData> = {
+  data: null, fetchedAt: 0,
+  consecutiveFailures: 0, isDegraded: false,
+};
+let _coalCache: SourceCache<CoalPriceData> = {
+  data: null, fetchedAt: 0,
+  consecutiveFailures: 0, isDegraded: false,
+};
+
+// ── Key production regions for IDX sectors ────────────────────
+// Maps BMKG region codes to IDX sectors they affect
+
+const KEY_REGIONS = [
+  // Palm oil / plantation — Sumatra and Kalimantan
+  { regionId: '15', regionName: 'Riau',              sector: 'Consumer Staples' },
+  { regionId: '16', regionName: 'Sumatera Selatan',  sector: 'Consumer Staples' },
+  { regionId: '14', regionName: 'Kalimantan Tengah', sector: 'Consumer Staples' },
+  { regionId: '17', regionName: 'Kalimantan Timur',  sector: 'Energy'           },
+  // Coal / mining — Kalimantan
+  { regionId: '18', regionName: 'Kalimantan Selatan', sector: 'Basic Materials' },
+  { regionId: '19', regionName: 'Kalimantan Barat',   sector: 'Basic Materials' },
+  // Nickel — Sulawesi and Maluku
+  { regionId: '20', regionName: 'Sulawesi Tengah',   sector: 'Basic Materials'  },
+  { regionId: '21', regionName: 'Maluku Utara',      sector: 'Basic Materials'  },
+  // Consumer demand indicator — Java
+  { regionId: '12', regionName: 'Jawa Tengah',       sector: 'Consumer Discretionary' },
+  { regionId: '11', regionName: 'Jawa Timur',        sector: 'Consumer Discretionary' },
+];
+
+// ── Fetch timeout wrapper ─────────────────────────────────────
+
+async function fetchWithTimeout(
+  url: string, 
+  ms: number = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
+
+// ── BMKG Weather Fetcher ──────────────────────────────────────
+
+async function fetchBMKGWeather(): Promise<WeatherRegion[]> {
+  const results: WeatherRegion[] = [];
+  const now = new Date().toISOString();
+
+  // BMKG open API: https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4={code}
+  // We fetch province-level forecasts for key regions
+  // Province codes map to BMKG adm1 codes
+
+  const BMKG_PROVINCE_MAP: Record<string, string> = {
+    '11': 'jawa-timur',
+    '12': 'jawa-tengah', 
+    '14': 'kalimantan-tengah',
+    '15': 'riau',
+    '16': 'sumatera-selatan',
+    '17': 'kalimantan-timur',
+    '18': 'kalimantan-selatan',
+    '19': 'kalimantan-barat',
+    '20': 'sulawesi-tengah',
+    '21': 'maluku-utara',
+  };
+
+  for (const region of KEY_REGIONS) {
+    try {
+      const provinceName = BMKG_PROVINCE_MAP[region.regionId];
+      if (!provinceName) continue;
+
+      // BMKG open data endpoint for weather forecast by province
+      const url = `https://data.bmkg.go.id/DataMKG/MEWS/DigitalForecast/DigitalForecast-${
+        provinceName.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')
+      }.xml`;
+
+      const response = await fetchWithTimeout(url, 5000);
+      
+      if (!response.ok) {
+        // Push with null data — region exists but data unavailable
+        results.push({
+          ...region,
+          rainfallMm: null,
+          rainfallAnomaly: null,
+          weatherCode: null,
+          temperature: null,
+          fetchedAt: now,
+        });
+        continue;
+      }
+
+      const text = await response.text();
+      
+      // Parse XML — extract weather code and temperature
+      // BMKG XML format: <weather>x</weather> <t>y</t>
+      const weatherMatch = text.match(/<weather>(\d+)<\/weather>/);
+      const tempMatch    = text.match(/<t>(\d+)<\/t>/);
+      
+      const weatherCode = weatherMatch ? weatherMatch[1] : null;
+      const temperature = tempMatch ? parseFloat(tempMatch[1]) : null;
+
+      // Weather codes 60-67 = rain, 80-82 = showers, 95-99 = thunderstorm
+      // Estimate rainfall from weather code
+      let rainfallMm: number | null = null;
+      if (weatherCode) {
+        const code = parseInt(weatherCode);
+        if (code >= 95) rainfallMm = 25;       // heavy rain/thunderstorm
+        else if (code >= 80) rainfallMm = 10;  // showers
+        else if (code >= 60) rainfallMm = 5;   // light rain
+        else rainfallMm = 0;                    // no rain
+      }
+
+      results.push({
+        ...region,
+        rainfallMm,
+        rainfallAnomaly: null, // requires historical baseline — future enhancement
+        weatherCode,
+        temperature,
+        fetchedAt: now,
+      });
+
+    } catch (err) {
+      // Individual region failure — push null and continue
+      results.push({
+        ...region,
+        rainfallMm: null,
+        rainfallAnomaly: null,
+        weatherCode: null,
+        temperature: null,
+        fetchedAt: now,
+      });
+    }
+  }
+
+  return results;
+}
+
+// ── CPO Price Fetcher ─────────────────────────────────────────
+// Primary: ESDM government reference price (monthly)
+// Fallback: hardcoded latest known price with staleness flag
+
+const CPO_FALLBACK: CPOPriceData = {
+  priceIDR: 15655,    // Latest KPBN price Mar 12, 2026
+  priceMYR: null,
+  priceUSD: 938.87,   // Government HR March 2026
+  changePercent30d: null,
+  trend: 'NAIK',
+  fetchedAt: '2026-03-12T00:00:00.000Z',
+  source: 'FALLBACK_HARDCODED',
+};
+
+async function fetchCPOPrice(): Promise<CPOPriceData> {
+  const now = new Date().toISOString();
+  
+  try {
+    // Try ESDM public API for CPO reference price
+    // https://www.minerba.esdm.go.id/harga_acuan — HTML scrape
+    // Primary approach: fetch from a reliable public endpoint
+    
+    // Attempt 1: ESDM mineral price reference page
+    const response = await fetchWithTimeout(
+      'https://www.minerba.esdm.go.id/harga_acuan',
+      6000
+    );
+
+    if (!response.ok) throw new Error(`ESDM returned ${response.status}`);
+    
+    const html = await response.text();
+    
+    // Look for CPO price patterns in the HTML
+    // Typical format: "938.87" or "USD 938.87/MT"
+    const usdMatch = html.match(/CPO[^$]*?([\d,]+\.?\d*)\s*(?:USD|US\$)/i);
+    const priceUSD = usdMatch ? parseFloat(usdMatch[1].replace(',', '')) : null;
+
+    if (!priceUSD || isNaN(priceUSD)) {
+      throw new Error('Could not parse CPO price from ESDM');
+    }
+
+    return {
+      priceIDR: null,      // KPBN tender data requires separate scrape
+      priceMYR: null,
+      priceUSD,
+      changePercent30d: null,
+      trend: null,
+      fetchedAt: now,
+      source: 'ESDM_MINERBA',
+    };
+
+  } catch (err) {
+    console.warn('[altDataFetcher] CPO fetch failed, using fallback:', 
+      err instanceof Error ? err.message : err);
+    
+    // Return fallback with original timestamp (shows as stale)
+    return { ...CPO_FALLBACK };
+  }
+}
+
+// ── HBA Coal Price Fetcher ────────────────────────────────────
+// Source: ESDM minerba.esdm.go.id/harga_acuan (monthly)
+// Published first week of each month
+
+const COAL_FALLBACK: CoalPriceData = {
+  hba1USD: 102.87,  // HBA1 GAR 6322 — Feb 2026
+  hba2USD: 71.74,   // HBA2 GAR 5300 — Feb 2026
+  hba3USD: 47.34,   // HBA3 GAR 4100 — Feb 2026
+  changePercent30d: null,
+  trend: 'TURUN',   // Coal has been declining 2024-2026
+  fetchedAt: '2026-02-16T00:00:00.000Z',
+  source: 'FALLBACK_HARDCODED',
+};
+
+async function fetchCoalPrice(): Promise<CoalPriceData> {
+  const now = new Date().toISOString();
+
+  try {
+    const response = await fetchWithTimeout(
+      'https://www.minerba.esdm.go.id/harga_acuan',
+      6000
+    );
+
+    if (!response.ok) throw new Error(`ESDM returned ${response.status}`);
+    
+    const html = await response.text();
+
+    // Look for HBA price patterns
+    // Format: "HBA" followed by USD price
+    const hba1Match = html.match(/HBA[^$]*?(\d{2,3}\.\d{2})/);
+    const hba1USD = hba1Match ? parseFloat(hba1Match[1]) : null;
+
+    if (!hba1USD || isNaN(hba1USD)) {
+      throw new Error('Could not parse HBA price from ESDM');
+    }
+
+    return {
+      hba1USD,
+      hba2USD: null,  // Requires more parsing — future enhancement
+      hba3USD: null,
+      changePercent30d: null,
+      trend: null,
+      fetchedAt: now,
+      source: 'ESDM_MINERBA',
+    };
+
+  } catch (err) {
+    console.warn('[altDataFetcher] Coal fetch failed, using fallback:',
+      err instanceof Error ? err.message : err);
+    return { ...COAL_FALLBACK };
+  }
+}
+
+// ── Cache management ──────────────────────────────────────────
+
+function isStale(cache: SourceCache<unknown>, ttl: number): boolean {
+  return Date.now() - cache.fetchedAt > ttl;
+}
+
+function markFailure(cache: SourceCache<unknown>): void {
+  cache.consecutiveFailures++;
+  if (cache.consecutiveFailures >= MAX_FAILURES) {
+    cache.isDegraded = true;
+    console.warn(`[altDataFetcher] Source degraded after ${MAX_FAILURES} failures`);
+  }
+}
+
+function markSuccess(cache: SourceCache<unknown>): void {
+  cache.consecutiveFailures = 0;
+  cache.isDegraded = false;
+}
+
+// ── Public API ────────────────────────────────────────────────
+
+/**
+ * Get weather data for key Indonesian production regions.
+ * Returns cached data if fresh. Triggers fetch if stale.
+ * Never throws.
+ */
+export async function getWeatherData(): Promise<WeatherRegion[]> {
+  if (!isStale(_weatherCache, WEATHER_TTL) && _weatherCache.data) {
+    return _weatherCache.data;
+  }
+
+  try {
+    const data = await fetchBMKGWeather();
+    _weatherCache.data = data;
+    _weatherCache.fetchedAt = Date.now();
+    markSuccess(_weatherCache);
+    console.log(`[altDataFetcher] BMKG weather updated: ${data.length} regions`);
+    return data;
+  } catch (err) {
+    markFailure(_weatherCache);
+    console.error('[altDataFetcher] BMKG weather fetch error:', err);
+    return _weatherCache.data ?? [];
+  }
+}
+
+/**
+ * Get CPO price data.
+ * Returns cached data if fresh. Falls back to hardcoded if fetch fails.
+ * Never throws.
+ */
+export async function getCPOPrice(): Promise<CPOPriceData> {
+  if (!isStale(_cpoCache, CPO_TTL) && _cpoCache.data) {
+    return _cpoCache.data;
+  }
+
+  try {
+    const data = await fetchCPOPrice();
+    _cpoCache.data = data;
+    _cpoCache.fetchedAt = Date.now();
+    markSuccess(_cpoCache);
+    console.log(`[altDataFetcher] CPO price updated: USD ${data.priceUSD}/MT`);
+    return data;
+  } catch (err) {
+    markFailure(_cpoCache);
+    console.error('[altDataFetcher] CPO fetch error:', err);
+    return _cpoCache.data ?? CPO_FALLBACK;
+  }
+}
+
+/**
+ * Get HBA coal price data.
+ * Returns cached data if fresh. Falls back to hardcoded if fetch fails.
+ * Never throws.
+ */
+export async function getCoalPrice(): Promise<CoalPriceData> {
+  if (!isStale(_coalCache, COAL_TTL) && _coalCache.data) {
+    return _coalCache.data;
+  }
+
+  try {
+    const data = await fetchCoalPrice();
+    _coalCache.data = data;
+    _coalCache.fetchedAt = Date.now();
+    markSuccess(_coalCache);
+    console.log(`[altDataFetcher] HBA coal updated: USD ${data.hba1USD}/ton`);
+    return data;
+  } catch (err) {
+    markFailure(_coalCache);
+    console.error('[altDataFetcher] Coal fetch error:', err);
+    return _coalCache.data ?? COAL_FALLBACK;
+  }
+}
+
+/**
+ * Get full snapshot of all alternative data.
+ * Used by M17/M18/M19 models and debug endpoint.
+ * Never throws.
+ */
+export async function getAltDataSnapshot(): Promise<AltDataSnapshot> {
+  const [weather, cpo, coal] = await Promise.allSettled([
+    getWeatherData(),
+    getCPOPrice(),
+    getCoalPrice(),
+  ]);
+
+  const degradedSources: string[] = [];
+  if (_weatherCache.isDegraded) degradedSources.push('BMKG_WEATHER');
+  if (_cpoCache.isDegraded)     degradedSources.push('CPO_PRICE');
+  if (_coalCache.isDegraded)    degradedSources.push('COAL_PRICE');
+
+  const hasAnyData = 
+    _weatherCache.fetchedAt > 0 ||
+    _cpoCache.fetchedAt     > 0 ||
+    _coalCache.fetchedAt    > 0;
+
+  return {
+    weather: weather.status === 'fulfilled' ? weather.value : [],
+    cpo:     cpo.status     === 'fulfilled' ? cpo.value     : CPO_FALLBACK,
+    coal:    coal.status    === 'fulfilled' ? coal.value    : COAL_FALLBACK,
+    lastFullRefresh: hasAnyData ? new Date().toISOString() : null,
+    degradedSources,
+  };
+}
+
+/**
+ * Get cache status for all sources — for debug endpoint.
+ * Shows whether data is fresh, stale, or degraded.
+ */
+export function getAltDataStatus() {
+  return {
+    weather: {
+      hasCachedData:      _weatherCache.data !== null,
+      ageMs:              Date.now() - _weatherCache.fetchedAt,
+      isStale:            isStale(_weatherCache, WEATHER_TTL),
+      isDegraded:         _weatherCache.isDegraded,
+      consecutiveFailures: _weatherCache.consecutiveFailures,
+      ttlMs:              WEATHER_TTL,
+      regionCount:        _weatherCache.data?.length ?? 0,
+    },
+    cpo: {
+      hasCachedData:      _cpoCache.data !== null,
+      ageMs:              Date.now() - _cpoCache.fetchedAt,
+      isStale:            isStale(_cpoCache, CPO_TTL),
+      isDegraded:         _cpoCache.isDegraded,
+      consecutiveFailures: _cpoCache.consecutiveFailures,
+      ttlMs:              CPO_TTL,
+      lastPriceUSD:       _cpoCache.data?.priceUSD ?? null,
+      source:             _cpoCache.data?.source ?? null,
+    },
+    coal: {
+      hasCachedData:      _coalCache.data !== null,
+      ageMs:              Date.now() - _coalCache.fetchedAt,
+      isStale:            isStale(_coalCache, COAL_TTL),
+      isDegraded:         _coalCache.isDegraded,
+      consecutiveFailures: _coalCache.consecutiveFailures,
+      ttlMs:              COAL_TTL,
+      lastHBA1USD:        _coalCache.data?.hba1USD ?? null,
+      source:             _coalCache.data?.source ?? null,
+    },
+    shadowMode: true,  // Not yet wired into engine composite
+    note: 'Data fetched and cached. M17/M18/M19 models not yet active.',
+  };
+}
+
+/**
+ * Warm up all caches. Call once on server startup.
+ * Non-blocking — runs in background.
+ */
+export function warmAltDataCaches(): void {
+  Promise.allSettled([
+    getWeatherData(),
+    getCPOPrice(),
+    getCoalPrice(),
+  ]).then(() => {
+    console.log('[altDataFetcher] Cache warmup complete');
+  }).catch(() => {
+    console.warn('[altDataFetcher] Cache warmup partially failed — using fallbacks');
+  });
+}
+
+---
+
+PART 2 — Add debug endpoint and warmup to server/routes.ts
+
+Append AFTER all existing endpoints:
+
+// GET /api/alt-data/status
+// Debug endpoint — shows alt data cache status
+// Remove or restrict in production
+app.get('/api/alt-data/status', async (req, res) => {
+  try {
+    const { getAltDataStatus } = await import('./engine/altDataFetcher');
+    res.status(200).json(getAltDataStatus());
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /api/alt-data/snapshot
+// Returns full alt data snapshot for debugging
+app.get('/api/alt-data/snapshot', async (req, res) => {
+  try {
+    const { getAltDataSnapshot } = await import('./engine/altDataFetcher');
+    const snapshot = await getAltDataSnapshot();
+    res.status(200).json(snapshot);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+Also in server/index.ts, add warmup call after server starts:
+Find the line where the server starts listening (app.listen or 
+similar). After it, add:
+
+// Warm up alternative data caches in background
+import('./engine/altDataFetcher')
+  .then(({ warmAltDataCaches }) => warmAltDataCaches())
+  .catch(err => console.warn('[startup] altDataFetcher warmup error:', err));
+
+---
+
+SAFETY RULES:
+1. Create: server/engine/altDataFetcher.ts only
+2. Modify: server/routes.ts (append only), server/index.ts 
+   (add warmup call after server starts — nothing else)
+3. NEVER touch any engine files (bandarmologyCore.ts etc.)
+4. NEVER touch any frontend files
+5. NEVER touch any existing endpoints
+6. After build: run runTests.ts — BBCA=74 and UNVR=10 must pass
+7. Test /api/alt-data/status returns valid JSON
+8. Test /api/alt-data/snapshot returns valid JSON
+9. Verify server still starts without errors
+10. Report all files created or modified
