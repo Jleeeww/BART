@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  { icon: LayoutGrid, label: "Peta Kesiapan", route: "/", exact: true },
+  { icon: LayoutGrid, label: "Beranda", route: "/", exact: true },
   { icon: Radio, label: "Radar", route: "/radar" },
   { icon: Star, label: "Watchlist", route: "/watchlist", locked: true },
   { icon: SlidersHorizontal, label: "Screener", route: "/screener", locked: true },
