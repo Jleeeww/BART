@@ -830,6 +830,33 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/search", async (req, res) => {
+    try {
+      const q = (typeof req.query.q === "string" ? req.query.q : "").trim();
+      if (q.length < 1) return res.json([]);
+      const qUpper = q.toUpperCase();
+      const qLower = q.toLowerCase();
+      const allStocks = await storage.getAllStocks();
+      const dbMap = new Map(allStocks.map(s => [s.symbol, s]));
+      const universe = HOMEPAGE_UNIVERSE.map(symbol => {
+        const db = dbMap.get(symbol);
+        return {
+          symbol,
+          companyName: db?.name || UNIVERSE_STOCK_NAMES[symbol] || symbol,
+          price: db ? String(db.price) : "0",
+          changePercent: db ? String(db.changePercent) : "0",
+        };
+      });
+      const results = universe
+        .filter(s => s.symbol.includes(qUpper) || s.companyName.toLowerCase().includes(qLower))
+        .slice(0, 8);
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching stocks:", error);
+      res.status(500).json({ message: "Failed to search stocks" });
+    }
+  });
+
   // Watchlist endpoints
   app.get("/api/watchlist", async (_req, res) => {
     try {

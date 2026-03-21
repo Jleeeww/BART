@@ -1,0 +1,78 @@
+Add a global stock search bar to client/src/components/Sidebar.tsx only.
+Do not touch any other file except adding one API endpoint to server/routes.ts.
+
+PART 1 — Search bar in Sidebar
+
+In Sidebar.tsx, between the logo section and the nav items, insert a search block:
+
+Container: px-3 py-3 border-b border-[#ffffff08]
+
+Search input wrapper: relative
+
+Input field:
+  w-full bg-[#161616] border border-[#ffffff10] rounded-md
+  pl-8 pr-3 py-2 text-xs IBM Plex Mono text-white
+  placeholder="Cari saham..." text-[#ffffff30]
+  outline-none focus:border-[#38BDF8]/40 focus:bg-[#1a1a1a]
+  transition-all duration-150
+
+Search icon (left side, absolute):
+  Use Search icon from lucide-react, 12px
+  absolute left-2.5 top-1/2 -translate-y-1/2 text-[#ffffff30]
+
+SEARCH BEHAVIOR:
+- Use useState for query string and results array and isOpen boolean
+- On input change: if query.length >= 1, fetch from /api/search?q={query}
+- Debounce: wait 200ms after last keystroke before fetching (use useEffect + setTimeout + clearTimeout)
+- Show results dropdown below the input when isOpen=true and results.length > 0
+
+Results dropdown:
+  absolute top-full left-0 right-0 mt-1 z-50
+  bg-[#1a1a1a] border border-[#ffffff10] rounded-md
+  max-h-64 overflow-y-auto
+  shadow-xl shadow-black/50
+
+Each result row:
+  px-3 py-2.5 flex items-center gap-3
+  hover:bg-[#38BDF8]/10 cursor-pointer
+  border-b border-[#ffffff06] last:border-0
+  On click: navigate to /stock/:symbol, clear query, close dropdown
+
+  Left: Symbol in Sora text-sm font-bold text-white (w-16 flex-shrink-0)
+  Middle: Company name IBM Plex Mono text-[10px] text-[#6b7280] truncate flex-1
+  Right: Price IBM Plex Mono text-xs text-white flex-shrink-0
+
+Empty results state (query exists but no results):
+  px-3 py-4 text-center IBM Plex Mono text-[10px] text-[#ffffff30]
+  "Saham tidak ditemukan"
+
+Loading state (fetching):
+  px-3 py-4 text-center IBM Plex Mono text-[10px] text-[#38BDF8]/50
+  "Memindai..."
+
+Close dropdown when user clicks outside:
+  Use useEffect with mousedown listener on document
+  Check if click is outside the search container ref
+
+PART 2 — Search API endpoint
+
+In server/routes.ts, add this endpoint:
+
+GET /api/search?q={query}
+
+Logic:
+  - Get query param q, trim it, uppercase it
+  - If q is empty or less than 1 char, return []
+  - Filter stocks from existing in-memory stock data (same source as /api/stocks)
+  - Match if stock.symbol.includes(q) OR stock.companyName.toLowerCase().includes(q.toLowerCase())
+  - Return max 8 results
+  - Each result: { symbol, companyName, price, changePercent }
+  - No new DB queries needed — use whatever stock data is already loaded in memory
+
+SAFETY RULES:
+1. Only modify Sidebar.tsx and routes.ts
+2. Do not change any engine files
+3. Do not change Homepage.tsx, RadarPage.tsx, or StockDashboard.tsx
+4. Do not install new packages
+5. Verify /api/search?q=BBCA returns BBCA data before finishing
+6. Report all changes made
