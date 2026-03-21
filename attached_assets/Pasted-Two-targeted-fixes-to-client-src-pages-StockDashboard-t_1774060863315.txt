@@ -1,0 +1,102 @@
+Two targeted fixes to client/src/pages/StockDashboard.tsx only.
+Do not touch any other file.
+
+---
+
+FIX 1 — Company logo in StockHeader
+
+Find the stock logo/avatar in StockDashboard or StockHeader.
+It currently shows a fallback letter "B" in a box.
+
+Replace it with the Stockbit CDN logo using the same pattern 
+already used in Radar and Screener:
+
+<img
+  src={`https://assets.stockbit.com/logos/companies/${symbol}.png`}
+  alt={symbol}
+  className="w-12 h-12 object-contain rounded-md"
+  onError={(e) => {
+    e.currentTarget.style.display = 'none';
+    e.currentTarget.nextElementSibling?.removeAttribute('style');
+  }}
+/>
+<div 
+  style={{ display: 'none' }}
+  className="w-12 h-12 rounded-md bg-[#1e1e1e] border border-[#ffffff10] 
+             flex items-center justify-center 
+             IBM Plex Mono text-sm font-bold text-[#38BDF8]"
+>
+  {symbol?.slice(0, 2)}
+</div>
+
+If the logo container already uses a different pattern, adapt 
+accordingly — the goal is: try Stockbit CDN first, fall back 
+to initials if image fails.
+
+---
+
+FIX 2 — Valuasi tab content
+
+Find the Valuasi tab panel. It currently shows "Segera Hadir".
+Replace it with actual valuation metrics from the stock data.
+
+The stock data object already contains these fields — use them:
+  peRatio, dividendYield, roe, netMargin, revenueGrowth (or similar)
+  Check what valuation fields actually exist on the stock object 
+  and use all available ones.
+
+Layout: grid grid-cols-2 gap-4 p-4 (or grid-cols-3 if 6+ metrics)
+
+Each metric card:
+  bg-[#161616] border border-[#ffffff08] rounded-md p-4
+  
+  Label: IBM Plex Mono text-[9px] tracking-widest text-[#6b7280] 
+         uppercase mb-2
+  Value: IBM Plex Mono text-2xl font-bold text-white
+  
+  Sub-label below value: IBM Plex Mono text-[10px] text-[#6b7280]
+  (e.g. "Price to Earnings" under "P/E Ratio")
+
+Metrics to show (use whatever fields exist on the stock object):
+  1. P/E Ratio — label "P/E RATIO", sub "Price to Earnings"
+     Value: stock.peRatio formatted to 2 decimal places
+     Color value text-amber-400 if peRatio > 25 (expensive)
+     Color value text-emerald-400 if peRatio < 15 (cheap)
+     Color value text-white if between
+
+  2. Dividend Yield — label "DIVIDEND YIELD", sub "Imbal Dividen"
+     Value: stock.dividendYield + "%" 
+     Color text-emerald-400 if > 3%
+
+  3. ROE — label "ROE", sub "Return on Equity"
+     Value: stock.roe + "%"
+     Color text-emerald-400 if > 15%, text-red-400 if < 5%
+
+  4. Net Margin — label "NET MARGIN", sub "Margin Laba Bersih"
+     Value: stock.netMargin + "%"
+     Color text-emerald-400 if > 20%
+
+  5. Revenue Growth YoY — label "PERTUMBUHAN", sub "Revenue YoY"
+     Value: stock.revenueGrowth + "%" (or equivalent field)
+     Color text-emerald-400 if positive, text-red-400 if negative
+     Show "↑" prefix if positive, "↓" if negative
+
+  6. PBV or any other ratio available — label accordingly
+
+For any field that is null/undefined/0:
+  Show "—" in text-[#ffffff20] instead of the value
+  Do not show a colored value for missing data
+
+Below the metrics grid, add an analyst note:
+  mt-4 bg-[#161616] border border-[#ffffff08] rounded-md p-4
+  Label: IBM Plex Mono text-[9px] tracking-widest text-[#6b7280] 
+         uppercase mb-2 "CATATAN ANALIS"
+  Text: IBM Plex Mono text-xs text-[#6b7280] leading-relaxed
+  Use stock.analystView if it exists, else show:
+  "Data valuasi berdasarkan laporan keuangan terakhir yang tersedia. 
+   Bandingkan dengan rata-rata industri sebelum mengambil keputusan."
+
+---
+
+SAFETY: Only StockDashboard.tsx. No logic changes. 
+No engine files. Report what changed.

@@ -23,8 +23,22 @@ export function StockHeader({ stock }: StockHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 pb-6 border-b border-border/50">
       <div className="flex items-start gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-bold text-2xl shadow-sm border border-primary/20">
-          {stock.symbol.substring(0, 1)}
+        <div className="w-16 h-16 rounded-2xl bg-[#1e1e1e] flex items-center justify-center overflow-hidden shadow-sm border border-[#ffffff10]">
+          <img
+            src={`https://assets.stockbit.com/logos/companies/${stock.symbol}.png`}
+            alt={stock.symbol}
+            className="w-12 h-12 object-contain rounded-md"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              (e.currentTarget.nextElementSibling as HTMLElement)?.removeAttribute('style');
+            }}
+          />
+          <div
+            style={{ display: 'none' }}
+            className="flex items-center justify-center text-[#38BDF8] font-bold text-2xl"
+          >
+            {stock.symbol.substring(0, 2)}
+          </div>
         </div>
         <div>
           <div className="flex items-center gap-3 flex-wrap">
