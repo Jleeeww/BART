@@ -1,0 +1,74 @@
+Two changes. Read everything before starting.
+
+---
+
+PART 1 — Fix StockDashboard top nav
+
+Modify client/src/pages/StockDashboard.tsx only for this part.
+
+Find the sticky top nav bar at the top of StockDashboard.
+It currently shows: BART logo (left) + IDX session status + IDX badge (right).
+
+Remove the BART logo entirely from this nav bar.
+The sidebar already provides the logo and navigation.
+
+Keep everything else in the nav bar exactly as is:
+- Sticky positioning
+- IDX session status dot + label
+- "IDX" monospace badge
+- The nav bar itself (do not remove the bar, just the BART logo)
+
+After removing the logo, the nav bar left side should be empty,
+with IDX status and badge on the right side only.
+Adjust the flex layout so IDX status sits on the right 
+with ml-auto or justify-end.
+
+---
+
+PART 2 — Mobile sidebar fix
+
+Modify client/src/components/Sidebar.tsx only for this part.
+
+The sidebar must be completely hidden on mobile screens.
+On desktop (md breakpoint and above) it shows normally.
+
+Change the sidebar outer container:
+  Add: hidden md:flex md:flex-col
+  (replaces any existing display classes)
+
+In client/src/App.tsx:
+Find the main content area that has ml-[200px].
+Change it to: ml-0 md:ml-[200px]
+So on mobile, content takes full width with no left margin.
+
+Also in App.tsx, add a mobile top bar that shows ONLY on mobile
+(hidden on md and above):
+
+Mobile top bar:
+  className="md:hidden fixed top-0 left-0 right-0 z-50 
+             h-12 bg-[#0a0a0a] border-b border-[#ffffff08]
+             flex items-center justify-between px-4"
+
+  Left: "BART" IBM Plex Mono font-bold text-[#38BDF8] text-base
+        clicking navigates to /
+
+  Right: a hamburger menu icon (Menu from lucide-react)
+         text-[#6b7280] — for now it does nothing on click
+         (mobile nav drawer is out of scope for now)
+
+On mobile, add pt-12 to the main content area so content 
+doesn't hide behind the fixed top bar:
+  className="flex-1 ml-0 md:ml-[200px] min-h-screen 
+             overflow-auto pt-12 md:pt-0"
+
+---
+
+SAFETY RULES:
+1. Only modify: StockDashboard.tsx, Sidebar.tsx, App.tsx
+2. Do not touch any engine files or backend
+3. Do not touch Homepage.tsx, RadarPage.tsx, WatchlistPage.tsx
+4. Do not install new packages
+5. Verify desktop layout unchanged after modifications
+6. Verify /stock/:symbol still loads correctly
+7. Verify sidebar still shows on desktop
+8. Report all changes made

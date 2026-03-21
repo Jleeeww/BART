@@ -268,15 +268,7 @@ export default function StockDashboard() {
     <div className="min-h-screen bg-background pb-20">
       {/* BART Top Nav */}
       <div className="border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <a href="/" style={{ textDecoration: 'none' }}>
-            <span
-              className="text-xl font-black tracking-tight"
-              style={{ fontFamily: 'var(--font-display)', color: '#38BDF8' }}
-            >
-              BART
-            </span>
-          </a>
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-end">
           <div className="flex items-center gap-4">
             {(() => {
               const dotColor = sessionStatus.color === "green" ? "bg-emerald-500" : 
