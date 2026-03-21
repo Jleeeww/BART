@@ -213,7 +213,7 @@ export default function RadarPage() {
         <table className="w-full min-w-[900px]">
           <thead>
             <tr style={{ background: "#111111", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-              {["SAHAM", "SEKTOR", "SKOR", "PERGERAKAN", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "AKSI"].map((h) => (
+              {["SAHAM", "SEKTOR", "PERGERAKAN", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "AKSI"].map((h) => (
                 <th
                   key={h}
                   className="text-left px-4 py-2"
@@ -289,15 +289,6 @@ export default function RadarPage() {
                       </span>
                     </td>
 
-                    <td className="px-4 py-3 w-20 text-center">
-                      <span
-                        className="text-lg font-bold"
-                        style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}
-                      >
-                        {stock.readinessScore}
-                      </span>
-                    </td>
-
                     <td className="px-4 py-3 w-28">
                       <div className="flex flex-col gap-0.5">
                         <span
@@ -323,6 +314,15 @@ export default function RadarPage() {
                               : `— 0.00%`}
                         </span>
                       </div>
+                    </td>
+
+                    <td className="px-4 py-3 w-20 text-center">
+                      <span
+                        className="text-lg font-bold"
+                        style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}
+                      >
+                        {stock.readinessScore}
+                      </span>
                     </td>
 
                     <td className="px-4 py-3 w-32">
