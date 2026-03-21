@@ -1,0 +1,527 @@
+Build the Radar batch engine. This is a backend architecture change.
+Read everything before touching any file.
+
+CRITICAL CONSTRAINTS:
+- Do NOT modify bandarmologyCore.ts, bandarmologyDecisionV2.ts, 
+  unifiedDecision.ts, or any existing engine file
+- Do NOT modify any existing API endpoints
+- Do NOT break any existing tests (BBCA=77, UNVR=5)
+- All new code is additive only
+
+---
+
+PART 1 — Create server/engine/radarEngine.ts
+
+This is the batch pipeline. It processes all stocks in chunks,
+caches results, and exposes a clean interface to the API layer.
+```typescript
+/**
+ * ============================================================
+ * RADAR BATCH ENGINE
+ * ============================================================
+ * Processes all stocks through computeBandarmologyV2() in 
+ * controlled chunks. Safe on any input. One bad stock never 
+ * crashes the batch. Results cached in memory with timestamp.
+ *
+ * SCALE CONTRACT:
+ *   - Tested safe at 900+ stocks
+ *   - Chunk size: 50 stocks (memory-safe)
+ *   - Cache TTL: 15min market hours, 60min off-hours
+ *   - Per-stock timeout: 5000ms (prevents hung computation)
+ *   - Error isolation: try/catch per stock, skip on failure
+ *   - Confidence gate: < 60% → flagged, excluded from main results
+ * ============================================================
+ */
+
+import { computeBandarmologyV2 } from './bandarmologyCore';
+import { buildBandarmologyInput } from './buildBandarmologyInput';
+import { getBandarmologyDecisionV2 } from './bandarmologyDecisionV2';
+import { getM6History } from './bandarmologyHistory';
+import type { RawStockRecord } from './buildBandarmologyInput';
+
+// ── Types ────────────────────────────────────────────────────
+
+export interface RadarStockResult {
+  symbol: string;
+  companyName: string;
+  sector: string | null;
+  price: number;
+  changePercent: number;
+  compositeScore: number;
+  confidence: number;
+  regime: string | null;
+  cyclePosition: string | null;
+  concentrationType: string;
+  flowBias: string | null;
+  homepageBucket: string;
+  isGorengan: boolean;
+  dataQuality: 'FULL' | 'PARTIAL' | 'MINIMAL';
+  processedAt: string;
+}
+
+export interface RadarResult {
+  stocks: RadarStockResult[];
+  hiddenCount: number;       // stocks below confidence threshold
+  errorCount: number;        // stocks that failed processing
+  totalProcessed: number;
+  cacheTimestamp: string;
+  isStale: boolean;
+  nextRefreshAt: string;
+}
+
+// ── Cache ────────────────────────────────────────────────────
+
+interface CacheEntry {
+  result: RadarResult;
+  timestamp: number;
+}
+
+let _cache: CacheEntry | null = null;
+let _isProcessing = false;
+
+const CHUNK_SIZE = 50;
+const CONFIDENCE_GATE = 60;
+const CACHE_TTL_MARKET_HOURS = 15 * 60 * 1000;   // 15 min
+const CACHE_TTL_OFF_HOURS    = 60 * 60 * 1000;   // 60 min
+const STOCK_TIMEOUT_MS       = 5000;
+
+// ── IDX session detection (WIB = UTC+7) ──────────────────────
+
+function isMarketHours(): boolean {
+  const now = new Date();
+  const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const day  = wib.getUTCDay();   // 0=Sun, 6=Sat
+  const hour = wib.getUTCHours();
+  const min  = wib.getUTCMinutes();
+  const time = hour * 60 + min;
+  if (day === 0 || day === 6) return false;
+  // Session 1: 09:00–12:00, Session 2: 13:30–15:50
+  return (time >= 540 && time < 720) || (time >= 810 && time < 950);
+}
+
+function getCacheTTL(): number {
+  return isMarketHours() ? CACHE_TTL_MARKET_HOURS : CACHE_TTL_OFF_HOURS;
+}
+
+function isCacheValid(): boolean {
+  if (!_cache) return false;
+  return Date.now() - _cache.timestamp < getCacheTTL();
+}
+
+// ── Per-stock processing with timeout ────────────────────────
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
+// ── Cycle position derivation (mirrors frontend logic) ────────
+
+function deriveCyclePosition(maturity: string | null): string | null {
+  if (!maturity) return null;
+  if (maturity === 'FORMING')  return 'TERLALU_DINI';
+  if (maturity === 'ACTIVE')   return 'KONFIRMASI_MULAI';
+  if (maturity === 'MATURE')   return 'ENTRY_WINDOW';
+  if (maturity === 'EXTENDED') return 'WASPADAI_DISTRIBUSI';
+  return null;
+}
+
+// ── Concentration type derivation ────────────────────────────
+
+function deriveConcentrationType(
+  m3Score: number | null,
+  m6Score: number | null
+): string {
+  if (m3Score === null) return 'TERSEBAR';
+  if (m3Score < 40) return 'TERSEBAR';
+  if (m3Score >= 40 && (m6Score ?? 50) < 35) return 'JEBAKAN_DISTRIBUSI';
+  return 'KENDALI_BANDAR';
+}
+
+// ── Data quality assessment ───────────────────────────────────
+
+function assessDataQuality(raw: RawStockRecord): 'FULL' | 'PARTIAL' | 'MINIMAL' {
+  const hasBroker  = !!raw.brokerData;
+  const hasFlow    = !!raw.foreignActivityData;
+  const hasHistory = Array.isArray(raw.netFlowHistory) && 
+                     (raw.netFlowHistory as unknown[]).length >= 5;
+  const hasPrice   = !!(raw.close ?? raw.price);
+  if (hasBroker && hasFlow && hasHistory && hasPrice) return 'FULL';
+  if (hasPrice && (hasBroker || hasFlow)) return 'PARTIAL';
+  return 'MINIMAL';
+}
+
+// ── Process a single stock ────────────────────────────────────
+
+async function processStock(
+  raw: RawStockRecord & {
+    companyName?: string;
+    sector?: string;
+    changePercent?: number;
+    isGorengan?: boolean;
+    homepageBucket?: string;
+  }
+): Promise<RadarStockResult | null> {
+  try {
+    const symbol = raw.symbol ?? '';
+    if (!symbol) return null;
+
+    // Load M6 history (safe: returns [] if unavailable)
+    const m6History = await withTimeout(
+      getM6History(symbol, 5),
+      2000
+    ).catch(() => [] as number[]);
+
+    // Build input
+    const input = buildBandarmologyInput(raw, m6History);
+
+    // Run engine with timeout
+    const result = await withTimeout(
+      Promise.resolve(computeBandarmologyV2(input)),
+      STOCK_TIMEOUT_MS
+    );
+
+    // Get decision
+    const decision = getBandarmologyDecisionV2(result as any);
+
+    // Extract key values
+    const compositeScore = result.composite?.score ?? 0;
+    const confidence     = result.composite?.confidence ?? 0;
+    const regime         = result.M16_regimeStability?.regime ?? null;
+
+    // Derive cycle position from M14 maturity
+    const m14 = result.M14_campaignDuration as any;
+    const cyclePosition = deriveCyclePosition(m14?.maturity ?? null);
+
+    // Derive concentration type
+    const m3Score = result.M3_brokerDominance?.score ?? null;
+    const m6Score = result.M6_flowNormalized?.score ?? null;
+    const concentrationType = deriveConcentrationType(m3Score, m6Score);
+
+    // Determine bucket
+    let homepageBucket = raw.homepageBucket ?? 'hindari_dulu';
+    if (raw.isGorengan) homepageBucket = 'hindari_dulu';
+
+    const dataQuality = assessDataQuality(raw);
+
+    return {
+      symbol,
+      companyName: raw.companyName ?? symbol,
+      sector:      raw.sector ?? null,
+      price:       Number(raw.close ?? raw.price ?? 0),
+      changePercent: Number(raw.changePercent ?? 0),
+      compositeScore: Number((compositeScore ?? 0).toFixed(2)),
+      confidence:     Number((confidence ?? 0).toFixed(0)),
+      regime,
+      cyclePosition,
+      concentrationType,
+      flowBias: raw.flowBias ?? null,
+      homepageBucket,
+      isGorengan: Boolean(raw.isGorengan),
+      dataQuality,
+      processedAt: new Date().toISOString(),
+    };
+  } catch (err) {
+    console.error(`[radarEngine] Failed to process ${raw.symbol}:`, err);
+    return null;
+  }
+}
+
+// ── Chunk processor ───────────────────────────────────────────
+
+async function processChunk(
+  stocks: (RawStockRecord & Record<string, unknown>)[]
+): Promise<{ results: RadarStockResult[]; errors: number }> {
+  const settled = await Promise.allSettled(
+    stocks.map((s) => processStock(s as any))
+  );
+
+  const results: RadarStockResult[] = [];
+  let errors = 0;
+
+  for (const s of settled) {
+    if (s.status === 'fulfilled' && s.value !== null) {
+      results.push(s.value);
+    } else {
+      errors++;
+    }
+  }
+
+  return { results, errors };
+}
+
+// ── Main batch run ────────────────────────────────────────────
+
+export async function runRadarBatch(
+  allStocks: (RawStockRecord & Record<string, unknown>)[]
+): Promise<RadarResult> {
+  if (_isProcessing) {
+    // Return stale cache if available, else empty
+    if (_cache) {
+      return { ..._cache.result, isStale: true };
+    }
+    return emptyResult();
+  }
+
+  _isProcessing = true;
+  const startTime = Date.now();
+
+  try {
+    const allResults: RadarStockResult[] = [];
+    let totalErrors = 0;
+
+    // Process in chunks of CHUNK_SIZE
+    for (let i = 0; i < allStocks.length; i += CHUNK_SIZE) {
+      const chunk = allStocks.slice(i, i + CHUNK_SIZE);
+      const { results, errors } = await processChunk(chunk);
+      allResults.push(...results);
+      totalErrors += errors;
+
+      // Yield between chunks to prevent blocking event loop
+      await new Promise((r) => setTimeout(r, 0));
+    }
+
+    // Apply confidence gate
+    const visible = allResults.filter((s) => s.confidence >= CONFIDENCE_GATE);
+    const hidden  = allResults.filter((s) => s.confidence < CONFIDENCE_GATE);
+
+    // Sort: by compositeScore descending, then by symbol
+    visible.sort((a, b) =>
+      b.compositeScore - a.compositeScore || a.symbol.localeCompare(b.symbol)
+    );
+
+    const now = new Date();
+    const nextRefresh = new Date(
+      now.getTime() + getCacheTTL()
+    );
+
+    const radarResult: RadarResult = {
+      stocks:         visible,
+      hiddenCount:    hidden.length,
+      errorCount:     totalErrors,
+      totalProcessed: allStocks.length,
+      cacheTimestamp: now.toISOString(),
+      isStale:        false,
+      nextRefreshAt:  nextRefresh.toISOString(),
+    };
+
+    console.log(
+      `[radarEngine] Batch complete: ${visible.length} visible, ` +
+      `${hidden.length} hidden, ${totalErrors} errors, ` +
+      `${Date.now() - startTime}ms`
+    );
+
+    // Update cache
+    _cache = { result: radarResult, timestamp: Date.now() };
+    return radarResult;
+
+  } finally {
+    _isProcessing = false;
+  }
+}
+
+// ── Public API ────────────────────────────────────────────────
+
+/**
+ * Get radar results. Returns cache if valid, triggers batch if stale.
+ * Non-blocking: if batch is running, returns stale cache immediately.
+ */
+export async function getRadarResults(
+  allStocks: (RawStockRecord & Record<string, unknown>)[]
+): Promise<RadarResult> {
+  if (isCacheValid() && _cache) {
+    return _cache.result;
+  }
+  return runRadarBatch(allStocks);
+}
+
+/**
+ * Force invalidate cache (call after DB update or new data arrives).
+ */
+export function invalidateRadarCache(): void {
+  _cache = null;
+  console.log('[radarEngine] Cache invalidated');
+}
+
+/**
+ * Get cache status for debugging.
+ */
+export function getRadarCacheStatus(): {
+  hasCache: boolean;
+  isValid: boolean;
+  ageMs: number | null;
+  isProcessing: boolean;
+} {
+  return {
+    hasCache:     _cache !== null,
+    isValid:      isCacheValid(),
+    ageMs:        _cache ? Date.now() - _cache.timestamp : null,
+    isProcessing: _isProcessing,
+  };
+}
+
+function emptyResult(): RadarResult {
+  const now = new Date().toISOString();
+  return {
+    stocks: [], hiddenCount: 0, errorCount: 0,
+    totalProcessed: 0, cacheTimestamp: now,
+    isStale: false, nextRefreshAt: now,
+  };
+}
+```
+
+---
+
+PART 2 — Add /api/radar endpoint to server/routes.ts
+
+Add this endpoint AFTER all existing endpoints.
+Do not modify any existing endpoint.
+```typescript
+// GET /api/radar
+// Returns radar batch results. Cache-first, triggers batch if stale.
+app.get('/api/radar', async (req, res) => {
+  try {
+    const { getRadarResults } = await import('./engine/radarEngine');
+    const { storage } = await import('./storage');
+    
+    // Load all stocks from DB
+    const allStocks = await storage.getAllStocks();
+    
+    if (!allStocks || allStocks.length === 0) {
+      return res.status(200).json({
+        stocks: [],
+        hiddenCount: 0,
+        errorCount: 0,
+        totalProcessed: 0,
+        cacheTimestamp: new Date().toISOString(),
+        isStale: false,
+        nextRefreshAt: new Date().toISOString(),
+      });
+    }
+
+    const result = await getRadarResults(allStocks as any);
+    res.status(200).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[/api/radar] Error:', message);
+    res.status(500).json({ 
+      error: 'Radar engine error', 
+      message,
+      stocks: [] 
+    });
+  }
+});
+
+// GET /api/radar/status
+// Returns cache status for debugging. Remove in production.
+app.get('/api/radar/status', async (req, res) => {
+  try {
+    const { getRadarCacheStatus } = await import('./engine/radarEngine');
+    res.status(200).json(getRadarCacheStatus());
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+```
+
+Also add getAllStocks() method to server/storage.ts if it doesn't 
+already exist. It should return all rows from the stocks table.
+Check if it exists first — only add if missing.
+
+---
+
+PART 3 — Wire RadarPage.tsx to /api/radar
+
+Modify client/src/pages/RadarPage.tsx to fetch from 
+/api/radar instead of /api/stocks.
+
+Replace the existing fetch logic with:
+
+const [radarData, setRadarData] = useState<RadarResult | null>(null);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+
+useEffect(() => {
+  setLoading(true);
+  fetch('/api/radar')
+    .then(r => r.json())
+    .then(data => {
+      setRadarData(data);
+      setLoading(false);
+    })
+    .catch(err => {
+      setError('Gagal memuat data radar');
+      setLoading(false);
+    });
+}, []);
+
+Loading state:
+  Full page centered loading indicator
+  "◎" text-4xl text-[#38BDF8]/30 animate-pulse mb-3
+  "Radar sedang memindai pasar..." IBM Plex Mono text-sm text-[#6b7280]
+
+Error state:
+  Full page centered error
+  "⚠" text-3xl text-red-400/50 mb-3
+  "{error}" IBM Plex Mono text-sm text-red-400/70
+
+Cache info bar (show when radarData exists):
+  Below the filter bar, above the confidence notice
+  bg-[#0d0d0d] border-b border-[#ffffff06] px-4 py-1.5
+  flex items-center justify-between
+  
+  Left: IBM Plex Mono text-[9px] text-[#ffffff20]
+    "Diperbarui: {formatted cacheTimestamp}"
+    Format: toLocaleString('id-ID', { 
+      day: '2-digit', month: 'short', 
+      hour: '2-digit', minute: '2-digit' 
+    })
+  
+  Right: IBM Plex Mono text-[9px] text-[#ffffff20]
+    "{totalProcessed} saham diproses · {errorCount} gagal · 
+     Refresh: {nextRefreshAt formatted as HH:MM WIB}"
+
+Update hiddenCount display:
+  Use radarData.hiddenCount from API response
+  (not hardcoded 0 anymore)
+
+Stocks to render: radarData?.stocks ?? []
+All existing filter pills, sorting, and table structure stays the same.
+Just replace the data source.
+
+---
+
+PART 4 — Auto-refresh during market hours
+
+In RadarPage.tsx, add auto-refresh:
+
+useEffect(() => {
+  // Refresh every 15 minutes during market hours
+  const interval = setInterval(() => {
+    fetch('/api/radar')
+      .then(r => r.json())
+      .then(data => setRadarData(data))
+      .catch(() => {}); // Silent fail on refresh
+  }, 15 * 60 * 1000);
+  
+  return () => clearInterval(interval);
+}, []);
+
+---
+
+SAFETY RULES:
+1. New files to create: server/engine/radarEngine.ts
+2. Files to modify: server/routes.ts, server/storage.ts 
+   (only if getAllStocks missing), client/src/pages/RadarPage.tsx
+3. NEVER modify: bandarmologyCore.ts, bandarmologyDecisionV2.ts,
+   unifiedDecision.ts, bandarmologyHistory.ts, buildBandarmologyInput.ts
+4. NEVER modify any existing API endpoint
+5. After build: run runTests.ts — BBCA=77 and UNVR=5 must still pass
+6. Test /api/radar returns a valid JSON response
+7. Test /api/radar/status returns cache status
+8. Test RadarPage loads without console errors
+9. Report every file created or modified with a summary of changes
