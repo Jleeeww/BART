@@ -1,0 +1,226 @@
+Create the Screener page. Read everything before starting.
+
+---
+
+FILES TO CREATE: client/src/pages/ScreenerPage.tsx
+FILES TO MODIFY: client/src/App.tsx, client/src/components/Sidebar.tsx
+DO NOT TOUCH: Any engine files, backend files, or other pages.
+
+---
+
+PART 1 — Add route in App.tsx
+Add: /screener → ScreenerPage
+Import ScreenerPage at the top with other page imports.
+
+---
+
+PART 2 — Unlock Screener in Sidebar.tsx
+Find the Screener nav item. Remove its locked styling and 
+"Segera" badge. Apply the same active/inactive styling as 
+Beranda, Radar, and Watchlist.
+
+---
+
+PART 3 — Build ScreenerPage.tsx
+
+CONCEPT:
+User-controlled filter interface. Users set criteria, BART 
+returns matching stocks. Same data source as Radar (/api/stocks).
+Filters that require live data are marked with a "Live IDX" badge
+and are disabled for now but visible — showing users what's coming.
+
+---
+
+PAGE HEADER:
+  Label: "SCREENER" IBM Plex Mono text-[10px] tracking-[0.2em] 
+    text-[#38BDF8] uppercase mb-1
+  Title: "Filter Saham IDX" Sora text-2xl font-bold text-white
+  Subtitle: "Tentukan kriteria — BART menampilkan saham yang cocok"
+    IBM Plex Mono text-sm text-[#6b7280] mt-1
+
+---
+
+LAYOUT: Two-column grid on desktop
+  grid grid-cols-[280px_1fr] gap-6 mt-6
+
+LEFT COLUMN — Filter panel:
+  bg-[#161616] border border-[#ffffff08] rounded-md p-4
+  height: fit-content (not full height)
+  position: sticky top-6
+
+  Title: "Filter Kriteria" Sora text-sm font-bold text-white mb-4
+
+  FILTER GROUPS (each group has a label + controls):
+
+  Group 1 — REZIM PASAR (active, works now):
+    Label: IBM Plex Mono text-[9px] tracking-widest text-[#6b7280] 
+           uppercase mb-2
+    Multi-select pill group:
+      Pills: "Semua" / "Akumulasi" / "Transisi" / "Distribusi" / "Volatile"
+      Active pill: bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30
+      Inactive: bg-[#ffffff06] text-[#6b7280] border border-[#ffffff08]
+      IBM Plex Mono text-[10px] px-3 py-1.5 rounded-sm cursor-pointer
+      Multiple can be selected simultaneously
+      Default: "Semua" selected
+
+  Group 2 — POSISI SIKLUS (active, works now):
+    Label same style
+    Multi-select pills:
+      "Semua" / "Terlalu Dini" / "Konfirmasi Mulai" / 
+      "Entry Window" / "Waspadai Distribusi"
+    Default: "Semua"
+
+  Group 3 — SKOR MINIMUM (active, works now):
+    Label same style
+    Range slider input:
+      min=0 max=100 step=5 defaultValue=0
+      accent-[#38BDF8] w-full cursor-pointer
+    Below slider: flex justify-between
+      Left: IBM Plex Mono text-[10px] text-[#6b7280] "Min: {value}"
+      Right: IBM Plex Mono text-[10px] text-[#6b7280] "Maks: 100"
+
+  Group 4 — SEKTOR (active with current data):
+    Label same style
+    Multi-select pills (wrap):
+      Extract unique sectors from stock data
+      "Semua" + one pill per unique sector found
+      Same pill styling as above
+      Default: "Semua"
+
+  Group 5 — ALIRAN DANA (active, works now):
+    Label same style
+    Pills: "Semua" / "Akumulasi" / "Netral" / "Distribusi"
+    Default: "Semua"
+
+  Divider: border-t border-[#ffffff08] my-4
+
+  Group 6 — LIKUIDITAS (disabled, live data):
+    Label row: flex items-center justify-between mb-2
+      Left: label same style "LIKUIDITAS"
+      Right: "Live IDX" badge — 
+        bg-[#38BDF8]/06 text-[#38BDF8]/40 border border-[#38BDF8]/15
+        IBM Plex Mono text-[9px] px-2 py-0.5 rounded-sm
+    Pills: "Semua" / ">50B/hari" / ">200B/hari" / ">500B/hari"
+    All pills: opacity-30 cursor-not-allowed pointer-events-none
+    Small note below: IBM Plex Mono text-[9px] text-[#ffffff15]
+      "Tersedia dengan data IDX live"
+
+  Group 7 — VOLUME ANOMALI (disabled, live data):
+    Same disabled pattern as Group 6
+    Label: "VOLUME ANOMALI"
+    Pills: "Semua" / ">1.5× Rata-rata" / ">2× Rata-rata" / ">3× Rata-rata"
+
+  Group 8 — KAPITALISASI PASAR (disabled, live data):
+    Same disabled pattern
+    Label: "KAPITALISASI PASAR"  
+    Pills: "Semua" / "Small Cap" / "Mid Cap" / "Large Cap"
+
+  Bottom of filter panel:
+    mt-4 flex flex-col gap-2
+
+    Reset button:
+      w-full bg-[#ffffff06] hover:bg-[#ffffff10] text-[#6b7280]
+      IBM Plex Mono text-[10px] py-2 rounded-sm border border-[#ffffff08]
+      transition-all "Reset Filter"
+      On click: reset all active filters to defaults
+
+    Results count:
+      text-center IBM Plex Mono text-[10px] text-[#6b7280] mt-1
+      "{n} saham ditemukan dari {total} saham"
+
+RIGHT COLUMN — Results table:
+
+  SORT BAR above table:
+    flex items-center justify-between mb-3
+    
+    Left: IBM Plex Mono text-[10px] text-[#6b7280]
+      "Diurutkan berdasarkan:"
+    
+    Right: sort pills (single select):
+      "Skor ↓" (default) / "Skor ↑" / "Nama A–Z" / "Perubahan ↓"
+      Same pill styling, single select
+
+  TABLE: Same structure as Radar table
+    Columns: SAHAM | SEKTOR | SKOR | REZIM | POSISI SIKLUS | 
+             ALIRAN DANA | KONSENTRASI | AKSI
+
+    Same row styling as Radar:
+      bg-[#161616] border-b border-[#ffffff08]
+      hover:bg-[#1a1a1a] transition-colors
+      Left accent border-l-2 (emerald/amber/red by bucket)
+      Logo + symbol + name in SAHAM column (same as Radar)
+
+    AKSI column:
+      [Star button] [DETAIL → button]
+      Star button: same watchlist toggle as Radar
+        Fetch watchlist from GET /api/watchlist on load
+        POST/DELETE on toggle
+
+  EMPTY STATE (no results after filter):
+    py-16 text-center
+    "◎" text-4xl text-[#ffffff10] mb-3
+    "Tidak ada saham yang cocok dengan filter ini"
+      IBM Plex Mono text-sm text-[#6b7280] mb-2
+    "Coba ubah atau reset kriteria filter"
+      IBM Plex Mono text-[10px] text-[#ffffff20]
+
+---
+
+FILTER LOGIC (client-side, no new API calls):
+
+Fetch stocks from GET /api/stocks on mount.
+Apply all active filters simultaneously:
+
+Rezim filter:
+  If "Semua" selected → no filter
+  Map selection to stock data:
+    "Akumulasi" → stock regime contains "ACCUMULATION" 
+                  OR flowBias === "Akumulasi"
+    "Transisi"  → regime contains "TRANSITION" or "FADING"
+    "Distribusi"→ regime contains "DISTRIBUTION" 
+                  OR flowBias === "Distribusi"
+    "Volatile"  → regime contains "VOLATILE"
+
+Posisi Siklus filter:
+  If "Semua" → no filter
+  Derive cyclePosition client-side from stock data
+  (same useMemo logic as StockDashboard)
+  Match selected labels to cyclePosition values
+
+Skor filter:
+  stock.readiness >= selectedMinScore
+
+Sektor filter:
+  If "Semua" → no filter
+  stock.sector === selectedSector
+
+Aliran Dana filter:
+  If "Semua" → no filter
+  stock.flowBias === selected (Akumulasi/Netral/Distribusi)
+
+Sort logic:
+  "Skor ↓": sort by readiness descending
+  "Skor ↑": sort by readiness ascending
+  "Nama A–Z": sort by symbol ascending
+  "Perubahan ↓": sort by changePercent descending
+
+---
+
+BOTTOM NOTICE:
+  mt-8 IBM Plex Mono text-[10px] text-[#ffffff20] text-center
+  "Filter likuiditas, volume, dan kapitalisasi akan aktif 
+   setelah integrasi data IDX live · PT Berkat Digital Investasi"
+
+---
+
+SAFETY RULES:
+1. Create: ScreenerPage.tsx
+2. Modify: App.tsx (add route), Sidebar.tsx (unlock Screener)
+3. Do NOT touch any engine files, backend files, or other pages
+4. Do NOT install new packages
+5. Use /api/stocks and /api/watchlist only — no new endpoints
+6. Verify /screener loads without console errors
+7. Verify all 5 active filters work correctly
+8. Verify disabled filters are visually distinct and unclickable
+9. Verify star toggle works same as Radar
+10. Report all files created or modified
