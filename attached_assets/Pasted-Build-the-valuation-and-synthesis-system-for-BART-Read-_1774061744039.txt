@@ -1,0 +1,755 @@
+Build the valuation and synthesis system for BART.
+Read everything before touching any file.
+
+CRITICAL CONSTRAINTS:
+- Do NOT modify bandarmologyCore.ts, bandarmologyDecisionV2.ts,
+  unifiedDecision.ts, bandarmologyCoreV1.ts, or any existing engine file
+- Do NOT modify any existing API endpoints
+- Do NOT break BBCA=77/WATCHLIST_PRIORITAS or UNVR=5/HINDARI_DULU
+- All new engine code is additive only
+- No Math.random() anywhere
+
+---
+
+PART 1 — Create server/engine/valuationEngine.ts
+
+/**
+ * ============================================================
+ * VALUATION ENGINE v1.0
+ * ============================================================
+ * Scores stock valuation relative to IDX sector benchmarks.
+ * Uses hardcoded sector averages (updated quarterly).
+ * Produces: ValuationScore (Murah/Wajar/Mahal) +
+ *           FundamentalQuality (Kuat/Sedang/Lemah) +
+ *           numeric scores for synthesis engine.
+ *
+ * SECTOR BENCHMARKS (IDX averages, Q1 2026):
+ *   Source: IDX statistics, Bloomberg consensus estimates
+ *   Updated: March 2026
+ *   Next review: June 2026
+ * ============================================================
+ */
+
+import { safe_div, safe_normalize, clamp } from './bandarmologyCore';
+
+// ── Sector benchmark table ────────────────────────────────────
+
+export interface SectorBenchmark {
+  sectorKey: string;       // matches stock.sector from DB
+  displayName: string;
+  avgPE: number;           // typical P/E range midpoint
+  avgPBV: number;          // typical P/BV range midpoint
+  avgROE: number;          // typical ROE %
+  avgNetMargin: number;    // typical net margin %
+  avgDivYield: number;     // typical dividend yield %
+}
+
+export const SECTOR_BENCHMARKS: SectorBenchmark[] = [
+  {
+    sectorKey: 'Financials',
+    displayName: 'Keuangan & Perbankan',
+    avgPE: 10.5, avgPBV: 1.6, avgROE: 14.0,
+    avgNetMargin: 28.0, avgDivYield: 3.5,
+  },
+  {
+    sectorKey: 'Consumer Staples',
+    displayName: 'Konsumer Primer',
+    avgPE: 24.0, avgPBV: 4.2, avgROE: 18.0,
+    avgNetMargin: 8.5, avgDivYield: 2.2,
+  },
+  {
+    sectorKey: 'Consumer Discretionary',
+    displayName: 'Konsumer Sekunder',
+    avgPE: 20.0, avgPBV: 3.0, avgROE: 14.0,
+    avgNetMargin: 6.5, avgDivYield: 1.8,
+  },
+  {
+    sectorKey: 'Energy',
+    displayName: 'Energi',
+    avgPE: 7.5, avgPBV: 1.3, avgROE: 16.0,
+    avgNetMargin: 12.0, avgDivYield: 5.0,
+  },
+  {
+    sectorKey: 'Basic Materials',
+    displayName: 'Material & Tambang',
+    avgPE: 8.0, avgPBV: 1.4, avgROE: 15.0,
+    avgNetMargin: 10.0, avgDivYield: 4.5,
+  },
+  {
+    sectorKey: 'Industrials',
+    displayName: 'Industri',
+    avgPE: 14.0, avgPBV: 1.8, avgROE: 12.0,
+    avgNetMargin: 7.0, avgDivYield: 2.0,
+  },
+  {
+    sectorKey: 'Technology',
+    displayName: 'Teknologi',
+    avgPE: 35.0, avgPBV: 5.5, avgROE: 10.0,
+    avgNetMargin: 8.0, avgDivYield: 0.5,
+  },
+  {
+    sectorKey: 'Telecommunications',
+    displayName: 'Telekomunikasi',
+    avgPE: 18.0, avgPBV: 3.0, avgROE: 18.0,
+    avgNetMargin: 15.0, avgDivYield: 3.8,
+  },
+  {
+    sectorKey: 'Healthcare',
+    displayName: 'Kesehatan',
+    avgPE: 28.0, avgPBV: 4.5, avgROE: 14.0,
+    avgNetMargin: 10.0, avgDivYield: 1.2,
+  },
+  {
+    sectorKey: 'Real Estate',
+    displayName: 'Properti',
+    avgPE: 12.0, avgPBV: 1.1, avgROE: 8.0,
+    avgNetMargin: 18.0, avgDivYield: 2.5,
+  },
+  {
+    sectorKey: 'Infrastructure',
+    displayName: 'Infrastruktur',
+    avgPE: 20.0, avgPBV: 2.5, avgROE: 12.0,
+    avgNetMargin: 12.0, avgDivYield: 2.8,
+  },
+  {
+    sectorKey: 'Transportation',
+    displayName: 'Transportasi',
+    avgPE: 16.0, avgPBV: 2.0, avgROE: 11.0,
+    avgNetMargin: 8.0, avgDivYield: 2.0,
+  },
+];
+
+// Default benchmark when sector is unknown
+const DEFAULT_BENCHMARK: SectorBenchmark = {
+  sectorKey: 'Unknown',
+  displayName: 'Umum',
+  avgPE: 15.0, avgPBV: 2.0, avgROE: 12.0,
+  avgNetMargin: 10.0, avgDivYield: 2.5,
+};
+
+export function getSectorBenchmark(sector: string | null | undefined): SectorBenchmark {
+  if (!sector) return DEFAULT_BENCHMARK;
+  const match = SECTOR_BENCHMARKS.find(
+    b => b.sectorKey.toLowerCase() === sector.toLowerCase()
+  );
+  return match ?? DEFAULT_BENCHMARK;
+}
+
+// ── Output types ──────────────────────────────────────────────
+
+export type ValuationLabel = 'MURAH' | 'WAJAR' | 'MAHAL' | 'TIDAK_ADA_DATA';
+export type QualityLabel   = 'KUAT'  | 'SEDANG' | 'LEMAH' | 'TIDAK_ADA_DATA';
+
+export interface ValuationResult {
+  label: ValuationLabel;
+  score: number;              // 0–100: 0=very cheap, 50=fair, 100=very expensive
+  peScore: number | null;     // 0–100 component
+  pbvScore: number | null;    // 0–100 component (future)
+  confidence: number;         // % of metrics available
+  sectorBenchmark: SectorBenchmark;
+  relativePE: number | null;  // stock PE / sector avg PE
+  interpretation: string;     // Bahasa Indonesia explanation
+}
+
+export interface FundamentalQuality {
+  label: QualityLabel;
+  score: number;              // 0–100
+  roeScore: number | null;
+  marginScore: number | null;
+  divScore: number | null;
+  confidence: number;
+  interpretation: string;
+}
+
+export interface ValuationEngineOutput {
+  valuation: ValuationResult;
+  quality: FundamentalQuality;
+  hasEnoughData: boolean;
+}
+
+// ── Valuation scoring ─────────────────────────────────────────
+
+function scoreValuation(
+  peRatio: number | null | undefined,
+  sector: string | null | undefined
+): ValuationResult {
+  const benchmark = getSectorBenchmark(sector);
+  const available: number[] = [];
+
+  let peScore: number | null = null;
+  let relativePE: number | null = null;
+
+  if (peRatio !== null && peRatio !== undefined && peRatio > 0) {
+    // Relative PE: stock PE / sector average PE
+    relativePE = peRatio / benchmark.avgPE;
+    // Score: relative PE > 2 = very expensive (100),
+    //        relative PE < 0.5 = very cheap (0),
+    //        relative PE = 1.0 = fair (50)
+    peScore = clamp(safe_normalize(relativePE, 0.3, 2.0) ?? 50);
+    available.push(peScore);
+  }
+
+  if (available.length === 0) {
+    return {
+      label: 'TIDAK_ADA_DATA',
+      score: 50,
+      peScore: null,
+      pbvScore: null,
+      confidence: 0,
+      sectorBenchmark: benchmark,
+      relativePE: null,
+      interpretation: 'Data valuasi tidak tersedia untuk analisis.',
+    };
+  }
+
+  const score = available.reduce((s, v) => s + v, 0) / available.length;
+  const confidence = Math.round((available.length / 1) * 100); // 1 metric available now
+
+  let label: ValuationLabel;
+  let interpretation: string;
+
+  if (score < 35) {
+    label = 'MURAH';
+    const discount = relativePE ? Math.round((1 - relativePE) * 100) : 0;
+    interpretation = `Saham diperdagangkan ${discount}% di bawah rata-rata sektor ${benchmark.displayName}. ` +
+      `Secara historis menarik jika fundamental bisnis tetap solid.`;
+  } else if (score < 65) {
+    label = 'WAJAR';
+    interpretation = `Valuasi sesuai dengan rata-rata sektor ${benchmark.displayName}. ` +
+      `Tidak ada diskon signifikan, namun juga tidak overpriced.`;
+  } else {
+    label = 'MAHAL';
+    const premium = relativePE ? Math.round((relativePE - 1) * 100) : 0;
+    interpretation = `Saham diperdagangkan ${premium}% di atas rata-rata sektor ${benchmark.displayName}. ` +
+      `Harga sudah merefleksikan ekspektasi pertumbuhan tinggi.`;
+  }
+
+  return {
+    label, score, peScore, pbvScore: null,
+    confidence, sectorBenchmark: benchmark,
+    relativePE: relativePE ? Number(relativePE.toFixed(2)) : null,
+    interpretation,
+  };
+}
+
+// ── Fundamental quality scoring ───────────────────────────────
+
+function scoreFundamentalQuality(
+  roe: number | null | undefined,
+  netMargin: number | null | undefined,
+  dividendYield: number | null | undefined,
+  sector: string | null | undefined
+): FundamentalQuality {
+  const benchmark = getSectorBenchmark(sector);
+  const available: number[] = [];
+
+  let roeScore: number | null = null;
+  let marginScore: number | null = null;
+  let divScore: number | null = null;
+
+  if (roe !== null && roe !== undefined && roe !== 0) {
+    // Score ROE relative to sector: 0% = 0, sectorAvg = 60, 2×avg = 100
+    roeScore = clamp(safe_normalize(roe, 0, benchmark.avgROE * 2) ?? 50);
+    available.push(roeScore);
+  }
+
+  if (netMargin !== null && netMargin !== undefined && netMargin !== 0) {
+    marginScore = clamp(safe_normalize(netMargin, 0, benchmark.avgNetMargin * 2) ?? 50);
+    available.push(marginScore);
+  }
+
+  if (dividendYield !== null && dividendYield !== undefined && dividendYield > 0) {
+    // Dividend yield: 0% = 0, sectorAvg = 70, 2×avg = 100
+    divScore = clamp(safe_normalize(dividendYield, 0, benchmark.avgDivYield * 2) ?? 50);
+    available.push(divScore);
+  }
+
+  if (available.length === 0) {
+    return {
+      label: 'TIDAK_ADA_DATA', score: 50,
+      roeScore: null, marginScore: null, divScore: null,
+      confidence: 0,
+      interpretation: 'Data fundamental tidak tersedia.',
+    };
+  }
+
+  const score = available.reduce((s, v) => s + v, 0) / available.length;
+  const confidence = Math.round((available.length / 3) * 100);
+
+  let label: QualityLabel;
+  let interpretation: string;
+
+  if (score >= 65) {
+    label = 'KUAT';
+    interpretation = `Fundamental bisnis kuat dibanding rata-rata sektor ${benchmark.displayName}. ` +
+      `ROE dan margin laba berada di atas rata-rata industri.`;
+  } else if (score >= 40) {
+    label = 'SEDANG';
+    interpretation = `Fundamental bisnis rata-rata untuk sektor ${benchmark.displayName}. ` +
+      `Tidak ada kelemahan signifikan, namun juga tidak menonjol.`;
+  } else {
+    label = 'LEMAH';
+    interpretation = `Fundamental bisnis di bawah rata-rata sektor ${benchmark.displayName}. ` +
+      `Perhatikan tren ROE dan margin sebelum berinvestasi.`;
+  }
+
+  return {
+    label, score: Number(score.toFixed(2)),
+    roeScore, marginScore, divScore,
+    confidence,
+    interpretation,
+  };
+}
+
+// ── Main export ───────────────────────────────────────────────
+
+export interface ValuationInput {
+  peRatio?: number | null;
+  dividendYield?: number | null;
+  roe?: number | null;
+  netMargin?: number | null;
+  sector?: string | null;
+}
+
+export function computeValuation(input: ValuationInput): ValuationEngineOutput {
+  const valuation = scoreValuation(input.peRatio, input.sector);
+  const quality   = scoreFundamentalQuality(
+    input.roe, input.netMargin, input.dividendYield, input.sector
+  );
+
+  const hasEnoughData = valuation.label !== 'TIDAK_ADA_DATA' ||
+                        quality.label   !== 'TIDAK_ADA_DATA';
+
+  return { valuation, quality, hasEnoughData };
+}
+
+---
+
+PART 2 — Create server/engine/synthesisEngine.ts
+
+/**
+ * ============================================================
+ * SYNTHESIS ENGINE v1.0
+ * ============================================================
+ * Cross-references Bandarmology + Valuation signals.
+ * Produces a unified institutional thesis for each stock.
+ *
+ * THE FOUR QUADRANTS:
+ *   MURAH  + AKUMULASI → "Pelaku besar masuk di harga murah"
+ *   MURAH  + DISTRIBUSI → "Harga murah tapi institusi keluar"
+ *   MAHAL  + AKUMULASI → "Institusi beli mahal — ekspektasi tinggi"
+ *   MAHAL  + DISTRIBUSI → "Mahal dan institusi keluar — risiko tinggi"
+ *
+ * Output feeds into Ringkasan tab synthesis card.
+ * ============================================================
+ */
+
+import type { ValuationEngineOutput, ValuationLabel, QualityLabel } from './valuationEngine';
+
+export type AlignmentType =
+  | 'MURAH_AKUMULASI'        // best case — value + institutional buying
+  | 'MURAH_DISTRIBUSI'       // value trap warning
+  | 'WAJAR_AKUMULASI'        // fair price + buying = normal accumulation
+  | 'WAJAR_DISTRIBUSI'       // fair price + selling = mild caution
+  | 'MAHAL_AKUMULASI'        // growth bet — institution sees catalyst
+  | 'MAHAL_DISTRIBUSI'       // danger — expensive + institutions exiting
+  | 'INSUFFICIENT_DATA';     // not enough data for synthesis
+
+export interface SynthesisResult {
+  alignment: AlignmentType;
+  headline: string;           // bold Bahasa Indonesia conclusion
+  explanation: string;        // 2–3 sentence explanation
+  implication: string;        // what this means for the user
+  alertLevel: 'INFO' | 'POSITIVE' | 'CAUTION' | 'DANGER';
+  synthScore: number;         // 0–100 unified score
+  components: {
+    bandarmologyScore: number | null;
+    valuationScore: number | null;
+    qualityScore: number | null;
+  };
+}
+
+// ── Alignment mapping ─────────────────────────────────────────
+
+function getAlignment(
+  valuationLabel: ValuationLabel,
+  flowBias: string | null | undefined,
+  bandarmologyDecision: string | null | undefined
+): AlignmentType {
+  if (valuationLabel === 'TIDAK_ADA_DATA') return 'INSUFFICIENT_DATA';
+
+  const isAccumulating =
+    flowBias === 'Akumulasi' ||
+    bandarmologyDecision === 'WATCHLIST_PRIORITAS' ||
+    bandarmologyDecision === 'SIAP_DIPANTAU';
+
+  const isDistributing =
+    flowBias === 'Distribusi' ||
+    bandarmologyDecision === 'HINDARI_DULU';
+
+  if (valuationLabel === 'MURAH') {
+    if (isAccumulating)  return 'MURAH_AKUMULASI';
+    if (isDistributing)  return 'MURAH_DISTRIBUSI';
+    return 'WAJAR_AKUMULASI'; // default to neutral-positive
+  }
+
+  if (valuationLabel === 'WAJAR') {
+    if (isDistributing) return 'WAJAR_DISTRIBUSI';
+    return 'WAJAR_AKUMULASI';
+  }
+
+  if (valuationLabel === 'MAHAL') {
+    if (isAccumulating)  return 'MAHAL_AKUMULASI';
+    return 'MAHAL_DISTRIBUSI';
+  }
+
+  return 'INSUFFICIENT_DATA';
+}
+
+// ── Synthesis text generation ─────────────────────────────────
+
+const SYNTHESIS_MAP: Record<AlignmentType, {
+  headline: string;
+  explanation: string;
+  implication: string;
+  alertLevel: SynthesisResult['alertLevel'];
+}> = {
+  MURAH_AKUMULASI: {
+    headline: 'Pelaku besar masuk di harga yang belum diapresiasi pasar',
+    explanation: 'Valuasi di bawah rata-rata sektor, namun institusi justru sedang mengakumulasi. ' +
+      'Ini adalah kombinasi klasik sebelum rerating harga — fundamentalnya murah, dan smart money sudah tahu.',
+    implication: 'Konfirmasi akumulasi berlanjut sebelum masuk. Ini adalah setup dengan rasio risiko-reward terbaik.',
+    alertLevel: 'POSITIVE',
+  },
+  MURAH_DISTRIBUSI: {
+    headline: 'Harga murah tapi institusi sedang keluar — waspadai value trap',
+    explanation: 'Valuasi terlihat menarik secara numerik, namun institusi yang memiliki informasi lebih baik ' +
+      'justru sedang mendistribusikan. Ini adalah sinyal value trap klasik.',
+    implication: 'Jangan tergoda valuasi murah. Tunggu institusi berhenti menjual sebelum mempertimbangkan masuk.',
+    alertLevel: 'CAUTION',
+  },
+  WAJAR_AKUMULASI: {
+    headline: 'Valuasi wajar dengan dukungan akumulasi institusi',
+    explanation: 'Harga berada di kisaran wajar untuk sektornya, dan institusi sedang mengakumulasi. ' +
+      'Tidak ada diskon besar, namun ada kepercayaan dari smart money.',
+    implication: 'Setup normal untuk akumulasi bertahap. Pantau apakah valuasi bergerak ke area murah seiring akumulasi berlanjut.',
+    alertLevel: 'INFO',
+  },
+  WAJAR_DISTRIBUSI: {
+    headline: 'Valuasi wajar namun institusi mulai mengurangi posisi',
+    explanation: 'Harga tidak mahal, namun institusi sudah mulai mendistribusikan. ' +
+      'Ini bisa menjadi tanda awal rotasi keluar sebelum harga bergerak turun.',
+    implication: 'Pantau ketat. Jika distribusi menguat, pertimbangkan untuk tidak menambah posisi.',
+    alertLevel: 'CAUTION',
+  },
+  MAHAL_AKUMULASI: {
+    headline: 'Institusi beli di harga mahal — ada ekspektasi katalis besar',
+    explanation: 'Valuasi di atas rata-rata sektor, namun institusi tetap mengakumulasi. ' +
+      'Ini mengindikasikan smart money mengantisipasi pertumbuhan atau katalis yang belum terefleksi dalam harga.',
+    implication: 'Berisiko jika katalis tidak terwujud. Cocok untuk investor yang percaya pada growth story-nya.',
+    alertLevel: 'INFO',
+  },
+  MAHAL_DISTRIBUSI: {
+    headline: 'Valuasi mahal dan institusi sedang keluar — risiko koreksi tinggi',
+    explanation: 'Kombinasi paling berbahaya: harga sudah di atas rata-rata sektor, ' +
+      'dan institusi yang masuk duluan kini sedang mengambil profit.',
+    implication: 'Hindari masuk baru. Jika sudah pegang, evaluasi exit strategy.',
+    alertLevel: 'DANGER',
+  },
+  INSUFFICIENT_DATA: {
+    headline: 'Data tidak cukup untuk sintesis penuh',
+    explanation: 'Analisis valuasi atau bandarmology belum tersedia untuk saham ini. ' +
+      'Kesimpulan sintesis akan tersedia setelah data lengkap.',
+    implication: 'Gunakan tab Flow dan Risiko untuk analisis manual sementara.',
+    alertLevel: 'INFO',
+  },
+};
+
+// ── Unified score ─────────────────────────────────────────────
+
+function computeSynthScore(
+  bandarmologyScore: number | null,
+  valuationScore: number | null,
+  qualityScore: number | null,
+  alignment: AlignmentType
+): number {
+  const scores: { value: number; weight: number }[] = [];
+
+  if (bandarmologyScore !== null) scores.push({ value: bandarmologyScore, weight: 0.50 });
+  if (qualityScore      !== null) scores.push({ value: qualityScore,      weight: 0.30 });
+
+  // Valuation contribution: cheap = boost, expensive = penalty
+  // Inverted: MURAH (low score) = good for synthesis, MAHAL (high score) = bad
+  if (valuationScore !== null) {
+    const invertedVal = 100 - valuationScore; // cheap = high, expensive = low
+    scores.push({ value: invertedVal, weight: 0.20 });
+  }
+
+  if (scores.length === 0) return 50;
+
+  const totalWeight = scores.reduce((s, v) => s + v.weight, 0);
+  const weighted    = scores.reduce((s, v) => s + v.value * v.weight, 0);
+  let base = weighted / totalWeight;
+
+  // Alignment modifiers
+  if (alignment === 'MURAH_AKUMULASI')   base = Math.min(100, base + 8);
+  if (alignment === 'MAHAL_DISTRIBUSI')  base = Math.max(0,   base - 10);
+  if (alignment === 'MURAH_DISTRIBUSI')  base = Math.max(0,   base - 5);
+
+  return Number(base.toFixed(2));
+}
+
+// ── Main export ───────────────────────────────────────────────
+
+export interface SynthesisInput {
+  bandarmologyDecision: string | null | undefined;
+  bandarmologyScore: number | null | undefined;
+  flowBias: string | null | undefined;
+  valuationOutput: ValuationEngineOutput | null;
+}
+
+export function computeSynthesis(input: SynthesisInput): SynthesisResult {
+  const { bandarmologyDecision, bandarmologyScore, flowBias, valuationOutput } = input;
+
+  const valuationLabel = valuationOutput?.valuation.label ?? 'TIDAK_ADA_DATA';
+  const valuationScore = valuationOutput?.valuation.score ?? null;
+  const qualityScore   = valuationOutput?.quality.score   ?? null;
+
+  const alignment = getAlignment(valuationLabel, flowBias, bandarmologyDecision);
+  const template  = SYNTHESIS_MAP[alignment];
+
+  const synthScore = computeSynthScore(
+    bandarmologyScore ?? null,
+    valuationScore,
+    qualityScore,
+    alignment
+  );
+
+  return {
+    alignment,
+    headline:    template.headline,
+    explanation: template.explanation,
+    implication: template.implication,
+    alertLevel:  template.alertLevel,
+    synthScore,
+    components: {
+      bandarmologyScore: bandarmologyScore ?? null,
+      valuationScore,
+      qualityScore,
+    },
+  };
+}
+
+---
+
+PART 3 — Add /api/valuation/:symbol endpoint to server/routes.ts
+
+Append AFTER all existing endpoints. Do not touch any existing endpoint.
+
+app.get('/api/valuation/:symbol', async (req, res) => {
+  try {
+    const symbol = req.params.symbol?.toUpperCase();
+    if (!symbol) return res.status(400).json({ error: 'Symbol required' });
+
+    // Get stock from storage
+    const stock = await storage.getStock(symbol);
+    if (!stock) return res.status(404).json({ error: 'Stock not found' });
+
+    const { computeValuation } = await import('./engine/valuationEngine');
+    const { computeSynthesis }  = await import('./engine/synthesisEngine');
+
+    // Compute valuation
+    const valuationOutput = computeValuation({
+      peRatio:       stock.peRatio       ?? null,
+      dividendYield: stock.dividendYield ?? null,
+      roe:           stock.roe           ?? null,
+      netMargin:     stock.netMargin     ?? null,
+      sector:        stock.sector        ?? null,
+    });
+
+    // Get bandarmology context from existing stock data
+    const bandarmologyDecision = (stock as any).decision   ?? null;
+    const bandarmologyScore    = (stock as any).readiness  ?? null;
+    const flowBias             = (stock as any).flowBias   ?? null;
+
+    // Compute synthesis
+    const synthesis = computeSynthesis({
+      bandarmologyDecision,
+      bandarmologyScore,
+      flowBias,
+      valuationOutput,
+    });
+
+    res.status(200).json({
+      symbol,
+      valuation: valuationOutput,
+      synthesis,
+      sectorBenchmark: valuationOutput.valuation.sectorBenchmark,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[/api/valuation] Error for ${req.params.symbol}:`, message);
+    res.status(500).json({ error: 'Valuation engine error', message });
+  }
+});
+
+---
+
+PART 4 — Update Valuasi tab in client/src/pages/StockDashboard.tsx
+
+Find the Valuasi tab panel. It currently shows a 2×2 metrics grid.
+Replace it entirely with this enhanced layout:
+
+Add a fetch for valuation data when the stock loads:
+  useEffect(() => {
+    if (!symbol) return;
+    fetch(`/api/valuation/${symbol}`)
+      .then(r => r.json())
+      .then(data => setValuationData(data))
+      .catch(() => {});
+  }, [symbol]);
+
+Add useState: const [valuationData, setValuationData] = useState<any>(null);
+
+NEW VALUASI TAB LAYOUT:
+
+Section A — Valuation verdict card:
+  If valuationData exists:
+  
+  bg-[#161616] border border-[#ffffff08] rounded-md p-4 mb-4
+  
+  Header row: flex items-center justify-between mb-3
+    Left: "PENILAIAN VALUASI" IBM Plex Mono text-[9px] tracking-widest 
+          text-[#6b7280] uppercase
+    Right: Valuation label badge:
+      MURAH: bg-emerald-500/10 text-emerald-400 border-emerald-500/30
+      WAJAR: bg-amber-500/10 text-amber-400 border-amber-500/30
+      MAHAL: bg-red-500/10 text-red-400 border-red-500/30
+      Style: border rounded-sm px-2 py-0.5 IBM Plex Mono text-[10px]
+
+  Relative P/E display:
+    flex items-baseline gap-2 mb-1
+    Large number: IBM Plex Mono text-3xl font-bold
+      color: emerald if MURAH, amber if WAJAR, red if MAHAL
+      Value: valuationData.valuation.relativePE + "×" 
+             (e.g. "0.8×" means trading at 0.8× sector average)
+    Label next to it: IBM Plex Mono text-xs text-[#6b7280] 
+      "rata-rata sektor"
+  
+  Sector context:
+    IBM Plex Mono text-[10px] text-[#6b7280] mb-3
+    "Benchmark: {sectorBenchmark.displayName} · P/E rata-rata {avgPE}×"
+  
+  Interpretation text:
+    IBM Plex Mono text-[11px] text-[#9ca3af] leading-relaxed
+    valuationData.valuation.interpretation
+
+Section B — Metrics grid (keep existing 4 metrics, same style):
+  P/E Ratio, Dividend Yield, ROE, Net Margin
+  Same coloring logic as before
+  Below each value, add sector benchmark comparison:
+    IBM Plex Mono text-[9px] text-[#ffffff20]
+    "Sektor: {benchmark value}" 
+    (e.g. under P/E show "Sektor: 10.5×")
+    Get values from valuationData.sectorBenchmark
+
+Section C — Fundamental quality card:
+  bg-[#161616] border border-[#ffffff08] rounded-md p-4 mt-4
+  
+  Header row: flex items-center justify-between mb-3
+    Left: "KUALITAS FUNDAMENTAL" IBM Plex Mono text-[9px] 
+          tracking-widest text-[#6b7280] uppercase
+    Right: Quality badge:
+      KUAT: emerald
+      SEDANG: amber
+      LEMAH: red
+      Same badge style as valuation label
+
+  Quality score bar:
+    Progress bar: w-full h-1.5 bg-[#ffffff08] rounded-full mb-2
+    Fill: w-[{score}%] 
+      bg-emerald-400 if KUAT, bg-amber-400 if SEDANG, bg-red-400 if LEMAH
+      rounded-full transition-all
+
+  Interpretation:
+    IBM Plex Mono text-[11px] text-[#9ca3af] leading-relaxed
+    valuationData.quality.interpretation
+
+Section D — Analyst note (keep existing CATATAN ANALIS block)
+
+If valuationData is null (loading):
+  Show skeleton placeholders:
+    3 blocks: h-24 bg-[#161616] rounded-md animate-pulse mb-4
+
+---
+
+PART 5 — Add synthesis card to Ringkasan tab in StockDashboard.tsx
+
+In the Ringkasan tab, find the Action Guidance card 
+(card-action-guidance). INSERT the synthesis card 
+DIRECTLY BELOW it (before ConvictionTimeline).
+
+Synthesis card:
+  Only render if valuationData?.synthesis exists
+  
+  Container:
+    bg-[#0d1a0d] border border-emerald-500/20 rounded-md p-4 mb-4
+    (change bg/border color based on alertLevel:
+      POSITIVE: bg-[#0d1a0d] border-emerald-500/20
+      CAUTION:  bg-[#1a1500] border-amber-500/20
+      DANGER:   bg-[#1a0d0d] border-red-500/20
+      INFO:     bg-[#161616] border-[#ffffff08])
+
+  Header: flex items-center gap-2 mb-3
+    Icon: GitMerge from lucide-react, 14px
+      color: emerald/amber/red/sky based on alertLevel
+    Label: "SINTESIS BART" IBM Plex Mono text-[9px] tracking-widest 
+      text-[#6b7280] uppercase
+    Right: synthScore badge:
+      IBM Plex Mono text-xs font-bold px-2 py-0.5 rounded-sm
+      bg-[#ffffff06] text-white
+      "{synthScore}/100"
+
+  Headline:
+    Sora text-sm font-bold mb-2
+    color: emerald-400/amber-400/red-400/white based on alertLevel
+    valuationData.synthesis.headline
+
+  Explanation:
+    IBM Plex Mono text-[11px] text-[#9ca3af] leading-relaxed mb-3
+    valuationData.synthesis.explanation
+
+  Implication block:
+    bg-[#ffffff04] rounded-sm px-3 py-2
+    flex items-start gap-2
+    Icon: ArrowRight 12px text-[#38BDF8]
+    Text: IBM Plex Mono text-[11px] text-[#6b7280]
+    valuationData.synthesis.implication
+
+  Three component scores at bottom:
+    flex gap-4 mt-3 pt-3 border-t border-[#ffffff08]
+    Each: flex flex-col items-center
+      Value: IBM Plex Mono text-sm font-bold text-white
+        (show "—" if null)
+      Label: IBM Plex Mono text-[9px] text-[#ffffff30] uppercase
+    
+    Component 1: "BANDARMOLOGI" — bandarmologyScore
+    Component 2: "VALUASI" — 100 - valuationScore (inverted: cheap=good)
+    Component 3: "FUNDAMENTAL" — qualityScore
+
+---
+
+SAFETY RULES:
+1. New files: server/engine/valuationEngine.ts, 
+              server/engine/synthesisEngine.ts
+2. Modified files: server/routes.ts (append only), 
+                   client/src/pages/StockDashboard.tsx
+3. NEVER touch: bandarmologyCore.ts, bandarmologyDecisionV2.ts,
+   unifiedDecision.ts, bandarmologyCoreV1.ts, or any other engine file
+4. NEVER modify existing endpoints
+5. Run runTests.ts after — BBCA=77 and UNVR=5 must still pass
+6. Test /api/valuation/BBCA returns valid JSON
+7. Test /api/valuation/UNVR returns valid JSON
+8. Verify Valuasi tab renders without console errors
+9. Verify Ringkasan tab synthesis card renders for BBCA
+10. Report every file created or modified

@@ -76,7 +76,9 @@ import {
   DollarSign, 
   Newspaper, 
   AlertTriangle,
-  UserCheck
+  UserCheck,
+  GitMerge,
+  ArrowRight
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -132,6 +134,7 @@ export default function StockDashboard() {
   const [aiData, setAIData] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [sessionStatus, setSessionStatus] = useState(getIDXSessionStatus());
+  const [valuationData, setValuationData] = useState<any>(null);
 
   const decisionV2 = useMemo(() => {
     if (!aiData?.actionGuidance) return null;
@@ -215,6 +218,14 @@ export default function StockDashboard() {
       .then(setAIData)
       .catch(console.error)
       .finally(() => setAiLoading(false));
+  }, [stock]);
+
+  useEffect(() => {
+    if (!stock) return;
+    fetch(`/api/valuation/${stock.symbol}`)
+      .then(r => { if (!r.ok) throw new Error('Valuation fetch failed'); return r.json(); })
+      .then(data => { if (data.error) throw new Error(data.error); setValuationData(data); })
+      .catch(err => { console.error(err); setValuationData(null); });
   }, [stock]);
 
   if (isLoading) {
@@ -487,6 +498,37 @@ export default function StockDashboard() {
                               </div>
                             </CollapsibleContent>
                           </Collapsible>
+                        </div>
+                      </Card>
+                    )}
+
+                    {valuationData?.synthesis && (
+                      <Card className={`p-5 border shadow-sm ${
+                        valuationData.synthesis.alertLevel === 'POSITIVE' ? 'border-emerald-500/30 bg-gradient-to-br from-emerald-500/8 to-emerald-500/3'
+                        : valuationData.synthesis.alertLevel === 'DANGER' ? 'border-red-500/30 bg-gradient-to-br from-red-500/8 to-red-500/3'
+                        : valuationData.synthesis.alertLevel === 'CAUTION' ? 'border-amber-500/30 bg-gradient-to-br from-amber-500/8 to-amber-500/3'
+                        : 'border-border/50 bg-card/50'
+                      }`} data-testid="card-synthesis">
+                        <div className="flex items-center gap-2 mb-3">
+                          <GitMerge className={`w-4 h-4 ${
+                            valuationData.synthesis.alertLevel === 'POSITIVE' ? 'text-emerald-400'
+                            : valuationData.synthesis.alertLevel === 'DANGER' ? 'text-red-400'
+                            : valuationData.synthesis.alertLevel === 'CAUTION' ? 'text-amber-400'
+                            : 'text-primary'
+                          }`} />
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Sintesis: Valuasi × Bandarmology</p>
+                        </div>
+                        <p className="text-sm font-semibold text-foreground mb-2" data-testid="text-synthesis-headline">
+                          {valuationData.synthesis.headline}
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-3" data-testid="text-synthesis-explanation">
+                          {valuationData.synthesis.explanation}
+                        </p>
+                        <div className="flex items-start gap-2 pt-3 border-t border-border/30">
+                          <ArrowRight className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
+                          <p className="text-xs text-foreground" data-testid="text-synthesis-implication">
+                            {valuationData.synthesis.implication}
+                          </p>
                         </div>
                       </Card>
                     )}
@@ -1990,87 +2032,126 @@ export default function StockDashboard() {
 
                   {/* Valuasi Tab */}
                   <TabsContent value="valuation" className="mt-0 focus-visible:outline-none">
-                    <div className="grid grid-cols-2 gap-4 p-4">
-                      {(() => {
+                    <div className="p-4 space-y-4">
+                      {valuationData ? (() => {
+                        const v = valuationData.valuation?.valuation;
+                        const q = valuationData.valuation?.quality;
+                        const bench = valuationData.sectorBenchmark;
                         const pe = parseFloat(stock.peRatio);
                         const dy = parseFloat(stock.dividendYield);
                         const roeVal = parseFloat(stock.roe);
                         const nm = parseFloat(stock.netMargin);
                         const monoFont = "'IBM Plex Mono', monospace";
+                        const verdictColor = v?.label === 'MURAH' ? '#34d399' : v?.label === 'MAHAL' ? '#fbbf24' : '#94a3b8';
+                        const verdictBg = v?.label === 'MURAH' ? 'rgba(52,211,153,0.08)' : v?.label === 'MAHAL' ? 'rgba(251,191,36,0.08)' : 'rgba(148,163,184,0.05)';
+                        const qualityColor = q?.label === 'KUAT' ? '#34d399' : q?.label === 'LEMAH' ? '#f87171' : '#94a3b8';
+                        const qualityBg = q?.label === 'KUAT' ? 'rgba(52,211,153,0.08)' : q?.label === 'LEMAH' ? 'rgba(248,113,113,0.08)' : 'rgba(148,163,184,0.05)';
 
-                        const metrics = [
-                          {
-                            label: "P/E RATIO",
-                            sub: "Price to Earnings",
-                            value: isNaN(pe) || pe === 0 ? null : pe.toFixed(2),
-                            color: isNaN(pe) || pe === 0 ? "#ffffff20" : pe > 25 ? "#fbbf24" : pe < 15 ? "#34d399" : "#ffffff",
-                          },
-                          {
-                            label: "DIVIDEND YIELD",
-                            sub: "Imbal Dividen",
-                            value: isNaN(dy) || dy === 0 ? null : dy.toFixed(2) + "%",
-                            color: isNaN(dy) || dy === 0 ? "#ffffff20" : dy > 3 ? "#34d399" : "#ffffff",
-                          },
-                          {
-                            label: "ROE",
-                            sub: "Return on Equity",
-                            value: isNaN(roeVal) || roeVal === 0 ? null : roeVal.toFixed(2) + "%",
-                            color: isNaN(roeVal) || roeVal === 0 ? "#ffffff20" : roeVal > 15 ? "#34d399" : roeVal < 5 ? "#f87171" : "#ffffff",
-                          },
-                          {
-                            label: "NET MARGIN",
-                            sub: "Margin Laba Bersih",
-                            value: isNaN(nm) || nm === 0 ? null : nm.toFixed(2) + "%",
-                            color: isNaN(nm) || nm === 0 ? "#ffffff20" : nm > 20 ? "#34d399" : "#ffffff",
-                          },
-                        ];
+                        return (
+                          <>
+                            <div className="rounded-lg p-5" style={{ background: verdictBg, border: `1px solid ${verdictColor}30` }} data-testid="valuation-verdict">
+                              <div className="flex items-center justify-between mb-3">
+                                <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: monoFont, color: '#6b7280' }}>VERDICT VALUASI</p>
+                                <span className="text-[10px] px-2 py-0.5 rounded" style={{ fontFamily: monoFont, background: `${verdictColor}20`, color: verdictColor }}>
+                                  {bench?.displayName ?? 'Umum'}
+                                </span>
+                              </div>
+                              <p className="text-2xl font-bold mb-1" style={{ fontFamily: monoFont, color: verdictColor }} data-testid="text-valuation-label">
+                                {v?.label === 'MURAH' ? '🟢 MURAH' : v?.label === 'MAHAL' ? '🟡 MAHAL' : v?.label === 'TIDAK_ADA_DATA' ? '⚪ N/A' : '⚪ WAJAR'}
+                              </p>
+                              <p className="text-xs leading-relaxed" style={{ fontFamily: monoFont, color: '#94a3b8' }} data-testid="text-valuation-interpretation">
+                                {v?.interpretation ?? ''}
+                              </p>
+                            </div>
 
-                        return metrics.map((m) => (
-                          <div
-                            key={m.label}
-                            className="rounded-md p-4"
-                            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-                            data-testid={`valuation-${m.label.toLowerCase().replace(/[\s/]+/g, "-")}`}
-                          >
-                            <p
-                              className="text-[9px] tracking-widest uppercase mb-2"
-                              style={{ fontFamily: monoFont, color: "#6b7280" }}
-                            >
-                              {m.label}
-                            </p>
-                            <p
-                              className="text-2xl font-bold"
-                              style={{ fontFamily: monoFont, color: m.color }}
-                            >
-                              {m.value ?? "—"}
-                            </p>
-                            <p
-                              className="text-[10px] mt-1"
-                              style={{ fontFamily: monoFont, color: "#6b7280" }}
-                            >
-                              {m.sub}
-                            </p>
+                            {v?.relativePE !== null && v?.relativePE !== undefined && (
+                              <div className="rounded-md p-4" style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.03)' }} data-testid="valuation-relative-pe">
+                                <p className="text-[9px] tracking-widest uppercase mb-3" style={{ fontFamily: monoFont, color: '#6b7280' }}>P/E RELATIF VS SEKTOR</p>
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="text-3xl font-bold" style={{ fontFamily: monoFont, color: v.relativePE < 0.85 ? '#34d399' : v.relativePE > 1.15 ? '#fbbf24' : '#ffffff' }} data-testid="text-relative-pe">
+                                    {v.relativePE.toFixed(2)}x
+                                  </span>
+                                  <span className="text-xs" style={{ fontFamily: monoFont, color: '#6b7280' }}>
+                                    {v.relativePE < 1 ? `${Math.round((1 - v.relativePE) * 100)}% di bawah rata-rata` : v.relativePE > 1 ? `${Math.round((v.relativePE - 1) * 100)}% di atas rata-rata` : 'Sama dengan rata-rata'}
+                                  </span>
+                                </div>
+                                <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#1e1e1e' }}>
+                                  <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, v.relativePE * 50)}%`, background: v.relativePE < 0.85 ? '#34d399' : v.relativePE > 1.15 ? '#fbbf24' : '#64748b' }} />
+                                </div>
+                                <div className="flex justify-between mt-1">
+                                  <span className="text-[9px]" style={{ fontFamily: monoFont, color: '#4a5568' }}>0x</span>
+                                  <span className="text-[9px]" style={{ fontFamily: monoFont, color: '#4a5568' }}>1x (avg)</span>
+                                  <span className="text-[9px]" style={{ fontFamily: monoFont, color: '#4a5568' }}>2x</span>
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-3">
+                              {[
+                                {
+                                  label: "P/E RATIO", sub: "Price to Earnings",
+                                  value: isNaN(pe) || pe === 0 ? null : pe.toFixed(2),
+                                  bench: bench?.avgPE?.toFixed(1),
+                                  color: isNaN(pe) || pe === 0 ? '#ffffff20' : pe > (bench?.avgPE ?? 15) * 1.3 ? '#fbbf24' : pe < (bench?.avgPE ?? 15) * 0.7 ? '#34d399' : '#ffffff',
+                                },
+                                {
+                                  label: "DIVIDEND YIELD", sub: "Imbal Dividen",
+                                  value: isNaN(dy) || dy === 0 ? null : dy.toFixed(2) + '%',
+                                  bench: (bench?.avgDivYield?.toFixed(1) ?? '') + '%',
+                                  color: isNaN(dy) || dy === 0 ? '#ffffff20' : dy > (bench?.avgDivYield ?? 2.5) ? '#34d399' : '#ffffff',
+                                },
+                                {
+                                  label: "ROE", sub: "Return on Equity",
+                                  value: isNaN(roeVal) || roeVal === 0 ? null : roeVal.toFixed(2) + '%',
+                                  bench: (bench?.avgROE?.toFixed(1) ?? '') + '%',
+                                  color: isNaN(roeVal) || roeVal === 0 ? '#ffffff20' : roeVal > (bench?.avgROE ?? 12) ? '#34d399' : roeVal < (bench?.avgROE ?? 12) * 0.5 ? '#f87171' : '#ffffff',
+                                },
+                                {
+                                  label: "NET MARGIN", sub: "Margin Laba Bersih",
+                                  value: isNaN(nm) || nm === 0 ? null : nm.toFixed(2) + '%',
+                                  bench: (bench?.avgNetMargin?.toFixed(1) ?? '') + '%',
+                                  color: isNaN(nm) || nm === 0 ? '#ffffff20' : nm > (bench?.avgNetMargin ?? 10) ? '#34d399' : '#ffffff',
+                                },
+                              ].map(m => (
+                                <div key={m.label} className="rounded-md p-4" style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.03)' }} data-testid={`valuation-${m.label.toLowerCase().replace(/[\s/]+/g, '-')}`}>
+                                  <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: monoFont, color: '#6b7280' }}>{m.label}</p>
+                                  <p className="text-2xl font-bold" style={{ fontFamily: monoFont, color: m.color }}>{m.value ?? '—'}</p>
+                                  <div className="flex items-center justify-between mt-1">
+                                    <p className="text-[10px]" style={{ fontFamily: monoFont, color: '#6b7280' }}>{m.sub}</p>
+                                    {m.bench && <p className="text-[9px]" style={{ fontFamily: monoFont, color: '#4a5568' }}>avg: {m.bench}</p>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="rounded-lg p-4" style={{ background: qualityBg, border: `1px solid ${qualityColor}30` }} data-testid="valuation-quality">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: monoFont, color: '#6b7280' }}>KUALITAS FUNDAMENTAL</p>
+                                <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ fontFamily: monoFont, background: `${qualityColor}20`, color: qualityColor }} data-testid="text-quality-label">
+                                  {q?.label ?? 'N/A'}
+                                </span>
+                              </div>
+                              <p className="text-xs leading-relaxed" style={{ fontFamily: monoFont, color: '#94a3b8' }} data-testid="text-quality-interpretation">
+                                {q?.interpretation ?? ''}
+                              </p>
+                            </div>
+
+                            <div className="rounded-md p-4" style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.03)' }} data-testid="valuation-analyst-note">
+                              <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: monoFont, color: '#6b7280' }}>CATATAN ANALIS</p>
+                              <p className="text-xs leading-relaxed" style={{ fontFamily: monoFont, color: '#6b7280' }}>
+                                Data valuasi berdasarkan laporan keuangan terakhir. Benchmark sektor ({bench?.displayName ?? 'Umum'}) digunakan sebagai pembanding relatif.
+                              </p>
+                            </div>
+                          </>
+                        );
+                      })() : (
+                        <div className="space-y-3">
+                          <div className="h-24 rounded-lg animate-pulse" style={{ background: '#161616' }} />
+                          <div className="grid grid-cols-2 gap-3">
+                            {[1,2,3,4].map(i => <div key={i} className="h-24 rounded-md animate-pulse" style={{ background: '#161616' }} />)}
                           </div>
-                        ));
-                      })()}
-                    </div>
-                    <div
-                      className="mt-4 rounded-md p-4 mx-4 mb-4"
-                      style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-                      data-testid="valuation-analyst-note"
-                    >
-                      <p
-                        className="text-[9px] tracking-widest uppercase mb-2"
-                        style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
-                      >
-                        CATATAN ANALIS
-                      </p>
-                      <p
-                        className="text-xs leading-relaxed"
-                        style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#6b7280" }}
-                      >
-                        Data valuasi berdasarkan laporan keuangan terakhir yang tersedia. Bandingkan dengan rata-rata industri sebelum mengambil keputusan.
-                      </p>
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
                 </div>

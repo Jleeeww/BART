@@ -48,8 +48,14 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 
 ### Navigation
 - App uses a persistent left sidebar (Sidebar.tsx) with AppLayout wrapper in App.tsx
-- Routes: `/` (Homepage), `/radar` (RadarPage), `/watchlist` (WatchlistPage), `/stock/:symbol` (StockDashboard)
-- 3 locked nav items (Screener, Pasar, Pengaturan) show "Segera" badge
+- Routes: `/` (Homepage), `/radar` (RadarPage), `/watchlist` (WatchlistPage), `/screener` (ScreenerPage), `/stock/:symbol` (StockDashboard)
+- 2 locked nav items (Pasar, Pengaturan) show "Segera" badge
+
+### AI Engine Files
+- `server/engine/bandarmologyCore.ts`: 12-model bandarmology engine (DO NOT MODIFY)
+- `server/engine/unifiedDecision.ts`: `getStockDecision()` unified brain (DO NOT MODIFY)
+- `server/engine/valuationEngine.ts`: Sector-relative valuation scoring (P/E vs benchmark, quality scoring)
+- `server/engine/synthesisEngine.ts`: Cross-references valuation × bandarmology for alignment analysis
 
 ### Key Design Patterns
 - **Shared Types**: Centralized definition of database schemas and API contracts for type safety.
