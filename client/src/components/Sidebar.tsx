@@ -95,7 +95,7 @@ export function Sidebar() {
           style={{ height: 48, borderBottom: "1px solid rgba(255,255,255,0.03)" }}
         >
           <span
-            className="font-bold text-base tracking-wider"
+            className="font-bold text-xl tracking-wider"
             style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#38BDF8" }}
           >
             BART
