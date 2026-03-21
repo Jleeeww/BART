@@ -20,7 +20,7 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 - **Build Tool**: Vite
 - **Routing**: Wouter
 - **State Management**: TanStack React Query
-- **Styling**: Tailwind CSS (with light/dark mode)
+- **Styling**: Tailwind CSS (dark terminal theme only, no light mode)
 - **UI Components**: shadcn/ui (based on Radix UI)
 - **Charts**: Recharts
 - **Animations**: Framer Motion
@@ -37,9 +37,18 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 
 ### Project Structure
 - `client/`: React frontend
+  - `client/src/components/Sidebar.tsx`: Fixed left sidebar navigation (200px, persistent)
+  - `client/src/pages/Homepage.tsx`: Main dashboard ("Peta Kesiapan")
+  - `client/src/pages/RadarPage.tsx`: Institutional radar table ("/radar")
+  - `client/src/pages/StockDashboard.tsx`: Individual stock detail ("/stock/:symbol")
 - `server/`: Node.js/Express backend
 - `shared/`: Shared code (DB schema, API contracts)
 - `migrations/`: Database migrations
+
+### Navigation
+- App uses a persistent left sidebar (Sidebar.tsx) with AppLayout wrapper in App.tsx
+- Routes: `/` (Homepage), `/radar` (RadarPage), `/stock/:symbol` (StockDashboard)
+- 4 locked nav items (Watchlist, Screener, Pasar, Pengaturan) show "Segera" badge
 
 ### Key Design Patterns
 - **Shared Types**: Centralized definition of database schemas and API contracts for type safety.

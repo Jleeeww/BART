@@ -409,20 +409,6 @@ export default function Homepage() {
 
   return (
     <div className="min-h-screen" style={{ background: "#0f0f0f" }}>
-      {/* SECTION 1 — Top Navigation Bar */}
-      <nav
-        className="flex items-center justify-between px-6"
-        style={{ height: 48, background: "#0a0a0a", borderBottom: "1px solid rgba(255,255,255,0.03)" }}
-      >
-        <span
-          className="font-bold text-lg tracking-wider"
-          style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#38BDF8" }}
-        >
-          BART
-        </span>
-        <SimulationToggle />
-      </nav>
-
       {/* SECTION 2 — Hero Block */}
       <section
         className="relative w-full"
@@ -434,7 +420,11 @@ export default function Homepage() {
             backgroundImage: "repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 3px)",
           }}
         />
-        <div className="relative flex items-start justify-between gap-8 px-6 pt-10 pb-6">
+        <div className="relative px-6 pt-6 pb-6">
+          <div className="flex justify-end mb-4">
+            <SimulationToggle />
+          </div>
+          <div className="flex items-start justify-between gap-8">
           <div className="flex-1">
             <p
               className="text-[10px] tracking-[0.2em] uppercase mb-2"
@@ -519,6 +509,7 @@ export default function Homepage() {
                 </p>
               </div>
             )}
+          </div>
           </div>
         </div>
       </section>

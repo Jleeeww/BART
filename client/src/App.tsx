@@ -6,19 +6,30 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Homepage from "@/pages/Homepage";
 import StockDashboard from "@/pages/StockDashboard";
+import RadarPage from "@/pages/RadarPage";
 import { SimulationProvider } from "@/contexts/SimulationContext";
 import { SimulationBanner } from "@/components/SimulationBanner";
+import { Sidebar } from "@/components/Sidebar";
 
 function Router() {
   return (
     <Switch>
-      {/* Homepage with readiness market map */}
       <Route path="/" component={Homepage} />
-      {/* Stock detail page */}
       <Route path="/stock/:symbol" component={StockDashboard} />
-      {/* Fallback to 404 */}
+      <Route path="/radar" component={RadarPage} />
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+function AppLayout() {
+  return (
+    <div className="flex min-h-screen" style={{ background: "#0f0f0f" }}>
+      <Sidebar />
+      <main className="flex-1 md:ml-[200px] min-h-screen overflow-auto">
+        <Router />
+      </main>
+    </div>
   );
 }
 
@@ -29,7 +40,7 @@ function App() {
         <SimulationProvider>
           <SimulationBanner />
           <Toaster />
-          <Router />
+          <AppLayout />
         </SimulationProvider>
       </TooltipProvider>
     </QueryClientProvider>

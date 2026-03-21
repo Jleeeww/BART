@@ -1,0 +1,244 @@
+Build the BART sidebar navigation and Radar page. This is a significant 
+structural change — read all instructions carefully before touching anything.
+
+---
+
+PART 1 — APP LAYOUT RESTRUCTURE
+
+Modify client/src/App.tsx:
+Wrap all routes in a new layout component called AppLayout.
+AppLayout renders a persistent left sidebar (desktop only) + main content area.
+
+Layout structure:
+<div className="flex min-h-screen bg-[#0f0f0f]">
+  <Sidebar />  {/* 200px wide, fixed left, full height */}
+  <main className="flex-1 ml-[200px] min-h-screen overflow-auto">
+    {/* route content renders here */}
+  </main>
+</div>
+
+Routes stay the same:
+/ → Homepage
+/stock/:symbol → StockDashboard
+/radar → RadarPage (NEW)
+* → 404
+
+---
+
+PART 2 — SIDEBAR COMPONENT
+
+Create client/src/components/Sidebar.tsx
+
+Fixed left sidebar, full viewport height, 200px wide.
+bg-[#0a0a0a] border-r border-[#ffffff08]
+position: fixed, left: 0, top: 0, height: 100vh, width: 200px
+z-index: 50
+Display: desktop only (hide on mobile with md:block hidden, 
+but do not build mobile version yet)
+
+SIDEBAR SECTIONS:
+
+Top section — Logo:
+  Height: 48px, border-b border-[#ffffff08]
+  flex items-center px-4
+  "BART" text: IBM Plex Mono font-bold text-[#38BDF8] text-base tracking-wider
+  Clicking it navigates to /
+
+Middle section — Nav items (flex-1, py-4):
+  6 nav items listed below.
+  Each nav item:
+    - Link to its route
+    - flex items-center gap-3 px-4 py-2.5 mx-2 rounded-md
+    - Active state: bg-[#38BDF8]/10 text-[#38BDF8] border-l-2 border-[#38BDF8]
+    - Inactive state: text-[#6b7280] hover:text-white hover:bg-[#ffffff06]
+    - Transition: transition-all duration-150
+    - Icon (16px, use lucide-react) + Label
+
+Nav items in order:
+1. Icon: LayoutGrid    Label: "Peta Kesiapan"   Route: /          
+2. Icon: Radio         Label: "Radar"            Route: /radar     
+3. Icon: Star          Label: "Watchlist"        Route: /watchlist  — LOCKED
+4. Icon: SlidersHorizontal Label: "Screener"     Route: /screener  — LOCKED
+5. Icon: BarChart2     Label: "Pasar"            Route: /pasar     — LOCKED
+6. Icon: Settings      Label: "Pengaturan"       Route: /pengaturan — LOCKED
+
+LOCKED items styling:
+  text-[#ffffff20] cursor-not-allowed
+  No hover effect
+  Small "Segera" badge on the right: 
+    bg-[#ffffff06] text-[#ffffff20] text-[9px] IBM Plex Mono px-1.5 rounded-sm
+
+Bottom section — Info block:
+  border-t border-[#ffffff08] p-4
+  "PT Berkat Digital Investasi" 
+  IBM Plex Mono text-[9px] text-[#ffffff20] tracking-wide
+  "BART v2.0" below it, same style
+
+Import useLocation from wouter to detect active route.
+Active = current pathname starts with the route 
+(e.g. /stock/BBCA still highlights "Peta Kesiapan" since it's a sub-route of /).
+Exception: / only matches exactly /, not /radar or others.
+
+---
+
+PART 3 — HOMEPAGE ADJUSTMENT
+
+In client/src/pages/Homepage.tsx:
+Remove the top nav bar entirely (the 48px bar with BART logo and SimulationToggle).
+The sidebar now provides the BART logo.
+Move SimulationToggle to the top-right of the hero section instead 
+(small, inline with the STATUS PASAR block or floated top-right of hero).
+Everything else on the homepage stays exactly as is.
+
+---
+
+PART 4 — RADAR PAGE
+
+Create client/src/pages/RadarPage.tsx
+Route: /radar
+
+This page is a placeholder that is architecturally ready for live IDX data.
+It must be built to handle any number of stocks — no hardcoded stock assumptions.
+Data comes from /api/stocks (existing endpoint) for now.
+When live IDX data arrives, only the data source changes — not the component.
+
+PAGE LAYOUT:
+Full width within the main content area. px-6 py-6.
+
+SECTION A — Page header:
+  Small label: "BANDARMOLOGY RADAR" IBM Plex Mono text-[10px] 
+    tracking-[0.2em] text-[#38BDF8] uppercase mb-1
+  Title: "Pemindaian Institusional IDX" Sora text-2xl font-bold text-white
+  Subtitle: "Mendeteksi aktivitas akumulasi dan distribusi di seluruh pasar" 
+    IBM Plex Mono text-sm text-[#6b7280] mt-1
+
+SECTION B — Filter + Stats bar:
+  bg-[#161616] border border-[#ffffff08] rounded-md px-4 py-3 mb-4
+  flex items-center justify-between
+
+  Left side — Filter pills (flex gap-2):
+    "Semua" / "Akumulasi" / "Distribusi" / "Waspadai"
+    Active pill: bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30
+    Inactive pill: bg-[#ffffff06] text-[#6b7280] border border-[#ffffff08]
+    IBM Plex Mono text-[10px] tracking-wide px-3 py-1.5 rounded-sm cursor-pointer
+    Filter logic: 
+      "Semua" = show all
+      "Akumulasi" = homepageBucket === 'siap_dipantau' OR 'watchlist_prioritas'
+      "Distribusi" = homepageBucket === 'hindari_dulu'
+      "Waspadai" = readiness between 40–59
+
+  Right side — live counts (flex gap-4):
+    Each count: IBM Plex Mono text-xs
+    "X Akumulasi" text-emerald-400
+    "X Distribusi" text-red-400  
+    "X Dipantau" text-amber-400
+    Counts derived from filtered stock data
+
+SECTION C — Confidence filter notice:
+  If any stocks are filtered out due to low confidence, show:
+  bg-[#1a1100] border border-amber-500/20 rounded-sm px-4 py-2 mb-3
+  IBM Plex Mono text-[10px] text-amber-500/70
+  "X saham disembunyikan karena kepercayaan sinyal di bawah 60%"
+  (For now use a placeholder: show this bar with count = 0 
+   since confidence filtering will activate with live data)
+
+SECTION D — Radar table:
+  Full width table. No outer border — rows are the visual unit.
+  Header row: bg-[#111111] border-b border-[#ffffff08]
+    Columns (IBM Plex Mono text-[9px] tracking-widest text-[#6b7280] uppercase px-4 py-2):
+    SAHAM | SEKTOR | SKOR | REZIM | POSISI SIKLUS | ALIRAN DANA | KONSENTRASI | AKSI
+  
+  Each stock row:
+    bg-[#161616] border-b border-[#ffffff08] 
+    hover:bg-[#1a1a1a] transition-colors duration-100
+    Left accent: border-l-2 
+      emerald if siap_dipantau, amber if watchlist_prioritas, red if hindari_dulu
+
+    Column values:
+    
+    SAHAM (w-32):
+      Symbol: Sora text-sm font-bold text-white
+      Company name: IBM Plex Mono text-[10px] text-[#6b7280] truncate
+
+    SEKTOR (w-28):
+      IBM Plex Mono text-[10px] text-[#6b7280]
+      Use stock.sector if available, else "—"
+
+    SKOR (w-20 text-center):
+      Score number: IBM Plex Mono text-lg font-bold
+      emerald-400 if ≥80, amber-400 if 60–79, red-400 if <60
+
+    REZIM (w-32):
+      Badge: bg-[#ffffff06] border border-[#ffffff10] rounded-sm 
+        px-2 py-0.5 IBM Plex Mono text-[10px]
+      Color: text-[#38BDF8] if ACCUMULATION, 
+             text-amber-400 if TRANSITION/FADING,
+             text-red-400 if DISTRIBUTION/VOLATILE,
+             text-[#6b7280] otherwise
+      Show the regime label from the stock data if available, else "—"
+
+    POSISI SIKLUS (w-40):
+      Show cyclePosition if available:
+        ENTRY_WINDOW → emerald-400 "Entry Window"
+        KONFIRMASI_MULAI → sky-400 "Konfirmasi Mulai"  
+        TERLALU_DINI → slate-400 "Terlalu Dini"
+        WASPADAI_DISTRIBUSI → amber-400 "Waspadai Distribusi"
+        null → text-[#ffffff20] "—"
+
+    ALIRAN DANA (w-28 text-right):
+      Show flowBias from stock data:
+        "Akumulasi" → emerald-400 "↑ Akumulasi"
+        "Distribusi" → red-400 "↓ Distribusi"
+        "Netral" → text-[#6b7280] "→ Netral"
+        IBM Plex Mono text-[11px]
+
+    KONSENTRASI (w-32):
+      Dynamic badge from concentration type:
+        KENDALI_BANDAR → border-emerald-500/40 text-emerald-400 "Kendali Bandar"
+        JEBAKAN_DISTRIBUSI → border-red-500/40 text-red-400 "Jebakan Distribusi"
+        TERSEBAR → border-[#ffffff15] text-[#6b7280] "Tersebar"
+      Badge style: border rounded-sm px-2 py-0.5 IBM Plex Mono text-[10px]
+      If not available: "—" text-[#ffffff20]
+
+    AKSI (w-24 text-right):
+      "DETAIL →" button:
+        bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-[#38BDF8] 
+        IBM Plex Mono text-[10px] px-3 py-1.5 rounded-sm 
+        border border-[#38BDF8]/20 transition-all
+        Navigates to /stock/:symbol
+
+  Empty state (no stocks after filter):
+    py-16 text-center
+    "◎" text-4xl text-[#ffffff10] mb-3
+    "Tidak ada saham terdeteksi pada filter ini" IBM Plex Mono text-sm text-[#6b7280]
+
+SECTION E — Bottom notice:
+  mt-6 IBM Plex Mono text-[10px] text-[#ffffff20] text-center
+  "Radar menampilkan saham dengan kepercayaan sinyal ≥ 60% · 
+   Data live IDX akan aktif setelah lisensi PT Berkat Digital Investasi"
+
+---
+
+DATA SOURCING FOR RADAR:
+Fetch from existing GET /api/stocks endpoint.
+Extract: symbol, companyName, readiness, homepageBucket, regime, 
+         flowBias, sector, changePercent, price
+cyclePosition and concentrationType: derive client-side using the same 
+logic already implemented in StockDashboard.tsx (copy the useMemo logic).
+Apply filter: only show stocks where the simulated confidence ≥ 60%.
+For now, treat all stocks from the API as having confidence = 100 
+(they pass the filter). The confidence gate will activate with live data.
+
+---
+
+SAFETY RULES:
+1. Do not modify bandarmologyCore.ts, bandarmologyDecisionV2.ts, 
+   unifiedDecision.ts, or any engine file
+2. Do not modify routes.ts or any backend file
+3. Do not change Homepage.tsx except removing the top nav bar 
+   and moving SimulationToggle as described
+4. Do not install new packages — use lucide-react (already installed), 
+   wouter (already installed), existing UI components
+5. Run no engine tests — this is frontend only
+6. After build: verify / loads, /radar loads, /stock/:symbol still loads
+7. Report every file created or modified
