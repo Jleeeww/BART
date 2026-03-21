@@ -37,7 +37,7 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 
 ### Project Structure
 - `client/`: React frontend
-  - `client/src/components/Sidebar.tsx`: Fixed left sidebar navigation (200px, persistent)
+  - `client/src/components/Sidebar.tsx`: Collapsible left sidebar navigation (200px expanded, 56px collapsed icons-only)
   - `client/src/pages/Homepage.tsx`: Main dashboard ("Peta Kesiapan")
   - `client/src/pages/RadarPage.tsx`: Institutional radar table ("/radar")
   - `client/src/pages/WatchlistPage.tsx`: Watchlist page ("/watchlist")
@@ -47,7 +47,7 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 - `migrations/`: Database migrations
 
 ### Navigation
-- App uses a persistent left sidebar (Sidebar.tsx) with AppLayout wrapper in App.tsx
+- App uses a collapsible left sidebar (Sidebar.tsx) with AppLayout wrapper in App.tsx; collapsed state managed in AppLayout, passed as props
 - Routes: `/` (Homepage), `/radar` (RadarPage), `/watchlist` (WatchlistPage), `/screener` (ScreenerPage), `/stock/:symbol` (StockDashboard)
 - 2 locked nav items (Pasar, Pengaturan) show "Segera" badge
 
