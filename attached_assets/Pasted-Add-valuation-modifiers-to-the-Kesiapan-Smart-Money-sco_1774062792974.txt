@@ -1,0 +1,239 @@
+Add valuation modifiers to the Kesiapan Smart Money score.
+Read everything carefully before touching anything.
+
+---
+
+WHAT THIS CHANGES:
+The readiness score gets a small valuation adjustment (±5 max).
+This affects the locked calibration values — BBCA will change
+from 77 to a new value, UNVR from 5 to a new value.
+After building, we will update the locked test values to match
+the new honest calibration.
+
+---
+
+PART 1 — Create server/engine/valuationModifier.ts
+
+/**
+ * ============================================================
+ * VALUATION MODIFIER v1.0
+ * ============================================================
+ * Applies a small valuation + quality adjustment to the
+ * v1.1 bandarmology readiness score.
+ *
+ * DESIGN RULES:
+ *   - Bandarmology remains dominant (90%+ of signal)
+ *   - Max total adjustment: ±5 points
+ *   - Deterministic: same input → same output
+ *   - Safe: null inputs → 0 modifier (no adjustment)
+ *   - Never pushes a HINDARI stock into WATCHLIST range
+ *   - Never pushes a WATCHLIST stock into SIAP range
+ *
+ * MODIFIER TABLE:
+ *   Valuation:  MURAH=+3, WAJAR=0, MAHAL=-3, NO_DATA=0
+ *   Quality:    KUAT=+2,  SEDANG=0, LEMAH=-2, NO_DATA=0
+ *   Max total:  clamp(sum, -5, +5)
+ * ============================================================
+ */
+
+export type ValuationLabel = 'MURAH' | 'WAJAR' | 'MAHAL' | 'TIDAK_ADA_DATA';
+export type QualityLabel   = 'KUAT'  | 'SEDANG' | 'LEMAH' | 'TIDAK_ADA_DATA';
+
+export interface ValuationModifierInput {
+  valuationLabel: ValuationLabel | null | undefined;
+  qualityLabel:   QualityLabel   | null | undefined;
+  currentReadiness: number;
+}
+
+export interface ValuationModifierOutput {
+  adjustedReadiness: number;
+  modifier: number;           // the actual ±N applied
+  valuationComponent: number; // -3, 0, or +3
+  qualityComponent: number;   // -2, 0, or +2
+  wasAdjusted: boolean;
+}
+
+export function applyValuationModifier(
+  input: ValuationModifierInput
+): ValuationModifierOutput {
+  const { valuationLabel, qualityLabel, currentReadiness } = input;
+
+  // Safety: invalid readiness → return unchanged
+  if (
+    currentReadiness === null ||
+    currentReadiness === undefined ||
+    isNaN(currentReadiness) ||
+    !isFinite(currentReadiness)
+  ) {
+    return {
+      adjustedReadiness: currentReadiness ?? 0,
+      modifier: 0,
+      valuationComponent: 0,
+      qualityComponent: 0,
+      wasAdjusted: false,
+    };
+  }
+
+  // Valuation component
+  let valuationComponent = 0;
+  if (valuationLabel === 'MURAH') valuationComponent = +3;
+  if (valuationLabel === 'MAHAL') valuationComponent = -3;
+
+  // Quality component
+  let qualityComponent = 0;
+  if (qualityLabel === 'KUAT')  qualityComponent = +2;
+  if (qualityLabel === 'LEMAH') qualityComponent = -2;
+
+  // Total modifier: clamp to ±5
+  const rawModifier = valuationComponent + qualityComponent;
+  const modifier = Math.max(-5, Math.min(5, rawModifier));
+
+  // Apply modifier
+  let adjusted = currentReadiness + modifier;
+
+  // BOUNDARY PROTECTION:
+  // Do not cross bucket thresholds purely due to valuation modifier.
+  // This prevents a borderline HINDARI (59) becoming WATCHLIST (60)
+  // just because valuation is MURAH.
+  // Thresholds: <60=HINDARI, 60-79=WATCHLIST, ≥80=SIAP
+  const originalBucket =
+    currentReadiness >= 80 ? 'SIAP' :
+    currentReadiness >= 60 ? 'WATCHLIST' : 'HINDARI';
+
+  const adjustedBucket =
+    adjusted >= 80 ? 'SIAP' :
+    adjusted >= 60 ? 'WATCHLIST' : 'HINDARI';
+
+  // If modifier would push across a bucket boundary, clamp at boundary
+  if (originalBucket !== adjustedBucket) {
+    if (originalBucket === 'HINDARI' && adjustedBucket === 'WATCHLIST') {
+      adjusted = 59; // cap just below WATCHLIST threshold
+    } else if (originalBucket === 'WATCHLIST' && adjustedBucket === 'SIAP') {
+      adjusted = 79; // cap just below SIAP threshold
+    } else if (originalBucket === 'WATCHLIST' && adjustedBucket === 'HINDARI') {
+      adjusted = 60; // floor just above HINDARI threshold
+    } else if (originalBucket === 'SIAP' && adjustedBucket === 'WATCHLIST') {
+      adjusted = 80; // floor just above WATCHLIST threshold
+    }
+  }
+
+  // Final clamp 0-100
+  adjusted = Math.max(0, Math.min(100, Math.round(adjusted)));
+
+  return {
+    adjustedReadiness: adjusted,
+    modifier,
+    valuationComponent,
+    qualityComponent,
+    wasAdjusted: modifier !== 0,
+  };
+}
+
+---
+
+PART 2 — Wire modifier into routes.ts
+
+Find the GET /api/stock/:symbol endpoint in routes.ts.
+This is the endpoint that returns the full stock object
+with readiness score.
+
+After the existing readiness score is computed (from 
+getStockDecision() in unifiedDecision.ts), add this block:
+
+// Apply valuation modifier to readiness score
+try {
+  const { computeValuation } = await import('./engine/valuationEngine');
+  const { applyValuationModifier } = await import('./engine/valuationModifier');
+
+  const valuationOutput = computeValuation({
+    peRatio:       stockData.peRatio       ?? null,
+    dividendYield: stockData.dividendYield ?? null,
+    roe:           stockData.roe           ?? null,
+    netMargin:     stockData.netMargin     ?? null,
+    sector:        stockData.sector        ?? null,
+  });
+
+  const modifierResult = applyValuationModifier({
+    valuationLabel:   valuationOutput.valuation.label,
+    qualityLabel:     valuationOutput.quality.label,
+    currentReadiness: stockData.readiness ?? 0,
+  });
+
+  if (modifierResult.wasAdjusted) {
+    stockData.readiness = modifierResult.adjustedReadiness;
+    stockData.valuationModifier = modifierResult.modifier;
+    stockData.valuationLabel    = valuationOutput.valuation.label;
+    stockData.qualityLabel      = valuationOutput.quality.label;
+  }
+} catch (err) {
+  // Valuation modifier is non-critical — never break the main response
+  console.error('[/api/stock] Valuation modifier error:', err);
+}
+
+IMPORTANT: Find the exact location in routes.ts where the 
+stock response object is assembled. The modifier must run 
+AFTER getStockDecision() and BEFORE the response is sent.
+If stockData is immutable, create a mutable copy first.
+
+Also apply the same modifier to GET /api/stocks (the bulk
+endpoint) so the homepage and radar scores are consistent.
+Use the same try/catch pattern — non-critical, never throws.
+
+---
+
+PART 3 — Update runTests.ts with new calibration values
+
+After implementing the modifier, run /api/stock/BBCA and 
+/api/stock/UNVR manually to get the new readiness scores.
+
+Then update runTests.ts:
+- Find the locked assertion for BBCA readiness
+- Update expected value from 77 to the new actual value
+- Find the locked assertion for UNVR readiness  
+- Update expected value from 5 to the new actual value
+- Keep all other assertions unchanged (decision labels 
+  WATCHLIST_PRIORITAS and HINDARI_DULU must still pass)
+
+Run runTests.ts after updating — all tests must pass.
+
+---
+
+PART 4 — Update Ringkasan tab modifier display
+
+In client/src/pages/StockDashboard.tsx, find the 
+Kesiapan Smart Money score display.
+
+Below the score number (77/100), add a small modifier line
+that shows when valuationModifier exists on the stock data:
+
+{stock.valuationModifier && stock.valuationModifier !== 0 && (
+  <div className="flex items-center gap-1 mt-1">
+    <span className={`IBM Plex Mono text-[10px] ${
+      stock.valuationModifier > 0 ? 'text-emerald-400' : 'text-red-400'
+    }`}>
+      {stock.valuationModifier > 0 ? '▲' : '▼'}
+      {Math.abs(stock.valuationModifier)} poin dari valuasi
+    </span>
+  </div>
+)}
+
+This gives users transparency — they can see the score
+was adjusted and by how much.
+
+---
+
+SAFETY RULES:
+1. New file: server/engine/valuationModifier.ts
+2. Modified files: server/routes.ts, runTests.ts, 
+                   client/src/pages/StockDashboard.tsx
+3. NEVER touch: bandarmologyCore.ts, bandarmologyDecisionV2.ts,
+   unifiedDecision.ts, bandarmologyCoreV1.ts
+4. The modifier is NON-CRITICAL — wrap in try/catch, 
+   never let it break existing responses
+5. After modifier is live, get actual new scores for 
+   BBCA and UNVR from the API before updating tests
+6. Run runTests.ts — all tests must pass with new values
+7. Decision labels must not change: BBCA=WATCHLIST_PRIORITAS,
+   UNVR=HINDARI_DULU
+8. Report: new BBCA readiness, new UNVR readiness, 
+   all files modified

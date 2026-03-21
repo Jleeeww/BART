@@ -6,6 +6,8 @@ import { getStockDecision, mapStockDataToInput } from "./engine/unifiedDecision"
 import { runEngineTests } from "./engine/runTests";
 import { computeBandarmology, buildBandarmologyInput, computeGorenganFromStock } from "./engine/bandarmologyCoreV1";
 import { testBandarmologyRouter } from "./routes/testBandarmology";
+import { computeValuation } from "./engine/valuationEngine";
+import { applyValuationModifier } from "./engine/valuationModifier";
 
 // ========================================
 // UNIFIED BRAIN ENGINE
@@ -715,6 +717,9 @@ export async function registerRoutes(
         console.log(`[UNIVERSE AUDIT] missingSymbols: none`);
       }
 
+      const bulkComputeValuation = computeValuation;
+      const bulkApplyModifier = applyValuationModifier;
+
       // Calculate readiness score for each stock using UNIFIED BRAIN
       // RULE: Never filter out stocks. If analysis fails, use fallback state.
       const stocksWithReadiness = universeStocks.map(stock => {
@@ -778,6 +783,26 @@ export async function registerRoutes(
             : decision.bucket === "Watchlist Prioritas" ? "watchlist_prioritas"
             : "hindari_dulu";
 
+          let adjustedReadiness = decision.readiness;
+          let bulkValuationModifier: number | null = null;
+          try {
+            const safeParse = (v: any): number | null => { const n = parseFloat(String(v)); return isFinite(n) ? n : null; };
+            const valOut = bulkComputeValuation({
+              peRatio: safeParse(stock.peRatio), dividendYield: safeParse(stock.dividendYield),
+              roe: safeParse(stock.roe), netMargin: safeParse(stock.netMargin), sector: stock.sector ?? null,
+            });
+            const modResult = bulkApplyModifier({
+              valuationLabel: valOut.valuation.label, qualityLabel: valOut.quality.label,
+              currentReadiness: decision.readiness,
+            });
+            if (modResult.wasAdjusted) {
+              adjustedReadiness = modResult.adjustedReadiness;
+              bulkValuationModifier = modResult.modifier;
+            }
+          } catch (modErr) {
+            console.error(`[/api/stocks] Valuation modifier error for ${stock.symbol}:`, modErr);
+          }
+
           return {
             symbol: stock.symbol,
             name: stock.name,
@@ -786,7 +811,7 @@ export async function registerRoutes(
             changePercent: stock.changePercent,
             sector: stock.sector,
             sectorBadge: stock.sectorBadge,
-            readinessScore: decision.readiness,
+            readinessScore: adjustedReadiness,
             marketRegime: decision.marketRegime,
             actionGuidance: decision.bucket,
             actionColor: decision.color,
@@ -797,6 +822,7 @@ export async function registerRoutes(
             isGorengan: gorenganResult.isGorengan,
             gorenganWarning: gorenganResult.isGorengan ? "Aktivitas spekulatif ritel terdeteksi" : null,
             riskOverride: gorenganResult.riskOverride,
+            valuationModifier: bulkValuationModifier,
           };
         } catch (analysisError) {
           console.error(`[UNIVERSE AUDIT] ${stock.symbol}: analysis FAILED — ${analysisError}`);
@@ -1054,6 +1080,35 @@ export async function registerRoutes(
       };
     })();
 
+    let valuationModifierValue: number | null = null;
+    let valuationLabelForResponse: string | null = null;
+    let qualityLabelForResponse: string | null = null;
+    try {
+      const safeParse = (v: any): number | null => { const n = parseFloat(String(v)); return isFinite(n) ? n : null; };
+      const valuationOutput = computeValuation({
+        peRatio:       safeParse(stockData?.peRatio),
+        dividendYield: safeParse(stockData?.dividendYield),
+        roe:           safeParse(stockData?.roe),
+        netMargin:     safeParse(stockData?.netMargin),
+        sector:        stockData?.sector ?? null,
+      });
+
+      const modifierResult = applyValuationModifier({
+        valuationLabel: valuationOutput.valuation.label,
+        qualityLabel:   valuationOutput.quality.label,
+        currentReadiness: actionGuidance._debug.readinessScore,
+      });
+
+      if (modifierResult.wasAdjusted) {
+        actionGuidance._debug.readinessScore = modifierResult.adjustedReadiness;
+        valuationModifierValue = modifierResult.modifier;
+        valuationLabelForResponse = valuationOutput.valuation.label;
+        qualityLabelForResponse = valuationOutput.quality.label;
+      }
+    } catch (err) {
+      console.error('[/api/ai] Valuation modifier error:', err);
+    }
+
     // ========================================
     // SMART NEWS FILTER ENGINE
     // Classifies news into Fundamental, Sentiment, or Noise
@@ -1270,7 +1325,10 @@ export async function registerRoutes(
       // IMPORTANT: Override score with consistent value from actionGuidance
       smartMoneyReadinessScore: {
         ...smartMoneyReadinessScore,
-        score: actionGuidance._debug.readinessScore, // Use consistent score
+        score: actionGuidance._debug.readinessScore,
+        valuationModifier: valuationModifierValue,
+        valuationLabel: valuationLabelForResponse,
+        qualityLabel: qualityLabelForResponse,
       },
       
       // Action Guidance Mode (Decision Layer)

@@ -677,6 +677,16 @@ export default function StockDashboard() {
                                   </span>
                                   <span className="text-lg text-muted-foreground font-medium">/ 100</span>
                                 </div>
+                                {aiData.smartMoneyReadinessScore.valuationModifier != null && aiData.smartMoneyReadinessScore.valuationModifier !== 0 && (
+                                  <div className="flex items-center gap-1 mt-1" data-testid="text-valuation-modifier">
+                                    <span className={`text-[10px] font-mono ${
+                                      aiData.smartMoneyReadinessScore.valuationModifier > 0 ? 'text-emerald-400' : 'text-red-400'
+                                    }`}>
+                                      {aiData.smartMoneyReadinessScore.valuationModifier > 0 ? '▲' : '▼'}
+                                      {Math.abs(aiData.smartMoneyReadinessScore.valuationModifier)} poin dari valuasi
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                             
