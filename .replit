@@ -46,3 +46,6 @@ waitForPort = 5000
 
 [userenv.shared]
 OPENAI_API_KEY = "your_real_api_key_here"
+
+[agent]
+integrations = ["github:1.0.0"]
