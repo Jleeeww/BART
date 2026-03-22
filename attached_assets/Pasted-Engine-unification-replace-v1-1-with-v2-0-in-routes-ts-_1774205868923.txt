@@ -1,0 +1,193 @@
+Engine unification: replace v1.1 with v2.0 in routes.ts.
+Read everything carefully. This is a surgical change only.
+
+WHAT THIS DOES:
+Replaces getStockDecision(brainInput) calls — which use the
+categorical v1.1 engine — with getStockDecisionV2(stockData)
+calls — which use the full v2.0 engine (computeBandarmologyV2).
+
+getStockDecisionV2() already exists in unifiedDecision.ts and
+returns the IDENTICAL StockDecisionResult interface.
+The response shapes do not change. Frontend is unaffected.
+
+DO NOT touch: any engine files, any frontend files,
+simulation endpoint, or any other backend file.
+ONLY modify server/routes.ts.
+
+---
+
+CHANGE 1 — Add getStockDecisionV2 to the import at line 5
+
+Find this line at the top of routes.ts:
+  import { getStockDecision, mapStockDataToInput } from "./engine/unifiedDecision";
+
+Change to:
+  import { getStockDecision, getStockDecisionV2, mapStockDataToInput } from "./engine/unifiedDecision";
+
+---
+
+CHANGE 2 — Bulk endpoint /api/stocks
+
+Find the block inside the bulk stocks map that reads:
+  const brainInput = mapStockDataToInput({
+    flowBias: stock.flowBias,
+    flowIntensity: stock.flowIntensity,
+    flowReliability: stock.flowReliability,
+    changePercent: stock.changePercent,
+    growth: stock.growth,
+    insiderData: stock.insiderData,
+    brokerData: stock.brokerData,
+    foreignActivityData: stock.foreignActivityData,
+    stockCharacter: stock.stockCharacter,
+    isGorengan: gorenganResult.isGorengan,
+  });
+
+  // GET DECISION from unified brain
+  const decision = getStockDecision(brainInput);
+
+Replace ONLY those two blocks (mapStockDataToInput call + 
+getStockDecision call) with:
+
+  // V2.0 ENGINE — full bandarmology composite
+  const decision = gorenganResult.isGorengan
+    ? getStockDecision({
+        netFlow: 'low', brokerStability: 'low', flowQuality: 'low',
+        priceTrend: 'sideways', volatility: 'high', insider: 'neutral',
+        isGorengan: true,
+      })
+    : getStockDecisionV2({
+        symbol:              stock.symbol,
+        brokerData:          stock.brokerData || '[]',
+        foreignActivityData: stock.foreignActivityData || '{}',
+        price:               stock.price,
+        close:               stock.price,
+        open:                stock.open   || 0,
+        high:                stock.high   || 0,
+        low:                 stock.low    || 0,
+        prevClose:           stock.prevClose || 0,
+        change:              stock.change || 0,
+        changePercent:       stock.changePercent || 0,
+        avgBuyPrice:         stock.avgBuyPrice  || 0,
+        avgSellPrice:        stock.avgSellPrice || 0,
+        todayValue:          stock.todayValue   || 0,
+        avg20dValue:         stock.avg20dValue  || 0,
+        flowBias:            stock.flowBias        || 'Netral',
+        flowIntensity:       stock.flowIntensity   || '',
+        flowReliability:     stock.flowReliability || 'Sedang',
+        netFlowHistory:      stock.netFlowHistory  || null,
+        priceHistory:        stock.priceHistory    || null,
+        insiderData:         stock.insiderData     || null,
+      });
+
+NOTE: Gorengan stocks still go through v1.1 forced-AVOID path.
+This is intentional — Gorengan override must remain hardcoded.
+
+---
+
+CHANGE 3 — Single stock endpoint /api/ai
+
+Find the actionGuidance block. Inside it, find:
+  // MAP to unified brain input (same function as homepage)
+  const brainInput = mapStockDataToInput({
+    flowBias,
+    flowIntensity,
+    flowReliability: flowReliabilityValue,
+    changePercent: stockData?.changePercent,
+    growth: stockData?.growth,
+    insiderData: stockData?.insiderData,
+    brokerData: stockData?.brokerData,
+    foreignActivityData: stockData?.foreignActivityData,
+    stockCharacter: stockData?.stockCharacter,
+    isGorengan: gorenganResult.isGorengan,
+  });
+
+  // GET DECISION from unified brain
+  const decision = getStockDecision(brainInput);
+
+Replace ONLY those two blocks with:
+
+  // V2.0 ENGINE — full bandarmology composite
+  const decision = gorenganResult.isGorengan
+    ? getStockDecision({
+        netFlow: 'low', brokerStability: 'low', flowQuality: 'low',
+        priceTrend: 'sideways', volatility: 'high', insider: 'neutral',
+        isGorengan: true,
+      })
+    : getStockDecisionV2({
+        symbol:              stockData?.symbol || '',
+        brokerData:          stockData?.brokerData          || '[]',
+        foreignActivityData: stockData?.foreignActivityData || '{}',
+        price:               stockData?.price        || 0,
+        close:               stockData?.price        || 0,
+        open:                stockData?.open         || 0,
+        high:                stockData?.high         || 0,
+        low:                 stockData?.low          || 0,
+        prevClose:           stockData?.prevClose    || 0,
+        change:              stockData?.change       || 0,
+        changePercent:       stockData?.changePercent || 0,
+        avgBuyPrice:         stockData?.avgBuyPrice  || 0,
+        avgSellPrice:        stockData?.avgSellPrice || 0,
+        todayValue:          stockData?.todayValue   || 0,
+        avg20dValue:         stockData?.avg20dValue  || 0,
+        flowBias:            flowBias,
+        flowIntensity:       flowIntensity,
+        flowReliability:     flowReliabilityValue,
+        netFlowHistory:      stockData?.netFlowHistory || null,
+        priceHistory:        stockData?.priceHistory   || null,
+        insiderData:         stockData?.insiderData    || null,
+      });
+
+---
+
+CHANGE 4 — /api/valuation/:symbol endpoint
+
+Find near line 2200:
+  const brainInput = mapStockDataToInput({
+    flowBias: stockData?.flowBias,
+    ...
+  });
+  const decision = getStockDecision(brainInput);
+
+Replace with:
+  const decision = getStockDecisionV2({
+    symbol:              stockData?.symbol || '',
+    brokerData:          stockData?.brokerData          || '[]',
+    foreignActivityData: stockData?.foreignActivityData || '{}',
+    price:               stockData?.price     || 0,
+    close:               stockData?.price     || 0,
+    changePercent:       stockData?.changePercent || 0,
+    avgBuyPrice:         stockData?.avgBuyPrice  || 0,
+    avgSellPrice:        stockData?.avgSellPrice || 0,
+    todayValue:          stockData?.todayValue   || 0,
+    avg20dValue:         stockData?.avg20dValue  || 0,
+    flowBias:            stockData?.flowBias        || 'Netral',
+    flowIntensity:       stockData?.flowIntensity   || '',
+    flowReliability:     stockData?.flowReliability || 'Sedang',
+    netFlowHistory:      stockData?.netFlowHistory  || null,
+    priceHistory:        stockData?.priceHistory    || null,
+    insiderData:         stockData?.insiderData     || null,
+  });
+
+---
+
+DO NOT CHANGE:
+- The simulation endpoint (lines ~1692–1720) — leave it on v1.1
+- Any other getStockDecision calls
+- Any response object shapes
+- Any frontend files
+- Any engine files
+
+---
+
+SAFETY RULES:
+1. Only modify server/routes.ts
+2. Make exactly 4 changes as described above
+3. Simulation endpoint MUST stay on v1.1 — do not change it
+4. After changes: run runTests.ts
+5. BBCA must equal 74 — if it changes, revert immediately
+6. UNVR must equal 10 — if it changes, revert immediately
+7. Test GET /api/stocks returns valid JSON
+8. Test GET /api/stock/BBCA returns valid JSON
+9. Report new BBCA and UNVR scores — if different from 74/10,
+   report the new values before updating any test files
+10. Do NOT update runTests.ts unless explicitly told to
