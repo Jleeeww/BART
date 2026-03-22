@@ -1,4 +1,4 @@
-import { pgTable, text, serial, numeric, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, numeric, timestamp, real, integer, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -166,3 +166,50 @@ export const insertSimulationAuditLogSchema = createInsertSchema(simulationAudit
 
 export type SimulationAuditLog = typeof simulationAuditLog.$inferSelect;
 export type InsertSimulationAuditLog = z.infer<typeof insertSimulationAuditLogSchema>;
+
+export const sessionHistory = pgTable('session_history', {
+  id:          serial('id').primaryKey(),
+  symbol:      text('symbol').notNull(),
+  date:        text('date').notNull(),
+  session:     integer('session').notNull().default(0),
+
+  open:        real('open'),
+  high:        real('high'),
+  low:         real('low'),
+  close:       real('close'),
+  prevClose:   real('prev_close'),
+  changePct:   real('change_pct'),
+
+  todayValue:  real('today_value'),
+  avg20dValue: real('avg20d_value'),
+  avgBuyPx:    real('avg_buy_px'),
+  avgSellPx:   real('avg_sell_px'),
+
+  netFlow:          real('net_flow'),
+  netForeignFlow:   real('net_foreign_flow'),
+  netDomesticFlow:  real('net_domestic_flow'),
+  foreignBuy:       real('foreign_buy'),
+  foreignSell:      real('foreign_sell'),
+  domesticBuy:      real('domestic_buy'),
+  domesticSell:     real('domestic_sell'),
+
+  flowBias:        text('flow_bias'),
+  flowIntensity:   text('flow_intensity'),
+  flowReliability: text('flow_reliability'),
+
+  brokerData: jsonb('broker_data'),
+
+  m6Score:        real('m6_score'),
+  compositeScore: real('composite_score'),
+  regime:         text('regime'),
+
+  dataSource: text('data_source').default('DEMO'),
+  ingestedAt: text('ingested_at'),
+}, (table) => ({
+  symbolDateSessionIdx: uniqueIndex('session_history_symbol_date_session_idx')
+    .on(table.symbol, table.date, table.session),
+}));
+
+export const insertSessionHistorySchema = createInsertSchema(sessionHistory);
+export type InsertSessionHistory = z.infer<typeof insertSessionHistorySchema>;
+export type SessionHistory = typeof sessionHistory.$inferSelect;

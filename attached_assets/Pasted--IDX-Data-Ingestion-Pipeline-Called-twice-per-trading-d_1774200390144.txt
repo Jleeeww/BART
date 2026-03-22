@@ -1,0 +1,753 @@
+/**
+ * IDX Data Ingestion Pipeline
+ * 
+ * Called twice per trading day:
+ *   12:15pm WIB → ingest Session 1 broker summary
+ *   04:00pm WIB → ingest Session 2 + full day data
+ * 
+ * Flow:
+ *   1. Receive IDX data (via webhook or scheduled pull)
+ *   2. Transform to session_history rows
+ *   3. Upsert into session_history table
+ *   4. Trigger radar engine cache invalidation
+ *   5. Log ingestion metrics
+ */
+
+export async function ingestSession(
+  sessionData: IDXSessionPayload,
+  session: 0 | 1 | 2
+): Promise<IngestionResult>
+
+export interface IDXSessionPayload {
+  date: string;
+  stocks: IDXStockSessionData[];
+}
+
+export interface IDXStockSessionData {
+  symbol: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  todayValue: number;
+  brokerSummary: BrokerSummaryRow[];  // from IDX broker data feed
+  foreignBuy: number;
+  foreignSell: number;
+  domesticBuy: number;
+  domesticSell: number;
+}
+```
+
+---
+
+**How it all connects at scale:**
+```
+IDX Data Feed arrives (12:15pm)
+        ↓
+idxIngester.ts
+  → transforms IDX format → session_history rows
+  → upserts 900 rows into DB
+  → invalidates radar cache
+        ↓
+radarEngine.ts batch runs
+  → for each stock: calls historyBuilder.ts
+  → historyBuilder builds netFlowHistory[60] from DB
+  → passes to computeBandarmologyV2()
+  → M12 gets recency-weighted 5-session history ✓
+  → M14 gets trailing streak from 60-session history ✓
+  → M16 gets 5 prior M6 scores from bandarmology_history ✓
+  → NEW M17 gets 60-session cumulative picture ✓
+        ↓
+Results cached → Radar + Pasar + Screener updated
+        ↓
+Users see midday signals at ~12:30pm
+```
+
+---
+
+**Now the Replit prompt:**
+
+This is a schema + backend build. No frontend changes. Paste this:
+
+---
+```
+Build the historical session storage layer for BART.
+This is the foundation for live IDX data ingestion.
+Read everything before touching any file.
+
+CRITICAL CONSTRAINTS:
+- Do NOT modify any existing engine files
+- Do NOT modify any existing API endpoints  
+- Do NOT touch any frontend files
+- Do NOT break BBCA=74/WATCHLIST_PRIORITAS or UNVR=10/HINDARI_DULU
+- All changes are additive only
+
+---
+
+PART 1 — Add session_history table to shared/schema.ts
+
+Import pgTable, serial, text, real, integer, jsonb, 
+timestamp from drizzle-orm/pg-core (check existing imports
+first and reuse what is already imported).
+
+Add this table definition AFTER the existing table definitions:
+
+export const sessionHistory = pgTable('session_history', {
+  id:          serial('id').primaryKey(),
+  symbol:      text('symbol').notNull(),
+  date:        text('date').notNull(),
+  session:     integer('session').notNull().default(0),
+  
+  // Price
+  open:        real('open'),
+  high:        real('high'),
+  low:         real('low'),
+  close:       real('close'),
+  prevClose:   real('prev_close'),
+  changePct:   real('change_pct'),
+  
+  // Volume
+  todayValue:  real('today_value'),
+  avg20dValue: real('avg20d_value'),
+  avgBuyPx:    real('avg_buy_px'),
+  avgSellPx:   real('avg_sell_px'),
+  
+  // Flow
+  netFlow:          real('net_flow'),
+  netForeignFlow:   real('net_foreign_flow'),
+  netDomesticFlow:  real('net_domestic_flow'),
+  foreignBuy:       real('foreign_buy'),
+  foreignSell:      real('foreign_sell'),
+  domesticBuy:      real('domestic_buy'),
+  domesticSell:     real('domestic_sell'),
+  
+  // Signals
+  flowBias:        text('flow_bias'),
+  flowIntensity:   text('flow_intensity'),
+  flowReliability: text('flow_reliability'),
+  
+  // Broker data
+  brokerData: jsonb('broker_data'),
+  
+  // Engine outputs
+  m6Score:        real('m6_score'),
+  compositeScore: real('composite_score'),
+  regime:         text('regime'),
+  
+  // Metadata
+  dataSource: text('data_source').default('DEMO'),
+  ingestedAt: text('ingested_at'),
+});
+
+Also add the Zod insert schema:
+export const insertSessionHistorySchema = 
+  createInsertSchema(sessionHistory);
+export type InsertSessionHistory = 
+  z.infer<typeof insertSessionHistorySchema>;
+
+---
+
+PART 2 — Create server/engine/historyBuilder.ts
+
+/**
+ * ============================================================
+ * HISTORY BUILDER v1.0
+ * ============================================================
+ * Builds typed history arrays for engine consumption
+ * from the session_history table.
+ *
+ * Called by radarEngine before processStock() to hydrate
+ * RawStockRecord with real multi-session history.
+ *
+ * DATA CONTRACT:
+ *   All arrays returned OLDEST → NEWEST (index 0 = oldest)
+ *   This matches the engine's existing data contract.
+ *   clean_history() in bandarmologyCore enforces minLength.
+ *
+ * SAFE ON EMPTY:
+ *   Returns empty arrays if no history exists.
+ *   Engine models handle empty history via clean_history().
+ * ============================================================
+ */
+
+import { db } from '../db';
+import { sessionHistory } from '../../shared/schema';
+import { eq, desc, and } from 'drizzle-orm';
+
+export interface StockHistoryArrays {
+  netFlowHistory: number[];        // up to 60 sessions oldest→newest
+  priceHistory: number[];          // up to 60 close prices oldest→newest
+  m6ScoreHistory: number[];        // last 5 M6 scores for M16
+  avg20dValue: number | null;      // rolling 20-session avg value
+  shortNetFlowHistory: number[];   // last 5 sessions (for M6/M8/M12)
+  sessionCount: number;            // how many sessions available
+  dataSource: string;              // most recent data source
+}
+
+export async function buildStockHistory(
+  symbol: string,
+  maxSessions: number = 60
+): Promise<StockHistoryArrays> {
+  const empty: StockHistoryArrays = {
+    netFlowHistory: [],
+    priceHistory: [],
+    m6ScoreHistory: [],
+    avg20dValue: null,
+    shortNetFlowHistory: [],
+    sessionCount: 0,
+    dataSource: 'NONE',
+  };
+
+  if (!symbol) return empty;
+
+  try {
+    // Fetch last maxSessions full-day sessions (session=0)
+    // ordered by date ascending (oldest first)
+    const records = await db
+      .select()
+      .from(sessionHistory)
+      .where(
+        and(
+          eq(sessionHistory.symbol, symbol.toUpperCase()),
+          eq(sessionHistory.session, 0)
+        )
+      )
+      .orderBy(desc(sessionHistory.date))
+      .limit(maxSessions);
+
+    if (!records || records.length === 0) return empty;
+
+    // Reverse to get oldest→newest order
+    const ordered = [...records].reverse();
+
+    // Build arrays — filter out null values
+    const netFlowHistory: number[] = [];
+    const priceHistory: number[] = [];
+    const m6ScoreHistory: number[] = [];
+    const valueHistory: number[] = [];
+
+    for (const r of ordered) {
+      if (r.netFlow !== null && r.netFlow !== undefined && 
+          isFinite(r.netFlow)) {
+        netFlowHistory.push(r.netFlow);
+      }
+      if (r.close !== null && r.close !== undefined && 
+          r.close > 0 && isFinite(r.close)) {
+        priceHistory.push(r.close);
+      }
+      if (r.m6Score !== null && r.m6Score !== undefined && 
+          isFinite(r.m6Score)) {
+        m6ScoreHistory.push(r.m6Score);
+      }
+      if (r.todayValue !== null && r.todayValue !== undefined && 
+          r.todayValue > 0 && isFinite(r.todayValue)) {
+        valueHistory.push(r.todayValue);
+      }
+    }
+
+    // Compute avg20dValue from last 20 value sessions
+    const last20Values = valueHistory.slice(-20);
+    const avg20dValue = last20Values.length > 0
+      ? last20Values.reduce((s, v) => s + v, 0) / last20Values.length
+      : null;
+
+    // Short history: last 5 net flow sessions
+    const shortNetFlowHistory = netFlowHistory.slice(-5);
+
+    // M6 score history: last 5 scores for M16
+    // NEVER include today's score — M16 reads PRIOR sessions only
+    const m6ForM16 = m6ScoreHistory.slice(-5);
+
+    const mostRecentSource = records[0]?.dataSource ?? 'NONE';
+
+    return {
+      netFlowHistory,
+      priceHistory,
+      m6ScoreHistory: m6ForM16,
+      avg20dValue,
+      shortNetFlowHistory,
+      sessionCount: records.length,
+      dataSource: mostRecentSource,
+    };
+
+  } catch (err) {
+    console.error(`[historyBuilder] Error for ${symbol}:`, err);
+    return empty;
+  }
+}
+
+/**
+ * Upsert a session record into session_history.
+ * Called by idxIngester after processing IDX data.
+ * Idempotent — safe to call multiple times for same session.
+ */
+export async function saveSessionHistory(
+  record: {
+    symbol: string;
+    date: string;
+    session: 0 | 1 | 2;
+    open?: number | null;
+    high?: number | null;
+    low?: number | null;
+    close?: number | null;
+    prevClose?: number | null;
+    changePct?: number | null;
+    todayValue?: number | null;
+    avg20dValue?: number | null;
+    netFlow?: number | null;
+    netForeignFlow?: number | null;
+    netDomesticFlow?: number | null;
+    foreignBuy?: number | null;
+    foreignSell?: number | null;
+    domesticBuy?: number | null;
+    domesticSell?: number | null;
+    flowBias?: string | null;
+    flowIntensity?: string | null;
+    flowReliability?: string | null;
+    brokerData?: unknown | null;
+    m6Score?: number | null;
+    compositeScore?: number | null;
+    regime?: string | null;
+    dataSource?: string;
+  }
+): Promise<void> {
+  try {
+    await db
+      .insert(sessionHistory)
+      .values({
+        symbol:          record.symbol.toUpperCase(),
+        date:            record.date,
+        session:         record.session,
+        open:            record.open ?? null,
+        high:            record.high ?? null,
+        low:             record.low ?? null,
+        close:           record.close ?? null,
+        prevClose:       record.prevClose ?? null,
+        changePct:       record.changePct ?? null,
+        todayValue:      record.todayValue ?? null,
+        avg20dValue:     record.avg20dValue ?? null,
+        netFlow:         record.netFlow ?? null,
+        netForeignFlow:  record.netForeignFlow ?? null,
+        netDomesticFlow: record.netDomesticFlow ?? null,
+        foreignBuy:      record.foreignBuy ?? null,
+        foreignSell:     record.foreignSell ?? null,
+        domesticBuy:     record.domesticBuy ?? null,
+        domesticSell:    record.domesticSell ?? null,
+        flowBias:        record.flowBias ?? null,
+        flowIntensity:   record.flowIntensity ?? null,
+        flowReliability: record.flowReliability ?? null,
+        brokerData:      record.brokerData ?? null,
+        m6Score:         record.m6Score ?? null,
+        compositeScore:  record.compositeScore ?? null,
+        regime:          record.regime ?? null,
+        dataSource:      record.dataSource ?? 'DEMO',
+        ingestedAt:      new Date().toISOString(),
+      })
+      .onConflictDoUpdate({
+        target: [
+          sessionHistory.symbol,
+          sessionHistory.date,
+          sessionHistory.session,
+        ],
+        set: {
+          open:            record.open ?? null,
+          high:            record.high ?? null,
+          low:             record.low ?? null,
+          close:           record.close ?? null,
+          prevClose:       record.prevClose ?? null,
+          changePct:       record.changePct ?? null,
+          todayValue:      record.todayValue ?? null,
+          avg20dValue:     record.avg20dValue ?? null,
+          netFlow:         record.netFlow ?? null,
+          netForeignFlow:  record.netForeignFlow ?? null,
+          netDomesticFlow: record.netDomesticFlow ?? null,
+          foreignBuy:      record.foreignBuy ?? null,
+          foreignSell:     record.foreignSell ?? null,
+          domesticBuy:     record.domesticBuy ?? null,
+          domesticSell:    record.domesticSell ?? null,
+          flowBias:        record.flowBias ?? null,
+          flowIntensity:   record.flowIntensity ?? null,
+          flowReliability: record.flowReliability ?? null,
+          brokerData:      record.brokerData ?? null,
+          m6Score:         record.m6Score ?? null,
+          compositeScore:  record.compositeScore ?? null,
+          regime:          record.regime ?? null,
+          dataSource:      record.dataSource ?? 'DEMO',
+          ingestedAt:      new Date().toISOString(),
+        },
+      });
+  } catch (err) {
+    console.error(`[historyBuilder] saveSessionHistory error for ${record.symbol}:`, err);
+    // Non-critical — do not throw
+  }
+}
+
+/**
+ * Get history status for a symbol — for debug endpoint.
+ */
+export async function getHistoryStatus(symbol: string): Promise<{
+  sessionCount: number;
+  dateRange: { oldest: string | null; newest: string | null };
+  hasFullHistory: boolean;  // >= 20 sessions
+  hasLongHistory: boolean;  // >= 60 sessions
+}> {
+  try {
+    const records = await db
+      .select({
+        date: sessionHistory.date,
+      })
+      .from(sessionHistory)
+      .where(
+        and(
+          eq(sessionHistory.symbol, symbol.toUpperCase()),
+          eq(sessionHistory.session, 0)
+        )
+      )
+      .orderBy(desc(sessionHistory.date))
+      .limit(60);
+
+    const count = records.length;
+    return {
+      sessionCount: count,
+      dateRange: {
+        oldest: count > 0 ? records[count - 1].date : null,
+        newest: count > 0 ? records[0].date : null,
+      },
+      hasFullHistory: count >= 20,
+      hasLongHistory: count >= 60,
+    };
+  } catch (err) {
+    return {
+      sessionCount: 0,
+      dateRange: { oldest: null, newest: null },
+      hasFullHistory: false,
+      hasLongHistory: false,
+    };
+  }
+}
+
+---
+
+PART 3 — Create server/engine/idxIngester.ts
+
+/**
+ * ============================================================
+ * IDX DATA INGESTER v1.0
+ * ============================================================
+ * Transforms raw IDX data feed into session_history rows.
+ * Called twice per trading day:
+ *   ~12:15pm WIB → session 1 data
+ *   ~04:00pm WIB → session 2 + full day (session 0)
+ *
+ * DESIGN:
+ *   - Accepts IDXSessionPayload (matches IDX broker summary format)
+ *   - Transforms to session_history rows
+ *   - Upserts via saveSessionHistory() (idempotent)
+ *   - Invalidates radar cache after successful ingestion
+ *   - Returns IngestionResult with counts + errors
+ *   - Never throws — fully wrapped in try/catch
+ *
+ * TO ACTIVATE WITH LIVE IDX DATA:
+ *   1. Subscribe to IDX data feed
+ *   2. Map IDX broker summary format to IDXStockSessionData
+ *   3. Call ingestSession() from your webhook or scheduler
+ * ============================================================
+ */
+
+import { saveSessionHistory } from './historyBuilder';
+import { invalidateRadarCache } from './radarEngine';
+
+export interface IDXBrokerRow {
+  code: string;
+  buyValue: number;   // IDR
+  sellValue: number;  // IDR
+  netValue: number;   // IDR (buy - sell)
+}
+
+export interface IDXStockSessionData {
+  symbol: string;
+  date: string;          // "YYYY-MM-DD"
+  session: 0 | 1 | 2;   // 0=full, 1=morning, 2=afternoon
+  
+  // Price
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  prevClose: number;
+  
+  // Volume
+  todayValue: number;    // IDR total transaction value
+  
+  // Broker summary
+  brokers: IDXBrokerRow[];
+  
+  // Foreign activity
+  foreignBuy: number;
+  foreignSell: number;
+  domesticBuy: number;
+  domesticSell: number;
+}
+
+export interface IDXSessionPayload {
+  date: string;
+  session: 0 | 1 | 2;
+  source: 'IDX_LIVE' | 'IDX_EOD' | 'IDX_DELAYED' | 'MANUAL';
+  stocks: IDXStockSessionData[];
+}
+
+export interface IngestionResult {
+  success: number;
+  errors: number;
+  skipped: number;
+  durationMs: number;
+  date: string;
+  session: number;
+  source: string;
+}
+
+function computeFlowSignals(
+  netFlow: number,
+  avg20dValue: number | null
+): {
+  flowBias: string;
+  flowIntensity: string;
+  flowReliability: string;
+} {
+  if (!avg20dValue || avg20dValue === 0) {
+    return {
+      flowBias: 'Netral',
+      flowIntensity: 'Tidak Ada Data',
+      flowReliability: 'Rendah',
+    };
+  }
+
+  const ratio = netFlow / avg20dValue;
+
+  const flowBias = ratio > 0.05 ? 'Akumulasi'
+    : ratio < -0.05 ? 'Distribusi'
+    : 'Netral';
+
+  const flowIntensity =
+    ratio > 0.5  ? 'Akumulasi Besar'
+    : ratio > 0.2  ? 'Akumulasi Sedang'
+    : ratio > 0.05 ? 'Akumulasi Ringan'
+    : ratio < -0.5 ? 'Distribusi Besar'
+    : ratio < -0.2 ? 'Distribusi Sedang'
+    : ratio < -0.05 ? 'Distribusi Ringan'
+    : 'Netral';
+
+  const flowReliability = Math.abs(ratio) > 0.3 ? 'Tinggi'
+    : Math.abs(ratio) > 0.1 ? 'Sedang'
+    : 'Rendah';
+
+  return { flowBias, flowIntensity, flowReliability };
+}
+
+export async function ingestSession(
+  payload: IDXSessionPayload
+): Promise<IngestionResult> {
+  const startTime = Date.now();
+  let success = 0;
+  let errors = 0;
+  let skipped = 0;
+
+  console.log(
+    `[idxIngester] Starting ingestion: ${payload.date} ` +
+    `session=${payload.session} source=${payload.source} ` +
+    `stocks=${payload.stocks.length}`
+  );
+
+  for (const stock of payload.stocks) {
+    try {
+      if (!stock.symbol || !stock.date) {
+        skipped++;
+        continue;
+      }
+
+      const netFlow = (stock.foreignBuy - stock.foreignSell) +
+                      (stock.domesticBuy - stock.domesticSell);
+      const netForeignFlow  = stock.foreignBuy - stock.foreignSell;
+      const netDomesticFlow = stock.domesticBuy - stock.domesticSell;
+      const changePct = stock.prevClose > 0
+        ? ((stock.close - stock.prevClose) / stock.prevClose) * 100
+        : null;
+
+      // Compute avg20dValue from history for flow signal calculation
+      // Pass null for now — will be computed by historyBuilder
+      const { flowBias, flowIntensity, flowReliability } =
+        computeFlowSignals(netFlow, null);
+
+      await saveSessionHistory({
+        symbol:          stock.symbol,
+        date:            stock.date,
+        session:         stock.session,
+        open:            stock.open,
+        high:            stock.high,
+        low:             stock.low,
+        close:           stock.close,
+        prevClose:       stock.prevClose,
+        changePct,
+        todayValue:      stock.todayValue,
+        avg20dValue:     null,  // computed by historyBuilder from table
+        netFlow,
+        netForeignFlow,
+        netDomesticFlow,
+        foreignBuy:      stock.foreignBuy,
+        foreignSell:     stock.foreignSell,
+        domesticBuy:     stock.domesticBuy,
+        domesticSell:    stock.domesticSell,
+        flowBias,
+        flowIntensity,
+        flowReliability,
+        brokerData:      stock.brokers,
+        m6Score:         null,  // computed after engine run
+        compositeScore:  null,  // computed after engine run
+        regime:          null,  // computed after engine run
+        dataSource:      payload.source,
+      });
+
+      success++;
+    } catch (err) {
+      errors++;
+      console.error(
+        `[idxIngester] Error processing ${stock.symbol}:`,
+        err instanceof Error ? err.message : err
+      );
+    }
+  }
+
+  // Invalidate radar cache so next request triggers fresh batch
+  if (success > 0) {
+    invalidateRadarCache();
+    console.log(
+      `[idxIngester] Complete: ${success} saved, ` +
+      `${errors} errors, ${skipped} skipped, ` +
+      `${Date.now() - startTime}ms. Radar cache invalidated.`
+    );
+  }
+
+  return {
+    success,
+    errors,
+    skipped,
+    durationMs: Date.now() - startTime,
+    date:    payload.date,
+    session: payload.session,
+    source:  payload.source,
+  };
+}
+
+/**
+ * Seed demo/historical data for a stock.
+ * Use this to populate session_history with demo data
+ * so historyBuilder has something to work with before
+ * live IDX data arrives.
+ */
+export async function seedDemoHistory(
+  symbol: string,
+  sessions: Array<{
+    date: string;
+    netFlow: number;
+    close: number;
+    todayValue: number;
+    flowBias: string;
+  }>
+): Promise<void> {
+  for (const s of sessions) {
+    await saveSessionHistory({
+      symbol,
+      date:       s.date,
+      session:    0,
+      close:      s.close,
+      todayValue: s.todayValue,
+      netFlow:    s.netFlow,
+      flowBias:   s.flowBias,
+      dataSource: 'DEMO',
+    });
+  }
+  console.log(
+    `[idxIngester] Seeded ${sessions.length} demo sessions for ${symbol}`
+  );
+}
+
+---
+
+PART 4 — Add debug endpoints to server/routes.ts
+
+Append AFTER all existing endpoints. Do not touch anything else.
+
+// GET /api/history/:symbol
+// Returns session history status for a stock
+app.get('/api/history/:symbol', async (req, res) => {
+  try {
+    const symbol = req.params.symbol?.toUpperCase();
+    if (!symbol) return res.status(400).json({ error: 'Symbol required' });
+    const { getHistoryStatus } = await import('./engine/historyBuilder');
+    const status = await getHistoryStatus(symbol);
+    res.status(200).json({ symbol, ...status });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// POST /api/ingest
+// Accepts IDX session data and ingests it
+// Secured with a simple bearer token check
+// Replace 'BART_INGEST_SECRET' with env variable in production
+app.post('/api/ingest', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization ?? '';
+    const token = authHeader.replace('Bearer ', '');
+    const expectedToken = process.env.INGEST_SECRET ?? 'BART_INGEST_SECRET';
+    
+    if (token !== expectedToken) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const payload = req.body;
+    if (!payload?.stocks || !Array.isArray(payload.stocks)) {
+      return res.status(400).json({ error: 'Invalid payload' });
+    }
+
+    const { ingestSession } = await import('./engine/idxIngester');
+    const result = await ingestSession(payload);
+    res.status(200).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[/api/ingest] Error:', message);
+    res.status(500).json({ error: message });
+  }
+});
+
+---
+
+PART 5 — Run DB migration
+
+After adding the sessionHistory table to schema.ts,
+run the Drizzle migration:
+  npx drizzle-kit push
+
+If push fails due to Neon connection, try:
+  npx drizzle-kit generate
+  Then push manually or via the existing migration setup.
+
+Verify the table was created by checking the Neon DB.
+
+---
+
+SAFETY RULES:
+1. New files: shared/schema.ts addition, 
+              server/engine/historyBuilder.ts,
+              server/engine/idxIngester.ts
+2. Modified files: shared/schema.ts (add table),
+                   server/routes.ts (append endpoints only)
+3. NEVER touch: bandarmologyCore.ts, unifiedDecision.ts,
+   bandarmologyCoreV1.ts, bandarmologyDecisionV2.ts,
+   radarEngine.ts, or any frontend file
+4. NEVER modify existing endpoints
+5. After build: run runTests.ts — BBCA=74 and UNVR=10 must pass
+6. Test GET /api/history/BBCA returns valid JSON
+7. Test POST /api/ingest with wrong token returns 401
+8. Verify session_history table exists in DB after migration
+9. Report every file created or modified
