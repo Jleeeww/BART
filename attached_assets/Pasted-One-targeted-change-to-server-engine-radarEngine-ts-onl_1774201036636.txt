@@ -1,0 +1,99 @@
+One targeted change to server/engine/radarEngine.ts only.
+Do not touch any other file.
+
+---
+
+WHAT TO CHANGE:
+
+In the processStock() function, find where the engine input
+is built. It currently calls:
+
+  const input = buildBandarmologyInput(raw, m6History);
+
+This reads netFlowHistory, priceHistory, and avg20dValue 
+directly from the raw stock record (static DB fields).
+
+Replace this entire block:
+
+  const m6History = await withTimeout(
+    getM6History(symbol, 5),
+    2000
+  ).catch(() => [] as number[]);
+
+  const input = buildBandarmologyInput(raw, m6History);
+
+With this:
+
+  // Load real session history from session_history table
+  // Falls back to raw record fields if history unavailable
+  const { buildStockHistory } = await import('./historyBuilder');
+  
+  const history = await withTimeout(
+    buildStockHistory(symbol, 60),
+    3000
+  ).catch(() => null);
+
+  // Merge history into raw record if available
+  // History takes priority over static DB fields
+  const enrichedRaw = history && history.sessionCount > 0
+    ? {
+        ...raw,
+        netFlowHistory:  history.netFlowHistory.length > 0
+                           ? history.netFlowHistory
+                           : raw.netFlowHistory,
+        priceHistory:    history.priceHistory.length > 0
+                           ? history.priceHistory
+                           : raw.priceHistory,
+        avg20dValue:     history.avg20dValue ?? raw.avg20dValue,
+        _m6ScoreHistory: history.m6ScoreHistory.length > 0
+                           ? history.m6ScoreHistory
+                           : raw._m6ScoreHistory,
+      }
+    : raw;
+
+  // M6 history for M16: from historyBuilder (prior sessions only)
+  // Falls back to getM6History if historyBuilder unavailable
+  const m6History = (history?.m6ScoreHistory.length ?? 0) > 0
+    ? history!.m6ScoreHistory
+    : await withTimeout(
+        getM6History(symbol, 5),
+        2000
+      ).catch(() => [] as number[]);
+
+  const input = buildBandarmologyInput(enrichedRaw, m6History);
+
+---
+
+Also update the dataQuality assessment to reflect whether
+real history was used. Find the assessDataQuality call and
+add a check:
+
+After: const dataQuality = assessDataQuality(raw);
+Change to: const dataQuality = assessDataQuality(enrichedRaw);
+
+Also add a new field to the returned RadarStockResult object:
+  historySource: history && history.sessionCount > 0
+    ? history.dataSource
+    : 'STATIC_DB',
+  sessionCount: history?.sessionCount ?? 0,
+
+Add these two fields to the RadarStockResult interface at the 
+top of the file:
+  historySource: string;
+  sessionCount: number;
+
+---
+
+SAFETY RULES:
+1. Only modify server/engine/radarEngine.ts
+2. Do not touch any other engine file
+3. Do not touch any frontend file
+4. Do not touch any existing API endpoint
+5. The change must be backward compatible — if historyBuilder
+   returns empty (no sessions yet), enrichedRaw falls back to
+   raw and behavior is identical to before
+6. After change: run runTests.ts — BBCA=74 and UNVR=10 must pass
+7. Test /api/radar still returns valid JSON
+8. Test /api/radar/status still works
+9. Verify that for BBCA, historySource shows in the response
+10. Report exactly what changed

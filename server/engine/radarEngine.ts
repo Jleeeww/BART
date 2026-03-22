@@ -37,6 +37,8 @@ export interface RadarStockResult {
   homepageBucket: string;
   isGorengan: boolean;
   dataQuality: 'FULL' | 'PARTIAL' | 'MINIMAL';
+  historySource: string;
+  sessionCount: number;
   processedAt: string;
 }
 
@@ -136,12 +138,37 @@ async function processStock(
     const symbol = raw.symbol ?? '';
     if (!symbol) return null;
 
-    const m6History = await withTimeout(
-      getM6History(symbol, 5),
-      2000
-    ).catch(() => [] as number[]);
+    const { buildStockHistory } = await import('./historyBuilder');
 
-    const input = buildBandarmologyInput(raw, m6History);
+    const history = await withTimeout(
+      buildStockHistory(symbol, 60),
+      3000
+    ).catch(() => null);
+
+    const enrichedRaw = history && history.sessionCount > 0
+      ? {
+          ...raw,
+          netFlowHistory:  history.netFlowHistory.length > 0
+                             ? history.netFlowHistory
+                             : raw.netFlowHistory,
+          priceHistory:    history.priceHistory.length > 0
+                             ? history.priceHistory
+                             : raw.priceHistory,
+          avg20dValue:     history.avg20dValue ?? raw.avg20dValue,
+          _m6ScoreHistory: history.m6ScoreHistory.length > 0
+                             ? history.m6ScoreHistory
+                             : (raw as any)._m6ScoreHistory,
+        }
+      : raw;
+
+    const m6History = (history?.m6ScoreHistory.length ?? 0) > 0
+      ? history!.m6ScoreHistory
+      : await withTimeout(
+          getM6History(symbol, 5),
+          2000
+        ).catch(() => [] as number[]);
+
+    const input = buildBandarmologyInput(enrichedRaw, m6History);
 
     const result = await withTimeout(
       Promise.resolve(computeBandarmologyV2(input)),
@@ -172,7 +199,7 @@ async function processStock(
       homepageBucket = 'hindari_dulu';
     }
 
-    const dataQuality = assessDataQuality(raw);
+    const dataQuality = assessDataQuality(enrichedRaw);
 
     return {
       symbol,
@@ -190,6 +217,10 @@ async function processStock(
       homepageBucket,
       isGorengan: Boolean(raw.isGorengan),
       dataQuality,
+      historySource: history && history.sessionCount > 0
+        ? history.dataSource
+        : 'STATIC_DB',
+      sessionCount: history?.sessionCount ?? 0,
       processedAt: new Date().toISOString(),
     };
   } catch (err) {
