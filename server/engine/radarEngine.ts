@@ -20,6 +20,7 @@ import { computeBandarmologyV2 } from './bandarmologyCore';
 import { buildBandarmologyInput } from './buildBandarmologyInput';
 import { getBandarmologyDecisionV2 } from './bandarmologyDecisionV2';
 import { getM6History } from './bandarmologyHistory';
+import { computeGorenganFromStock } from './gorenganDetector';
 import type { RawStockRecord } from './buildBandarmologyInput';
 
 export interface RadarStockResult {
@@ -188,8 +189,30 @@ async function processStock(
     const m6Score = result.M6_flowNormalized?.score ?? null;
     const concentrationType = deriveConcentrationType(m3Score, m6Score);
 
+    let gorenganOverride = false;
+    try {
+      const gorenganResult = computeGorenganFromStock({
+        changePercent: String(raw.changePercent ?? '0'),
+        flowBias:      String(raw.flowBias ?? 'Netral'),
+        flowIntensity: String(raw.flowIntensity ?? ''),
+        flowReliability: String(raw.flowReliability ?? 'Sedang'),
+        brokerData:    typeof raw.brokerData === 'string'
+                         ? raw.brokerData : JSON.stringify(raw.brokerData ?? []),
+        foreignActivityData: typeof raw.foreignActivityData === 'string'
+                         ? raw.foreignActivityData
+                         : JSON.stringify(raw.foreignActivityData ?? {}),
+        todayValue:  typeof raw.todayValue === 'number' ? raw.todayValue : null,
+        avg20dValue: typeof raw.avg20dValue === 'number' ? raw.avg20dValue : null,
+      });
+      gorenganOverride = gorenganResult.isGorengan;
+    } catch (gorenganErr) {
+      console.warn(`[radarEngine] Gorengan check failed for ${symbol}:`, gorenganErr);
+    }
+
+    const effectiveIsGorengan = gorenganOverride || Boolean(raw.isGorengan);
+
     let homepageBucket = 'hindari_dulu';
-    if (raw.isGorengan) {
+    if (effectiveIsGorengan) {
       homepageBucket = 'hindari_dulu';
     } else if (decision?.decision === 'SIAP_DIPANTAU' || decision?.decision === 'BUY') {
       homepageBucket = 'siap_dipantau';
@@ -207,7 +230,9 @@ async function processStock(
       sector:      raw.sector ?? null,
       price:       Number(raw.close ?? raw.price ?? 0),
       changePercent: Number(raw.changePercent ?? 0),
-      compositeScore: Number((compositeScore ?? 0).toFixed(2)),
+      compositeScore: effectiveIsGorengan
+        ? 0
+        : Number((compositeScore ?? 0).toFixed(2)),
       confidence:     Number((confidence ?? 0).toFixed(0)),
       regime,
       cyclePosition,
@@ -215,7 +240,7 @@ async function processStock(
       flowBias: homepageBucket === 'siap_dipantau' ? 'Akumulasi' :
                 homepageBucket === 'hindari_dulu' ? 'Distribusi' : 'Netral',
       homepageBucket,
-      isGorengan: Boolean(raw.isGorengan),
+      isGorengan: effectiveIsGorengan,
       dataQuality,
       historySource: history && history.sessionCount > 0
         ? history.dataSource

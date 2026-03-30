@@ -1,0 +1,196 @@
+Extract Gorengan Detection into a standalone module and wire
+it into the v2.0 Radar path as a safety override.
+
+Read everything before touching any file.
+
+---
+
+PART 1 — Create server/engine/gorenganDetector.ts
+
+This is a NEW standalone file. Copy the gorengan logic out of
+bandarmologyCoreV1.ts into this file. Do not modify
+bandarmologyCoreV1.ts yet.
+
+The file should contain exactly these exports:
+
+1. GorenganResult interface
+2. detectGorengan() function (internal, not exported)
+3. computeGorenganFromStock() function (exported)
+
+Copy these exactly from bandarmologyCoreV1.ts — do not rewrite
+the logic. Then apply the 3 improvements below.
+
+After copying, apply these improvements to
+computeGorenganFromStock() in the NEW file only:
+
+IMPROVEMENT 1 — Real volumeRatio:
+  Update function signature to accept optional numeric fields:
+    todayValue?: number | null;
+    avg20dValue?: number | null;
+
+  Replace hardcoded:
+    const volumeRatio = 1.2;
+  With:
+    const todayVal = typeof stock.todayValue === 'number'
+      ? stock.todayValue : null;
+    const avg20Val = typeof stock.avg20dValue === 'number'
+      ? stock.avg20dValue : null;
+    const volumeRatio = (todayVal && avg20Val && avg20Val > 0)
+      ? todayVal / avg20Val
+      : 1.2;
+
+IMPROVEMENT 2 — Smarter smallLotDominates:
+  Replace:
+    smallLotDominates: brokerData.length > 15 && top3Percent < 25,
+  With:
+    smallLotDominates: brokerData.length > 15 &&
+      top3Percent < 25 &&
+      foreignFlowAbsent,
+
+IMPROVEMENT 3 — hasTapeControl fallback:
+  Replace the detectTapeControl call with:
+    const hasTapeControlResult = avgBuyPrice > 0
+      ? detectTapeControl({
+          high:      avgBuyPrice * 1.002,
+          low:       avgBuyPrice * 0.998,
+          lastPrice: avgBuyPrice,
+          volumeRatio,
+          netFlow:   totalNetBuy,
+          buyAvg:    avgBuyPrice
+        })
+      : true;
+
+Also copy these helper functions that
+computeGorenganFromStock() depends on:
+- parseBrokerIDR() — from parseBrokerIDR.ts (import it)
+- parseForeignData() — from foreignParser.ts (import it)
+- detectTapeControl() — from tapeControl.ts (import it)
+
+So the imports at the top of gorenganDetector.ts should be:
+  import { parseBrokerIDR } from './parseBrokerIDR';
+  import { parseForeignData } from './foreignParser';
+  import { detectTapeControl } from './tapeControl';
+
+Do NOT copy parseBrokerIDR, parseForeignData, detectTapeControl
+inline — import them from their existing files.
+
+---
+
+PART 2 — Update bandarmologyCoreV1.ts to re-export
+
+In bandarmologyCoreV1.ts, find where computeGorenganFromStock
+is defined and exported.
+
+Add this import at the top of the file (after existing imports):
+  import {
+    computeGorenganFromStock as _computeGorenganFromStock,
+    GorenganResult
+  } from './gorenganDetector';
+
+Then find the existing computeGorenganFromStock function
+definition in bandarmologyCoreV1.ts. Replace the entire
+function body with a re-export delegation:
+
+  export function computeGorenganFromStock(stock: {
+    changePercent: string;
+    flowBias: string;
+    flowIntensity: string;
+    flowReliability: string;
+    brokerData: string;
+    foreignActivityData: string;
+    stockCharacter?: string | null;
+    todayValue?: number | null;
+    avg20dValue?: number | null;
+  }): GorenganResult {
+    return _computeGorenganFromStock(stock);
+  }
+
+This keeps backward compatibility — all existing callers of
+computeGorenganFromStock() via bandarmologyCoreV1.ts continue
+to work identically. The logic now lives in one place.
+
+---
+
+PART 3 — Wire into radarEngine.ts
+
+In server/engine/radarEngine.ts, add this import at the top:
+  import { computeGorenganFromStock } from './gorenganDetector';
+
+In processStock(), find the section after the engine runs
+and the decision is computed. Find where homepageBucket
+is determined. It looks like:
+
+  let homepageBucket = 'hindari_dulu';
+  if (raw.isGorengan) {
+    homepageBucket = 'hindari_dulu';
+  } else if (decision?.decision === ...) {
+  ...
+
+BEFORE the homepageBucket logic, add a gorengan check:
+
+  // SAFETY OVERRIDE: Run Gorengan Detector on every stock
+  // This runs independently of v2.0 engine output
+  // Gorengan stocks are forced to hindari_dulu regardless
+  // of what the bandarmology composite says
+  let gorenganOverride = false;
+  try {
+    const gorenganResult = computeGorenganFromStock({
+      changePercent: String(raw.changePercent ?? '0'),
+      flowBias:      String(raw.flowBias ?? 'Netral'),
+      flowIntensity: String(raw.flowIntensity ?? ''),
+      flowReliability: String(raw.flowReliability ?? 'Sedang'),
+      brokerData:    typeof raw.brokerData === 'string'
+                       ? raw.brokerData : JSON.stringify(raw.brokerData ?? []),
+      foreignActivityData: typeof raw.foreignActivityData === 'string'
+                       ? raw.foreignActivityData
+                       : JSON.stringify(raw.foreignActivityData ?? {}),
+      todayValue:  typeof raw.todayValue === 'number' ? raw.todayValue : null,
+      avg20dValue: typeof raw.avg20dValue === 'number' ? raw.avg20dValue : null,
+    });
+    gorenganOverride = gorenganResult.isGorengan;
+  } catch (gorenganErr) {
+    // Gorengan check failed — do not penalize, continue normally
+    console.warn(`[radarEngine] Gorengan check failed for ${symbol}:`, gorenganErr);
+  }
+
+Then update the homepageBucket logic to respect gorenganOverride:
+
+  // Force hindari_dulu if gorengan detected
+  const effectiveIsGorengan = gorenganOverride || Boolean(raw.isGorengan);
+
+  let homepageBucket = 'hindari_dulu';
+  if (effectiveIsGorengan) {
+    homepageBucket = 'hindari_dulu';
+  } else if (decision?.decision === 'SIAP_DIPANTAU' ||
+             decision?.decision === 'BUY') {
+    homepageBucket = 'siap_dipantau';
+  } else if (decision?.decision === 'WATCHLIST_PRIORITAS' ||
+             decision?.decision === 'WATCHLIST') {
+    homepageBucket = 'watchlist_prioritas';
+  } else {
+    homepageBucket = 'hindari_dulu';
+  }
+
+Also update the returned object to include gorengan info:
+  isGorengan: effectiveIsGorengan,
+
+And cap compositeScore at 0 if gorengan:
+  compositeScore: effectiveIsGorengan
+    ? 0
+    : Number((compositeScore ?? 0).toFixed(2)),
+
+---
+
+SAFETY RULES:
+1. New file: server/engine/gorenganDetector.ts
+2. Modified files: server/engine/bandarmologyCoreV1.ts
+                   server/engine/radarEngine.ts
+3. Do NOT touch: bandarmologyCore.ts (v2.0), routes.ts,
+   any frontend file, any other engine file
+4. After build: run runTests.ts
+5. BBCA must equal 74 — if not, revert everything
+6. UNVR must equal 10 — if not, revert everything
+7. Test /api/radar still returns valid JSON
+8. Verify BBCA is NOT flagged as gorengan in radar results
+9. Verify the gorenganOverride field appears in radar output
+10. Report all files created or modified

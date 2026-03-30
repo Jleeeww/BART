@@ -31,6 +31,10 @@ import { calculateFlowQualityScore } from "./flowQuality";
 import { getInsiderDirection } from "./insider";
 import { detectTapeControl } from "./tapeControl";
 import { detectAccumulationPhase } from "./phaseDetection";
+import {
+  computeGorenganFromStock as _computeGorenganFromStock,
+  GorenganResult as _GorenganResult
+} from './gorenganDetector';
 
 // ═══════════════════════════════════════════════════════════
 // UTILITY FUNCTIONS (v1.1)
@@ -365,79 +369,10 @@ export function computeGorenganFromStock(stock: {
   brokerData: string;
   foreignActivityData: string;
   stockCharacter?: string | null;
+  todayValue?: number | null;
+  avg20dValue?: number | null;
 }): GorenganResult {
-  let brokerData: any[] = [];
-  try {
-    brokerData = JSON.parse(stock.brokerData || "[]");
-  } catch (e) {
-    brokerData = [];
-  }
-
-  const foreignParsed = parseForeignData(stock.foreignActivityData || "{}");
-
-  const sortedBrokers = [...brokerData].sort((a, b) => {
-    const aNet = parseBrokerIDR(a.netBuy) - parseBrokerIDR(a.netSell);
-    const bNet = parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell);
-    return bNet - aNet;
-  });
-
-  const totalNetBuy = brokerData.reduce((sum, b) => sum + Math.max(0, parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell)), 0);
-  const top3NetBuy = sortedBrokers.slice(0, 3).reduce((sum, b) => sum + Math.max(0, parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell)), 0);
-  const top3Percent = totalNetBuy > 0 ? (top3NetBuy / totalNetBuy) * 100 : 50;
-
-  const hasBrokerFragmentation = brokerData.length > 10 && top3Percent < 40;
-
-  const totalVolume = brokerData.reduce((s, b) =>
-    s + parseBrokerIDR(b.netBuy) + parseBrokerIDR(b.netSell), 0);
-  const smallBrokerCount = totalVolume > 0
-    ? brokerData.filter(b =>
-        parseBrokerIDR(b.netBuy) + parseBrokerIDR(b.netSell) < totalVolume * 0.02
-      ).length
-    : 0;
-  const retailProxyDominates = brokerData.length > 0 && smallBrokerCount > brokerData.length * 0.5;
-
-  const foreignFlowAbsent = Math.abs(foreignParsed.netForeignFlow) < Math.abs(foreignParsed.netDomesticFlow) * 0.1;
-
-  const hasAccumulationLadder = stock.flowReliability === "Tinggi" &&
-    stock.flowBias === "Akumulasi" &&
-    !stock.flowIntensity.includes("Distribusi");
-
-  const priceChangePercent = Math.abs(parseFloat(stock.changePercent) || 0);
-
-  let marketRegime = "Transisi";
-  if (stock.flowBias === "Akumulasi") {
-    marketRegime = stock.flowIntensity.includes("Besar") ? "Active Accumulation" : "Akumulasi Awal";
-  } else if (stock.flowBias === "Distribusi") {
-    marketRegime = "Distribution into Strength";
-  }
-
-  const avgBuyPrice = parseFloat(String(stock.brokerData ? sortedBrokers[0]?.avgBuy || "0" : "0").replace(/[^\d.]/g, "")) || 0;
-  const volumeRatio = 1.2;
-
-  const hasTapeControlResult = detectTapeControl({
-    high: avgBuyPrice * 1.002,
-    low: avgBuyPrice * 0.998,
-    lastPrice: avgBuyPrice,
-    volumeRatio,
-    netFlow: totalNetBuy,
-    buyAvg: avgBuyPrice
-  });
-
-  return detectGorengan({
-    priceChangePercent5d: priceChangePercent,
-    hasIntradaySpikes: priceChangePercent > 10,
-    volumeRatio,
-    top3BrokerNetBuyPercent: top3Percent,
-    hasBrokerFragmentation,
-    retailProxyDominates,
-    smallLotDominates: brokerData.length > 15 && top3Percent < 25,
-    foreignFlowAbsent,
-    hasAccumulationLadder,
-    marketRegime,
-    hasTapeControl: hasTapeControlResult,
-    hasAbsorptionFailure: stock.flowBias === "Distribusi" && priceChangePercent > 0,
-    hasPostSpikeDistribution: stock.flowBias === "Distribusi" && priceChangePercent > 15
-  });
+  return _computeGorenganFromStock(stock);
 }
 
 // ═══════════════════════════════════════════════════════════
