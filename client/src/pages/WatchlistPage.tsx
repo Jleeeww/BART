@@ -4,6 +4,23 @@ import { Link } from "wouter";
 import { Star } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
+interface SignalData {
+  symbol: string;
+  status: string;
+  statusReason: string;
+  scoreDrift: number | null;
+  baselineScore: number | null;
+  currentScore: number | null;
+}
+
+interface SignalsResponse {
+  signals: SignalData[];
+  total: number;
+  aktif: number;
+  diragukan: number;
+  gugur: number;
+}
+
 interface StockData {
   symbol: string;
   name: string;
@@ -150,6 +167,8 @@ export default function WatchlistPage() {
   const [toastVisible, setToastVisible] = useState(false);
   const [removedSymbols, setRemovedSymbols] = useState<Set<string>>(new Set());
 
+  const [refreshingSignals, setRefreshingSignals] = useState(false);
+
   const { data: watchlistItems } = useQuery<WatchlistItem[]>({
     queryKey: ["/api/watchlist"],
   });
@@ -157,6 +176,18 @@ export default function WatchlistPage() {
   const { data: allStocks } = useQuery<StockData[]>({
     queryKey: ["/api/stocks"],
   });
+
+  const { data: signalsData } = useQuery<SignalsResponse>({
+    queryKey: ["/api/signals"],
+  });
+
+  const signals = useMemo(() => {
+    const map: Record<string, SignalData> = {};
+    (signalsData?.signals ?? []).forEach((s: SignalData) => {
+      map[s.symbol] = s;
+    });
+    return map;
+  }, [signalsData]);
 
   const watchlistMap = useMemo(() => {
     const m = new Map<string, WatchlistItem>();
@@ -261,6 +292,43 @@ export default function WatchlistPage() {
         </p>
       </div>
 
+      {(() => {
+        const diragukan = Object.values(signals).filter(s => s.status === 'DIRAGUKAN').length;
+        const gugur = Object.values(signals).filter(s => s.status === 'GUGUR').length;
+        if (diragukan === 0 && gugur === 0) return null;
+        return (
+          <div
+            className="flex items-center gap-3 px-4 py-2 mb-3 rounded-sm"
+            style={{ background: "#1a1500", border: "1px solid rgba(245,158,11,0.2)" }}
+            data-testid="signal-warning-bar"
+          >
+            <span style={{ fontFamily: mono, fontSize: 12, color: "#fbbf24" }}>⚠</span>
+            <span style={{ fontFamily: mono, fontSize: 10, color: "rgba(251,191,36,0.8)" }}>
+              {diragukan > 0 ? `${diragukan} sinyal diragukan` : ''}{diragukan > 0 && gugur > 0 ? ' · ' : ''}{gugur > 0 ? `${gugur} sinyal gugur` : ''}
+            </span>
+            <span
+              className="ml-auto cursor-pointer hover:underline"
+              style={{ fontFamily: mono, fontSize: 10, color: "#38BDF8" }}
+              data-testid="button-refresh-signals"
+              onClick={async () => {
+                if (refreshingSignals) return;
+                setRefreshingSignals(true);
+                try {
+                  const symbols = watchlistedStocks.map(s => s.symbol);
+                  await Promise.all(symbols.map(sym =>
+                    apiRequest("POST", `/api/signals/${sym}/update`).catch(() => {})
+                  ));
+                  queryClient.invalidateQueries({ queryKey: ["/api/signals"] });
+                } catch {}
+                setRefreshingSignals(false);
+              }}
+            >
+              {refreshingSignals ? 'Memperbarui...' : 'Perbarui'}
+            </span>
+          </div>
+        );
+      })()}
+
       <div
         className="flex items-center justify-between px-4 py-3 mb-4 rounded-md"
         style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
@@ -305,7 +373,7 @@ export default function WatchlistPage() {
           <table className="w-full min-w-[1000px]">
             <thead>
               <tr style={{ background: "#111111", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                {["SAHAM", "SEKTOR", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "DITAMBAHKAN", "AKSI"].map((h) => (
+                {["SAHAM", "SEKTOR", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "DITAMBAHKAN", "STATUS", "AKSI"].map((h) => (
                   <th
                     key={h}
                     className="text-left px-4 py-2"
@@ -359,6 +427,34 @@ export default function WatchlistPage() {
                       <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
                         {formatDate(wItem?.addedAt ?? null)}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 w-32" data-testid={`signal-status-${stock.symbol}`}>
+                      {(() => {
+                        const signal = signals[stock.symbol];
+                        const status = signal?.status ?? 'AKTIF';
+                        const drift = signal?.scoreDrift;
+                        const badgeMap: Record<string, { label: string; bg: string; text: string; border: string }> = {
+                          AKTIF:     { label: '● AKTIF',     bg: 'rgba(16,185,129,0.1)', text: '#34d399', border: 'rgba(16,185,129,0.3)' },
+                          DIRAGUKAN: { label: '⚠ DIRAGUKAN', bg: 'rgba(245,158,11,0.1)', text: '#fbbf24', border: 'rgba(245,158,11,0.3)' },
+                          GUGUR:     { label: '✕ GUGUR',     bg: 'rgba(239,68,68,0.1)',  text: '#f87171', border: 'rgba(239,68,68,0.3)' },
+                        };
+                        const badge = badgeMap[status] || badgeMap.AKTIF;
+                        return (
+                          <div title={signal?.statusReason ?? ''}>
+                            <span
+                              className="inline-block px-2 py-0.5 rounded-sm"
+                              style={{ fontFamily: mono, fontSize: 9, color: badge.text, background: badge.bg, border: `1px solid ${badge.border}` }}
+                            >
+                              {badge.label}
+                            </span>
+                            {drift !== null && drift !== undefined && status !== 'AKTIF' && (
+                              <div style={{ fontFamily: mono, fontSize: 9, color: '#6b7280', marginTop: 2 }}>
+                                {drift > 0 ? `▲ +${drift}` : `▼ ${drift} poin`}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 w-32 text-right">
                       <div className="flex items-center justify-end gap-2">

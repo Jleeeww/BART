@@ -1,0 +1,509 @@
+Build signal lifecycle persistence and the /api/signals endpoint.
+Read everything before touching any file.
+
+WHAT THIS BUILDS:
+1. A signal_lifecycle table in the DB to track AKTIF/DIRAGUKAN/GUGUR
+   status per watchlisted stock, updated each session
+2. A signalLifecycle.ts engine module that computes status
+3. GET /api/signals endpoint returning all watchlisted stocks
+   with their current lifecycle status
+4. WatchlistPage.tsx updated to show AKTIF/DIRAGUKAN/GUGUR badges
+
+CRITICAL CONSTRAINTS:
+- Do NOT touch bandarmologyCore.ts, bandarmologyCoreV1.ts,
+  radarEngine.ts, gorenganDetector.ts, or any existing engine file
+- Do NOT touch any existing API endpoints
+- Do NOT break BBCA=74/WATCHLIST_PRIORITAS or UNVR=10/HINDARI_DULU
+
+---
+
+PART 1 — Add signal_lifecycle table to shared/schema.ts
+
+Add after existing table definitions. Check existing imports
+first and reuse what is already imported from drizzle-orm/pg-core.
+
+export const signalLifecycle = pgTable('signal_lifecycle', {
+  id:            serial('id').primaryKey(),
+  symbol:        text('symbol').notNull(),
+
+  // Current lifecycle status
+  status:        text('status').notNull().default('AKTIF'),
+  // AKTIF = thesis intact
+  // DIRAGUKAN = early warning (M6 dropped ≥15pts OR risiko <50)
+  // GUGUR = thesis broken (M6 dropped ≥25pts OR cycle=WASPADAI OR risiko <35)
+
+  // Score when signal was first fired (baseline for drift detection)
+  baselineScore:    real('baseline_score'),
+  baselineDate:     text('baseline_date'),
+
+  // Most recent session scores
+  currentScore:     real('current_score'),
+  currentDate:      text('current_date'),
+  currentRegime:    text('current_regime'),
+  currentCycle:     text('current_cycle'),
+
+  // Score drift from baseline (negative = declining)
+  scoreDrift:       real('score_drift'),
+
+  // Human readable reason for current status (Bahasa Indonesia)
+  statusReason:     text('status_reason'),
+
+  // Never deleted — permanent signal log
+  firedAt:       text('fired_at'),    // when signal first became AKTIF
+  updatedAt:     text('updated_at'),  // last time status was recalculated
+});
+
+export const insertSignalLifecycleSchema =
+  createInsertSchema(signalLifecycle);
+export type InsertSignalLifecycle =
+  z.infer<typeof insertSignalLifecycleSchema>;
+
+---
+
+PART 2 — Create server/engine/signalLifecycle.ts
+
+/**
+ * ============================================================
+ * SIGNAL LIFECYCLE ENGINE v1.0
+ * ============================================================
+ * Tracks AKTIF → DIRAGUKAN → GUGUR status for watchlisted stocks.
+ *
+ * LIFECYCLE RULES:
+ *   AKTIF:     Thesis intact. Score not drifted significantly.
+ *   DIRAGUKAN: Score dropped ≥15pts from baseline OR regime
+ *              shifted away from accumulation. Early warning.
+ *   GUGUR:     Score dropped ≥25pts from baseline OR cycle
+ *              shifted to WASPADAI_DISTRIBUSI OR score <35.
+ *              Thesis broken. Never auto-recovers to AKTIF.
+ *
+ * DESIGN:
+ *   - Called after each radar batch run or session ingestion
+ *   - Reads from signal_lifecycle table (persistent)
+ *   - Upserts on symbol — one record per watchlisted stock
+ *   - Never deletes records — permanent signal log
+ *   - Safe on empty — if no baseline, sets baseline on first call
+ * ============================================================
+ */
+
+import { db } from '../db';
+import { signalLifecycle } from '../../shared/schema';
+import { eq } from 'drizzle-orm';
+
+export type SignalStatus = 'AKTIF' | 'DIRAGUKAN' | 'GUGUR';
+
+export interface SignalLifecycleInput {
+  symbol: string;
+  currentScore: number;
+  currentDate: string;
+  currentRegime: string | null;
+  currentCycle: string | null;
+}
+
+export interface SignalLifecycleOutput {
+  symbol: string;
+  status: SignalStatus;
+  statusReason: string;
+  scoreDrift: number | null;
+  baselineScore: number | null;
+  baselineDate: string | null;
+  currentScore: number;
+  firedAt: string | null;
+  updatedAt: string;
+}
+
+function computeStatus(
+  currentScore: number,
+  baselineScore: number | null,
+  currentCycle: string | null,
+  previousStatus: SignalStatus
+): { status: SignalStatus; reason: string } {
+
+  // GUGUR conditions — once GUGUR, never auto-recover
+  if (previousStatus === 'GUGUR') {
+    return {
+      status: 'GUGUR',
+      reason: 'Sinyal telah gugur. Konfirmasi baru diperlukan untuk re-entry.',
+    };
+  }
+
+  // Score too low — GUGUR regardless
+  if (currentScore < 35) {
+    return {
+      status: 'GUGUR',
+      reason: `Skor kesiapan ${currentScore} di bawah ambang minimum (35). Tesis gugur.`,
+    };
+  }
+
+  // Cycle shifted to distribution — GUGUR
+  if (currentCycle === 'WASPADAI_DISTRIBUSI') {
+    return {
+      status: 'GUGUR',
+      reason: 'Posisi siklus bergeser ke fase distribusi. Tesis akumulasi gugur.',
+    };
+  }
+
+  // Score drift from baseline
+  if (baselineScore !== null) {
+    const drift = currentScore - baselineScore;
+
+    // Dropped ≥25pts — GUGUR
+    if (drift <= -25) {
+      return {
+        status: 'GUGUR',
+        reason: `Skor turun ${Math.abs(drift).toFixed(0)} poin dari baseline (${baselineScore}→${currentScore}). Tesis gugur.`,
+      };
+    }
+
+    // Dropped ≥15pts — DIRAGUKAN
+    if (drift <= -15) {
+      return {
+        status: 'DIRAGUKAN',
+        reason: `Skor turun ${Math.abs(drift).toFixed(0)} poin dari baseline (${baselineScore}→${currentScore}). Pantau ketat.`,
+      };
+    }
+  }
+
+  // All good — AKTIF
+  return {
+    status: 'AKTIF',
+    reason: 'Tesis akumulasi masih intact. Struktur institusional terjaga.',
+  };
+}
+
+export async function updateSignalLifecycle(
+  input: SignalLifecycleInput
+): Promise<SignalLifecycleOutput> {
+  const now = new Date().toISOString();
+  const sym = input.symbol.toUpperCase();
+
+  try {
+    // Check existing record
+    const existing = await db
+      .select()
+      .from(signalLifecycle)
+      .where(eq(signalLifecycle.symbol, sym))
+      .limit(1);
+
+    const record = existing[0] ?? null;
+
+    // First time seeing this symbol — set baseline
+    const baselineScore = record?.baselineScore ?? input.currentScore;
+    const baselineDate  = record?.baselineDate  ?? input.currentDate;
+    const firedAt       = record?.firedAt       ?? now;
+    const previousStatus = (record?.status ?? 'AKTIF') as SignalStatus;
+
+    const scoreDrift = input.currentScore - baselineScore;
+
+    const { status, reason } = computeStatus(
+      input.currentScore,
+      baselineScore,
+      input.currentCycle,
+      previousStatus
+    );
+
+    const output: SignalLifecycleOutput = {
+      symbol:        sym,
+      status,
+      statusReason:  reason,
+      scoreDrift:    Number(scoreDrift.toFixed(2)),
+      baselineScore,
+      baselineDate,
+      currentScore:  input.currentScore,
+      firedAt,
+      updatedAt:     now,
+    };
+
+    // Upsert into DB
+    await db
+      .insert(signalLifecycle)
+      .values({
+        symbol:         sym,
+        status,
+        baselineScore,
+        baselineDate,
+        currentScore:   input.currentScore,
+        currentDate:    input.currentDate,
+        currentRegime:  input.currentRegime ?? null,
+        currentCycle:   input.currentCycle  ?? null,
+        scoreDrift:     output.scoreDrift,
+        statusReason:   reason,
+        firedAt,
+        updatedAt:      now,
+      })
+      .onConflictDoUpdate({
+        target: [signalLifecycle.symbol],
+        set: {
+          status,
+          currentScore:  input.currentScore,
+          currentDate:   input.currentDate,
+          currentRegime: input.currentRegime ?? null,
+          currentCycle:  input.currentCycle  ?? null,
+          scoreDrift:    output.scoreDrift,
+          statusReason:  reason,
+          updatedAt:     now,
+          // Never update baseline or firedAt after first set
+        },
+      });
+
+    return output;
+
+  } catch (err) {
+    console.error(`[signalLifecycle] Error for ${sym}:`, err);
+    // Return safe default — never crash caller
+    return {
+      symbol:       sym,
+      status:       'AKTIF',
+      statusReason: 'Status tidak dapat diverifikasi.',
+      scoreDrift:   null,
+      baselineScore: null,
+      baselineDate:  null,
+      currentScore:  input.currentScore,
+      firedAt:       null,
+      updatedAt:     now,
+    };
+  }
+}
+
+export async function getSignalLifecycle(
+  symbol: string
+): Promise<SignalLifecycleOutput | null> {
+  try {
+    const records = await db
+      .select()
+      .from(signalLifecycle)
+      .where(eq(signalLifecycle.symbol, symbol.toUpperCase()))
+      .limit(1);
+
+    if (!records[0]) return null;
+    const r = records[0];
+
+    return {
+      symbol:        r.symbol,
+      status:        (r.status ?? 'AKTIF') as SignalStatus,
+      statusReason:  r.statusReason ?? '',
+      scoreDrift:    r.scoreDrift ?? null,
+      baselineScore: r.baselineScore ?? null,
+      baselineDate:  r.baselineDate ?? null,
+      currentScore:  r.currentScore ?? 0,
+      firedAt:       r.firedAt ?? null,
+      updatedAt:     r.updatedAt ?? '',
+    };
+  } catch (err) {
+    console.error(`[signalLifecycle] getSignalLifecycle error for ${symbol}:`, err);
+    return null;
+  }
+}
+
+export async function getAllSignalLifecycles(): Promise<SignalLifecycleOutput[]> {
+  try {
+    const records = await db.select().from(signalLifecycle);
+    return records.map(r => ({
+      symbol:        r.symbol,
+      status:        (r.status ?? 'AKTIF') as SignalStatus,
+      statusReason:  r.statusReason ?? '',
+      scoreDrift:    r.scoreDrift ?? null,
+      baselineScore: r.baselineScore ?? null,
+      baselineDate:  r.baselineDate ?? null,
+      currentScore:  r.currentScore ?? 0,
+      firedAt:       r.firedAt ?? null,
+      updatedAt:     r.updatedAt ?? '',
+    }));
+  } catch (err) {
+    console.error('[signalLifecycle] getAllSignalLifecycles error:', err);
+    return [];
+  }
+}
+
+---
+
+PART 3 — Add endpoints to server/routes.ts
+
+Append AFTER all existing endpoints. Do not touch anything else.
+
+// GET /api/signals
+// Returns all watchlisted stocks with their signal lifecycle status
+// Joins watchlist symbols with signal_lifecycle records
+app.get('/api/signals', async (req, res) => {
+  try {
+    const { getAllSignalLifecycles } = await import('./engine/signalLifecycle');
+    const { storage } = await import('./storage');
+
+    // Get all watchlisted symbols
+    const watchlist = await storage.getWatchlist();
+    const watchlistSymbols = new Set(watchlist.map((w: any) => w.symbol));
+
+    // Get all lifecycle records
+    const lifecycles = await getAllSignalLifecycles();
+
+    // Get current stock data for watchlisted symbols
+    const allStocks = await storage.getAllStocks();
+    const stockMap = new Map(allStocks.map((s: any) => [s.symbol, s]));
+
+    // Build response — only watchlisted symbols
+    const signals = watchlist.map((w: any) => {
+      const lifecycle = lifecycles.find(l => l.symbol === w.symbol) ?? null;
+      const stock = stockMap.get(w.symbol);
+
+      return {
+        symbol:       w.symbol,
+        companyName:  stock?.name ?? w.symbol,
+        addedAt:      w.addedAt ?? null,
+        price:        stock?.price ?? null,
+        changePercent: stock?.changePercent ?? null,
+
+        // Lifecycle
+        status:       lifecycle?.status ?? 'AKTIF',
+        statusReason: lifecycle?.statusReason ?? 'Belum ada data sesi.',
+        scoreDrift:   lifecycle?.scoreDrift ?? null,
+        baselineScore: lifecycle?.baselineScore ?? null,
+        currentScore: lifecycle?.currentScore ?? stock?.readinessScore ?? null,
+        firedAt:      lifecycle?.firedAt ?? w.addedAt ?? null,
+        updatedAt:    lifecycle?.updatedAt ?? null,
+      };
+    });
+
+    res.status(200).json({
+      signals,
+      total:     signals.length,
+      aktif:     signals.filter(s => s.status === 'AKTIF').length,
+      diragukan: signals.filter(s => s.status === 'DIRAGUKAN').length,
+      gugur:     signals.filter(s => s.status === 'GUGUR').length,
+    });
+
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[/api/signals] Error:', message);
+    res.status(500).json({ error: message, signals: [] });
+  }
+});
+
+// POST /api/signals/:symbol/update
+// Manually trigger lifecycle update for a single symbol
+// Called after session ingestion or on demand
+app.post('/api/signals/:symbol/update', async (req, res) => {
+  try {
+    const symbol = req.params.symbol?.toUpperCase();
+    if (!symbol) return res.status(400).json({ error: 'Symbol required' });
+
+    const { storage } = await import('./storage');
+    const { updateSignalLifecycle } = await import('./engine/signalLifecycle');
+
+    const stock = await storage.getStock(symbol);
+    if (!stock) return res.status(404).json({ error: 'Stock not found' });
+
+    // Derive cycle from regime + score
+    const score = (stock as any).readinessScore ?? 0;
+    const regime = ((stock as any).marketRegime ?? '').toLowerCase();
+    let currentCycle: string | null = null;
+    if (regime.includes('akumulasi') && score >= 80) currentCycle = 'ENTRY_WINDOW';
+    else if (regime.includes('akumulasi') && score >= 60) currentCycle = 'KONFIRMASI_MULAI';
+    else if (regime.includes('distribusi')) currentCycle = 'WASPADAI_DISTRIBUSI';
+
+    const result = await updateSignalLifecycle({
+      symbol,
+      currentScore: score,
+      currentDate:  new Date().toISOString().split('T')[0],
+      currentRegime: (stock as any).marketRegime ?? null,
+      currentCycle,
+    });
+
+    res.status(200).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+---
+
+PART 4 — Update WatchlistPage.tsx
+
+In client/src/pages/WatchlistPage.tsx:
+
+Add a second fetch on mount alongside the existing watchlist fetch:
+  const [signals, setSignals] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    fetch('/api/signals')
+      .then(r => r.json())
+      .then(data => {
+        const map: Record<string, any> = {};
+        (data.signals ?? []).forEach((s: any) => {
+          map[s.symbol] = s;
+        });
+        setSignals(map);
+      })
+      .catch(() => {});
+  }, []);
+
+In each watchlist table row, find the DITAMBAHKAN column.
+After it, add a STATUS column (insert before AKSI):
+
+Header: "STATUS" IBM Plex Mono text-[9px] tracking-widest
+  text-[#6b7280] uppercase px-4 py-2
+
+Each row value: px-4 py-3
+  const signal = signals[stock.symbol];
+  const status = signal?.status ?? 'AKTIF';
+
+  Badge:
+    AKTIF:     bg-emerald-500/10 text-emerald-400
+               border border-emerald-500/30 rounded-sm
+               IBM Plex Mono text-[9px] px-2 py-0.5
+               "● AKTIF"
+
+    DIRAGUKAN: bg-amber-500/10 text-amber-400
+               border border-amber-500/30 rounded-sm
+               IBM Plex Mono text-[9px] px-2 py-0.5
+               "⚠ DIRAGUKAN"
+
+    GUGUR:     bg-red-500/10 text-red-400
+               border border-red-500/30 rounded-sm
+               IBM Plex Mono text-[9px] px-2 py-0.5
+               "✕ GUGUR"
+
+  Below badge (if scoreDrift exists and status !== 'AKTIF'):
+    IBM Plex Mono text-[9px] text-[#6b7280] mt-0.5
+    scoreDrift > 0 ? "▲ +{drift}" : "▼ {drift} poin"
+
+  Tooltip on hover (use title attribute):
+    signal?.statusReason ?? ''
+
+Also add a summary bar below the page header
+(between header and stats bar):
+
+If any signals exist with status DIRAGUKAN or GUGUR:
+  bg-[#1a1500] border border-amber-500/20 rounded-sm
+  px-4 py-2 mb-3 flex items-center gap-3
+  IBM Plex Mono text-[10px]
+
+  Left: ⚠ text-amber-400
+  Text: text-amber-400/80
+    "{diragukan} sinyal diragukan · {gugur} sinyal gugur"
+  Right: small "Perbarui" button that calls
+    /api/signals/:symbol/update for each watchlisted symbol
+    text-[#38BDF8] cursor-pointer hover:underline
+
+---
+
+PART 5 — Run DB migration
+
+After adding signalLifecycle table to schema.ts run:
+  npx drizzle-kit push
+
+Verify signal_lifecycle table exists in Neon DB.
+
+---
+
+SAFETY RULES:
+1. New files: server/engine/signalLifecycle.ts
+2. Modified: shared/schema.ts, server/routes.ts (append only),
+             client/src/pages/WatchlistPage.tsx
+3. NEVER touch any existing engine file
+4. NEVER touch existing endpoints
+5. Run runTests.ts — BBCA=74 and UNVR=10 must pass
+6. Test GET /api/signals returns valid JSON
+7. Test POST /api/signals/BBCA/update returns valid JSON
+8. Verify WatchlistPage shows STATUS column
+9. Verify BBCA shows AKTIF badge (it's in watchlist by default)
+10. Report all files created or modified

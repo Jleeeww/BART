@@ -213,3 +213,29 @@ export const sessionHistory = pgTable('session_history', {
 export const insertSessionHistorySchema = createInsertSchema(sessionHistory);
 export type InsertSessionHistory = z.infer<typeof insertSessionHistorySchema>;
 export type SessionHistory = typeof sessionHistory.$inferSelect;
+
+export const signalLifecycle = pgTable('signal_lifecycle', {
+  id:            serial('id').primaryKey(),
+  symbol:        text('symbol').notNull().unique(),
+
+  status:        text('status').notNull().default('AKTIF'),
+
+  baselineScore:    real('baseline_score'),
+  baselineDate:     text('baseline_date'),
+
+  currentScore:     real('current_score'),
+  currentDate:      text('current_date'),
+  currentRegime:    text('current_regime'),
+  currentCycle:     text('current_cycle'),
+
+  scoreDrift:       real('score_drift'),
+
+  statusReason:     text('status_reason'),
+
+  firedAt:       text('fired_at'),
+  updatedAt:     text('updated_at'),
+});
+
+export const insertSignalLifecycleSchema = createInsertSchema(signalLifecycle).omit({ id: true });
+export type InsertSignalLifecycle = z.infer<typeof insertSignalLifecycleSchema>;
+export type SignalLifecycle = typeof signalLifecycle.$inferSelect;
