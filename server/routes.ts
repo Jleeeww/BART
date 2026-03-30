@@ -753,6 +753,7 @@ export async function registerRoutes(
 
           // GORENGAN DETECTOR
           const gorenganResult = computeGorenganFromStock({
+            symbol: stock.symbol,
             changePercent: typeof stock.changePercent === 'number' ? String(stock.changePercent) : stock.changePercent,
             flowBias: stock.flowBias || "Netral",
             flowIntensity: stock.flowIntensity || "Tidak Ada Data",
@@ -972,6 +973,7 @@ export async function registerRoutes(
 
       // GORENGAN DETECTOR
       const gorenganResult = computeGorenganFromStock({
+        symbol,
         changePercent: String(stockData?.changePercent || "0"),
         flowBias,
         flowIntensity,
@@ -1675,6 +1677,7 @@ export async function registerRoutes(
       // STEP 4: GORENGAN DETECTION via computeGorenganFromStock
       // ========================================
       const simGorenganResult = computeGorenganFromStock({
+        symbol,
         changePercent: String(marketData.changePercent),
         flowBias,
         flowIntensity,
@@ -2189,6 +2192,7 @@ export async function registerRoutes(
       });
 
       const gorenganResult = computeGorenganFromStock({
+        symbol,
         changePercent: stock.changePercent || "0",
         flowBias: stock.flowBias || "Netral",
         flowIntensity: stock.flowIntensity || "",
@@ -2348,6 +2352,7 @@ export async function registerRoutes(
       if (!stock) return res.status(404).json({ error: 'Stock not found' });
 
       const gorenganResult = computeGorenganFromStock({
+        symbol,
         changePercent: typeof stock.changePercent === 'number' ? String(stock.changePercent) : stock.changePercent,
         flowBias: stock.flowBias || "Netral",
         flowIntensity: stock.flowIntensity || "Tidak Ada Data",
@@ -2407,6 +2412,46 @@ export async function registerRoutes(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       res.status(500).json({ error: message });
+    }
+  });
+
+  app.get('/api/monitor/scores', async (req, res) => {
+    try {
+      const { getLastDistribution } = await import('./engine/scoreMonitor');
+      res.status(200).json(getLastDistribution());
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.post('/api/backtest', async (req, res) => {
+    try {
+      const symbols: string[] = req.body?.symbols ?? [];
+      if (!Array.isArray(symbols) || !symbols.length)
+        return res.status(400).json({ error: 'symbols array required' });
+      if (symbols.length > 50)
+        return res.status(400).json({ error: 'Max 50 symbols per run' });
+      const { backtestAll } = await import('./engine/backtestEngine');
+      res.status(200).json(await backtestAll(symbols));
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  app.get('/api/backtest/:symbol', async (req, res) => {
+    try {
+      const symbol = req.params.symbol?.toUpperCase();
+      if (!symbol) return res.status(400).json({ error: 'Symbol required' });
+      const { backtestSymbol } = await import('./engine/backtestEngine');
+      const result = await backtestSymbol(symbol);
+      if (!result) return res.status(404).json({
+        error: 'Insufficient historical data',
+        symbol,
+        minSessionsRequired: 20,
+      });
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
     }
   });
 

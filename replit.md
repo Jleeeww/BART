@@ -59,7 +59,9 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 - `server/engine/historyBuilder.ts`: Builds stock history arrays from session_history table (netFlow, price, m6Score)
 - `server/engine/idxIngester.ts`: Ingests IDX session data, computes flow signals, saves to DB, invalidates radar cache
 - `server/engine/signalLifecycle.ts`: Signal lifecycle tracking (AKTIF/DIRAGUKAN/GUGUR) for watchlisted stocks
-- `server/engine/gorenganDetector.ts`: Standalone gorengan detection (extracted from bandarmologyCoreV1)
+- `server/engine/gorenganDetector.ts`: Standalone gorengan detection (extracted from bandarmologyCoreV1) with 50-stock blue-chip whitelist
+- `server/engine/scoreMonitor.ts`: Score distribution monitor (HEALTHY/WARNING/CRITICAL health status)
+- `server/engine/backtestEngine.ts`: Backtesting pipeline for historical signal accuracy validation
 
 ### Key Design Patterns
 - **Shared Types**: Centralized definition of database schemas and API contracts for type safety.

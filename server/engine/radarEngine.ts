@@ -21,6 +21,7 @@ import { buildBandarmologyInput } from './buildBandarmologyInput';
 import { getBandarmologyDecisionV2 } from './bandarmologyDecisionV2';
 import { getM6History } from './bandarmologyHistory';
 import { computeGorenganFromStock } from './gorenganDetector';
+import { analyzeScoreDistribution, cacheDistribution } from './scoreMonitor';
 import type { RawStockRecord } from './buildBandarmologyInput';
 
 export interface RadarStockResult {
@@ -192,6 +193,7 @@ async function processStock(
     let gorenganOverride = false;
     try {
       const gorenganResult = computeGorenganFromStock({
+        symbol,
         changePercent: String(raw.changePercent ?? '0'),
         flowBias:      String(raw.flowBias ?? 'Netral'),
         flowIntensity: String(raw.flowIntensity ?? ''),
@@ -303,6 +305,17 @@ export async function runRadarBatch(
 
     const visible = allResults.filter((s) => s.confidence >= CONFIDENCE_GATE);
     const hidden  = allResults.filter((s) => s.confidence < CONFIDENCE_GATE);
+
+    const allScores = allResults.map(s => s.compositeScore);
+    if (allScores.length > 0) {
+      const distribution = analyzeScoreDistribution(allScores);
+      cacheDistribution(distribution);
+      if (distribution.healthStatus === 'CRITICAL') {
+        console.error('[radarEngine] CRITICAL: ' + distribution.recommendation);
+      } else if (distribution.healthStatus === 'WARNING') {
+        console.warn('[radarEngine] WARNING: ' + distribution.warnings.join(', '));
+      }
+    }
 
     visible.sort((a, b) =>
       b.compositeScore - a.compositeScore || a.symbol.localeCompare(b.symbol)

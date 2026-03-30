@@ -232,6 +232,8 @@ export const signalLifecycle = pgTable('signal_lifecycle', {
 
   statusReason:     text('status_reason'),
 
+  diragudanSessions: integer('diragukan_sessions').default(0),
+
   firedAt:       text('fired_at'),
   updatedAt:     text('updated_at'),
 });

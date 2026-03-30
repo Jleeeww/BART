@@ -2,6 +2,19 @@ import { parseBrokerIDR } from './parseBrokerIDR';
 import { parseForeignData } from './foreignParser';
 import { detectTapeControl } from './tapeControl';
 
+const GORENGAN_WHITELIST = new Set([
+  'BBCA','BBRI','BMRI','BBNI','BRIS',
+  'TLKM','ASII','UNVR','ICBP','INDF',
+  'KLBF','GGRM','HMSP','SMGR','INCO',
+  'PTBA','ADRO','ANTM','ITMG','PGAS',
+  'JSMR','WIKA','WSKT','PTPP','AKRA',
+  'EXCL','ISAT','MNCN','SCMA','EMTK',
+  'CPIN','JPFA','MAIN','SIDO','MYOR',
+  'ACES','LPPF','ERAA','MAPI','RALS',
+  'BSDE','CTRA','LPKR','PWON','SMRA',
+  'AALI','LSIP','SIMP','TBLA','SSMS',
+]);
+
 export interface GorenganResult {
   isGorengan: boolean;
   triggeredLayers: number[];
@@ -111,7 +124,18 @@ export function computeGorenganFromStock(stock: {
   stockCharacter?: string | null;
   todayValue?: number | null;
   avg20dValue?: number | null;
+  symbol?: string | null;
 }): GorenganResult {
+  const sym = (stock as any).symbol?.toUpperCase() ?? '';
+  if (sym && GORENGAN_WHITELIST.has(sym)) {
+    return {
+      isGorengan: false,
+      triggeredLayers: [],
+      layerDetails: ['Saham blue-chip — dikecualikan dari deteksi gorengan'],
+      riskOverride: null,
+    };
+  }
+
   let brokerData: any[] = [];
   try {
     brokerData = JSON.parse(stock.brokerData || "[]");
@@ -167,6 +191,10 @@ export function computeGorenganFromStock(stock: {
     ? todayVal / avg20Val
     : 1.2;
 
+  const effectiveVolumeRatio = (volumeRatio > 3 && top3Percent > 60)
+    ? 2.5
+    : volumeRatio;
+
   const hasTapeControlResult = avgBuyPrice > 0
     ? detectTapeControl({
         high:      avgBuyPrice * 1.002,
@@ -181,7 +209,7 @@ export function computeGorenganFromStock(stock: {
   return detectGorengan({
     priceChangePercent5d: priceChangePercent,
     hasIntradaySpikes: priceChangePercent > 10,
-    volumeRatio,
+    volumeRatio: effectiveVolumeRatio,
     top3BrokerNetBuyPercent: top3Percent,
     hasBrokerFragmentation,
     retailProxyDominates,

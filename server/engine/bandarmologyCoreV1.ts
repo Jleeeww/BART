@@ -371,6 +371,7 @@ export function computeGorenganFromStock(stock: {
   stockCharacter?: string | null;
   todayValue?: number | null;
   avg20dValue?: number | null;
+  symbol?: string | null;
 }): GorenganResult {
   return _computeGorenganFromStock(stock);
 }

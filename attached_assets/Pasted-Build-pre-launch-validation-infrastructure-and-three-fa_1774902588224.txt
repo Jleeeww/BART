@@ -1,0 +1,543 @@
+Build pre-launch validation infrastructure and three failure
+prevention systems. Read everything before starting.
+
+CRITICAL: Do NOT touch bandarmologyCore.ts, radarEngine.ts
+existing endpoints, or any frontend file unless specified.
+All changes are additive. Run runTests.ts after each part.
+BBCA must equal 74 and UNVR must equal 10 throughout.
+
+---
+
+PART 1 — Failure 2 Prevention: Gorengan Whitelist
+Modify server/engine/gorenganDetector.ts only.
+
+At the top of the file after imports, add:
+
+const GORENGAN_WHITELIST = new Set([
+  'BBCA','BBRI','BMRI','BBNI','BRIS',
+  'TLKM','ASII','UNVR','ICBP','INDF',
+  'KLBF','GGRM','HMSP','SMGR','INCO',
+  'PTBA','ADRO','ANTM','ITMG','PGAS',
+  'JSMR','WIKA','WSKT','PTPP','AKRA',
+  'EXCL','ISAT','MNCN','SCMA','EMTK',
+  'CPIN','JPFA','MAIN','SIDO','MYOR',
+  'ACES','LPPF','ERAA','MAPI','RALS',
+  'BSDE','CTRA','LPKR','PWON','SMRA',
+  'AALI','LSIP','SIMP','TBLA','SSMS',
+]);
+
+In computeGorenganFromStock(), add this as the very first
+block inside the function before any other logic:
+
+  const sym = (stock as any).symbol?.toUpperCase() ?? '';
+  if (sym && GORENGAN_WHITELIST.has(sym)) {
+    return {
+      isGorengan: false,
+      triggeredLayers: [],
+      layerDetails: ['Saham blue-chip — dikecualikan dari deteksi gorengan'],
+      riskOverride: null,
+    };
+  }
+
+Then after volumeRatio is computed, add:
+
+  const effectiveVolumeRatio = (volumeRatio > 3 && top3Percent > 60)
+    ? 2.5
+    : volumeRatio;
+
+Pass effectiveVolumeRatio instead of volumeRatio in the
+detectGorengan() call for the volumeRatio field.
+
+---
+
+PART 2 — Failure 3 Prevention: Lifecycle Smoothing
+Two files: shared/schema.ts and server/engine/signalLifecycle.ts
+
+In shared/schema.ts, find the signalLifecycle table definition.
+Add this column:
+  diragudanSessions: integer('diragukan_sessions').default(0),
+
+In server/engine/signalLifecycle.ts:
+
+Update computeStatus() signature to accept:
+  consecutiveDiragukan: number
+
+Change the drift <= -15 block from:
+  if (drift <= -15) {
+    return { status: 'DIRAGUKAN', reason: ... };
+  }
+
+To:
+  if (drift <= -15) {
+    if (consecutiveDiragukan >= 1) {
+      return {
+        status: 'DIRAGUKAN',
+        reason: `Skor turun ${Math.abs(drift).toFixed(0)} poin selama ${consecutiveDiragukan + 1} sesi berturut-turut. Pantau ketat.`,
+      };
+    } else {
+      return {
+        status: 'AKTIF',
+        reason: `Skor turun ${Math.abs(drift).toFixed(0)} poin sesi ini. Pantau — konfirmasi diperlukan sesi berikutnya.`,
+      };
+    }
+  }
+
+In updateSignalLifecycle(), after computing scoreDrift,
+add:
+  const prevConsecutive = record?.diragudanSessions ?? 0;
+  const newConsecutive = (scoreDrift <= -15 && scoreDrift > -25)
+    ? prevConsecutive + 1
+    : 0;
+
+Pass newConsecutive to computeStatus as consecutiveDiragukan.
+
+In the upsert .values() and .set() blocks, add:
+  diragudanSessions: newConsecutive,
+
+Run: npx drizzle-kit push after schema change.
+
+---
+
+PART 3 — Failure 1 Prevention: Score Distribution Monitor
+Create server/engine/scoreMonitor.ts with exactly this content:
+
+/**
+ * SCORE DISTRIBUTION MONITOR v1.0
+ * Detects if engine scores are clustering at extremes,
+ * indicating miscalibrated thresholds.
+ * Healthy: bell curve around 35-65
+ * Warning: >40% of stocks at extremes (<20 or >80)
+ * Critical: >60% of stocks at extremes
+ */
+
+export interface ScoreDistribution {
+  total: number;
+  mean: number;
+  median: number;
+  std: number;
+  buckets: {
+    veryLow: number;   // 0-20
+    low: number;       // 21-40
+    mid: number;       // 41-60
+    high: number;      // 61-80
+    veryHigh: number;  // 81-100
+  };
+  percentages: {
+    veryLow: number;
+    low: number;
+    mid: number;
+    high: number;
+    veryHigh: number;
+  };
+  extremeRate: number;
+  healthStatus: 'HEALTHY' | 'WARNING' | 'CRITICAL';
+  warnings: string[];
+  recommendation: string;
+}
+
+export function analyzeScoreDistribution(
+  scores: number[]
+): ScoreDistribution {
+  if (scores.length === 0) {
+    return {
+      total: 0, mean: 0, median: 0, std: 0,
+      buckets: { veryLow:0, low:0, mid:0, high:0, veryHigh:0 },
+      percentages: { veryLow:0, low:0, mid:0, high:0, veryHigh:0 },
+      extremeRate: 0,
+      healthStatus: 'WARNING',
+      warnings: ['No scores to analyze'],
+      recommendation: 'Feed data into engine first.',
+    };
+  }
+
+  const sorted = [...scores].sort((a, b) => a - b);
+  const n = scores.length;
+  const mean = scores.reduce((s, v) => s + v, 0) / n;
+  const median = sorted[Math.floor(n / 2)];
+  const variance = scores.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+  const std = Math.sqrt(variance);
+
+  const buckets = {
+    veryLow:  scores.filter(s => s <= 20).length,
+    low:      scores.filter(s => s > 20 && s <= 40).length,
+    mid:      scores.filter(s => s > 40 && s <= 60).length,
+    high:     scores.filter(s => s > 60 && s <= 80).length,
+    veryHigh: scores.filter(s => s > 80).length,
+  };
+
+  const pct = (v: number) => Number(((v / n) * 100).toFixed(1));
+  const percentages = {
+    veryLow:  pct(buckets.veryLow),
+    low:      pct(buckets.low),
+    mid:      pct(buckets.mid),
+    high:     pct(buckets.high),
+    veryHigh: pct(buckets.veryHigh),
+  };
+
+  const extremeRate = Number(
+    (((buckets.veryLow + buckets.veryHigh) / n) * 100).toFixed(1)
+  );
+
+  const warnings: string[] = [];
+  let healthStatus: ScoreDistribution['healthStatus'] = 'HEALTHY';
+  let recommendation = 'Distribusi skor normal. Tidak perlu tindakan.';
+
+  if (mean < 25) {
+    warnings.push(`Mean ${mean.toFixed(1)} terlalu rendah — sebagian besar saham HINDARI`);
+    healthStatus = 'WARNING';
+    recommendation = 'Periksa apakah data flow/broker terisi dengan benar.';
+  }
+  if (mean > 75) {
+    warnings.push(`Mean ${mean.toFixed(1)} terlalu tinggi — threshold akumulasi terlalu longgar`);
+    healthStatus = 'WARNING';
+    recommendation = 'Threshold akumulasi mungkin terlalu longgar. Perlu kalibrasi.';
+  }
+  if (extremeRate > 60) {
+    warnings.push(`${extremeRate}% saham di zona ekstrem`);
+    healthStatus = 'CRITICAL';
+    recommendation = 'KRITIS: Engine perlu kalibrasi ulang sebelum launch.';
+  } else if (extremeRate > 40) {
+    warnings.push(`${extremeRate}% saham di zona ekstrem — di atas normal`);
+    if (healthStatus === 'HEALTHY') healthStatus = 'WARNING';
+    recommendation = 'Monitor selama 3-5 sesi.';
+  }
+  if (std < 8) {
+    warnings.push(`Std dev ${std.toFixed(1)} terlalu rendah — skor terlalu seragam`);
+    if (healthStatus === 'HEALTHY') healthStatus = 'WARNING';
+    recommendation = 'Engine tidak membedakan saham dengan baik. Periksa model weights.';
+  }
+
+  return {
+    total: n,
+    mean: Number(mean.toFixed(2)),
+    median: Number(median.toFixed(2)),
+    std: Number(std.toFixed(2)),
+    buckets, percentages, extremeRate,
+    healthStatus, warnings, recommendation,
+  };
+}
+
+let _lastDistribution: ScoreDistribution | null = null;
+let _lastCheckedAt: string | null = null;
+
+export function cacheDistribution(dist: ScoreDistribution): void {
+  _lastDistribution = dist;
+  _lastCheckedAt = new Date().toISOString();
+}
+
+export function getLastDistribution(): {
+  distribution: ScoreDistribution | null;
+  checkedAt: string | null;
+} {
+  return { distribution: _lastDistribution, checkedAt: _lastCheckedAt };
+}
+
+---
+
+PART 4 — Wire scoreMonitor into radarEngine.ts
+
+Add import at top of radarEngine.ts:
+  import { analyzeScoreDistribution, cacheDistribution }
+    from './scoreMonitor';
+
+In runRadarBatch(), after the visible/hidden split,
+add:
+  const allScores = allResults.map(s => s.compositeScore);
+  if (allScores.length > 0) {
+    const distribution = analyzeScoreDistribution(allScores);
+    cacheDistribution(distribution);
+    if (distribution.healthStatus === 'CRITICAL') {
+      console.error('[radarEngine] CRITICAL: ' + distribution.recommendation);
+    } else if (distribution.healthStatus === 'WARNING') {
+      console.warn('[radarEngine] WARNING: ' + distribution.warnings.join(', '));
+    }
+  }
+
+---
+
+PART 5 — Backtesting Pipeline
+Create server/engine/backtestEngine.ts with exactly this:
+
+import { db } from '../db';
+import { sessionHistory } from '../../shared/schema';
+import { eq, and, asc } from 'drizzle-orm';
+import { analyzeScoreDistribution } from './scoreMonitor';
+
+export interface BacktestSignal {
+  symbol: string;
+  signalDate: string;
+  signalScore: number;
+  signalRegime: string | null;
+  priceAtSignal: number;
+  price5Sessions: number | null;
+  price10Sessions: number | null;
+  price15Sessions: number | null;
+  return5: number | null;
+  return10: number | null;
+  return15: number | null;
+  correct5: boolean | null;
+  correct10: boolean | null;
+  correct15: boolean | null;
+}
+
+export interface BacktestResult {
+  symbol: string;
+  totalSessions: number;
+  totalSignals: number;
+  accuracy5: number | null;
+  accuracy10: number | null;
+  accuracy15: number | null;
+  avgReturn5: number | null;
+  avgReturn10: number | null;
+  avgReturn15: number | null;
+  falsePositiveRate: number | null;
+  signals: BacktestSignal[];
+  scoreDistribution: ReturnType<typeof analyzeScoreDistribution>;
+  recommendation: string;
+}
+
+export interface BacktestSummary {
+  totalSymbols: number;
+  totalSignals: number;
+  overallAccuracy10: number | null;
+  bestSymbols: string[];
+  worstSymbols: string[];
+  calibrationNeeded: boolean;
+  recommendations: string[];
+  results: BacktestResult[];
+}
+
+export async function backtestSymbol(
+  symbol: string
+): Promise<BacktestResult | null> {
+  try {
+    const records = await db
+      .select()
+      .from(sessionHistory)
+      .where(
+        and(
+          eq(sessionHistory.symbol, symbol.toUpperCase()),
+          eq(sessionHistory.session, 0)
+        )
+      )
+      .orderBy(asc(sessionHistory.date));
+
+    if (!records || records.length < 20) return null;
+
+    const signals: BacktestSignal[] = [];
+    const scores: number[] = [];
+
+    for (let i = 0; i < records.length - 15; i++) {
+      const session = records[i];
+      const score = session.compositeScore ?? 0;
+      scores.push(score);
+
+      const regime = (session.regime ?? '').toLowerCase();
+      const isSignal = score >= 60 &&
+        (regime.includes('accumulation') || regime.includes('akumulasi'));
+
+      if (!isSignal) continue;
+
+      const s5  = records[i + 5]  ?? null;
+      const s10 = records[i + 10] ?? null;
+      const s15 = records[i + 15] ?? null;
+
+      const p0  = session.close ?? 0;
+      const p5  = s5?.close  ?? null;
+      const p10 = s10?.close ?? null;
+      const p15 = s15?.close ?? null;
+
+      const ret = (now: number, fut: number | null) =>
+        fut && now > 0
+          ? Number(((fut - now) / now * 100).toFixed(2))
+          : null;
+
+      signals.push({
+        symbol:          symbol.toUpperCase(),
+        signalDate:      session.date,
+        signalScore:     score,
+        signalRegime:    session.regime ?? null,
+        priceAtSignal:   p0,
+        price5Sessions:  p5,
+        price10Sessions: p10,
+        price15Sessions: p15,
+        return5:         ret(p0, p5),
+        return10:        ret(p0, p10),
+        return15:        ret(p0, p15),
+        correct5:        p5  ? p5  > p0 : null,
+        correct10:       p10 ? p10 > p0 : null,
+        correct15:       p15 ? p15 > p0 : null,
+      });
+    }
+
+    if (signals.length === 0) return null;
+
+    const acc = (key: 'correct5' | 'correct10' | 'correct15') => {
+      const valid = signals.filter(s => s[key] !== null);
+      if (!valid.length) return null;
+      return Number(
+        (valid.filter(s => s[key]).length / valid.length * 100).toFixed(1)
+      );
+    };
+
+    const avgRet = (key: 'return5' | 'return10' | 'return15') => {
+      const vals = signals.filter(s => s[key] !== null).map(s => s[key]!);
+      if (!vals.length) return null;
+      return Number((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2));
+    };
+
+    const accuracy10 = acc('correct10');
+    const falsePositiveRate = accuracy10 !== null
+      ? Number((100 - accuracy10).toFixed(1)) : null;
+
+    let recommendation = '';
+    if (accuracy10 === null) {
+      recommendation = 'Data tidak cukup untuk evaluasi.';
+    } else if (accuracy10 >= 70) {
+      recommendation = `Akurasi ${accuracy10}% — engine terkalibrasi baik untuk ${symbol}.`;
+    } else if (accuracy10 >= 55) {
+      recommendation = `Akurasi sedang ${accuracy10}% — pertimbangkan penyesuaian threshold.`;
+    } else {
+      recommendation = `Akurasi rendah ${accuracy10}% — kalibrasi diperlukan untuk ${symbol}.`;
+    }
+
+    return {
+      symbol: symbol.toUpperCase(),
+      totalSessions: records.length,
+      totalSignals: signals.length,
+      accuracy5:  acc('correct5'),
+      accuracy10,
+      accuracy15: acc('correct15'),
+      avgReturn5:  avgRet('return5'),
+      avgReturn10: avgRet('return10'),
+      avgReturn15: avgRet('return15'),
+      falsePositiveRate,
+      signals,
+      scoreDistribution: analyzeScoreDistribution(scores),
+      recommendation,
+    };
+  } catch (err) {
+    console.error(`[backtestEngine] Error for ${symbol}:`, err);
+    return null;
+  }
+}
+
+export async function backtestAll(
+  symbols: string[]
+): Promise<BacktestSummary> {
+  const results: BacktestResult[] = [];
+
+  for (const sym of symbols) {
+    const r = await backtestSymbol(sym);
+    if (r) results.push(r);
+    await new Promise(res => setTimeout(res, 0));
+  }
+
+  if (!results.length) {
+    return {
+      totalSymbols: 0, totalSignals: 0,
+      overallAccuracy10: null,
+      bestSymbols: [], worstSymbols: [],
+      calibrationNeeded: true,
+      recommendations: ['Tidak ada data historis yang cukup.'],
+      results: [],
+    };
+  }
+
+  const totalSignals = results.reduce((s, r) => s + r.totalSignals, 0);
+  const acc10s = results.filter(r => r.accuracy10 !== null).map(r => r.accuracy10!);
+  const overallAccuracy10 = acc10s.length
+    ? Number((acc10s.reduce((a, b) => a + b, 0) / acc10s.length).toFixed(1))
+    : null;
+
+  const bestSymbols  = results.filter(r => (r.accuracy10 ?? 0) >= 70).map(r => r.symbol);
+  const worstSymbols = results.filter(r => r.accuracy10 !== null && r.accuracy10 < 40).map(r => r.symbol);
+  const calibrationNeeded = (overallAccuracy10 ?? 0) < 55 ||
+    worstSymbols.length > results.length * 0.3;
+
+  const recommendations: string[] = [];
+  if (overallAccuracy10 !== null) {
+    if (overallAccuracy10 >= 70)
+      recommendations.push(`Akurasi keseluruhan ${overallAccuracy10}% — engine siap launch.`);
+    else if (overallAccuracy10 >= 55)
+      recommendations.push(`Akurasi ${overallAccuracy10}% — kalibrasi minor diperlukan.`);
+    else
+      recommendations.push(`PERINGATAN: Akurasi ${overallAccuracy10}% — kalibrasi mayor diperlukan.`);
+  }
+  if (bestSymbols.length)
+    recommendations.push(`Best: ${bestSymbols.slice(0, 5).join(', ')}`);
+  if (worstSymbols.length)
+    recommendations.push(`Perlu perhatian: ${worstSymbols.slice(0, 5).join(', ')}`);
+
+  return {
+    totalSymbols: results.length, totalSignals,
+    overallAccuracy10, bestSymbols, worstSymbols,
+    calibrationNeeded, recommendations, results,
+  };
+}
+
+---
+
+PART 6 — Add endpoints to server/routes.ts
+Append AFTER all existing endpoints:
+
+app.get('/api/monitor/scores', async (req, res) => {
+  try {
+    const { getLastDistribution } = await import('./engine/scoreMonitor');
+    res.status(200).json(getLastDistribution());
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+app.post('/api/backtest', async (req, res) => {
+  try {
+    const symbols: string[] = req.body?.symbols ?? [];
+    if (!Array.isArray(symbols) || !symbols.length)
+      return res.status(400).json({ error: 'symbols array required' });
+    if (symbols.length > 50)
+      return res.status(400).json({ error: 'Max 50 symbols per run' });
+    const { backtestAll } = await import('./engine/backtestEngine');
+    res.status(200).json(await backtestAll(symbols));
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+app.get('/api/backtest/:symbol', async (req, res) => {
+  try {
+    const symbol = req.params.symbol?.toUpperCase();
+    if (!symbol) return res.status(400).json({ error: 'Symbol required' });
+    const { backtestSymbol } = await import('./engine/backtestEngine');
+    const result = await backtestSymbol(symbol);
+    if (!result) return res.status(404).json({
+      error: 'Insufficient historical data',
+      symbol,
+      minSessionsRequired: 20,
+    });
+    res.status(200).json(result);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+---
+
+SAFETY RULES:
+1. New files: server/engine/scoreMonitor.ts,
+              server/engine/backtestEngine.ts
+2. Modified: server/engine/gorenganDetector.ts,
+             server/engine/signalLifecycle.ts,
+             shared/schema.ts (diragudanSessions column),
+             server/engine/radarEngine.ts (scoreMonitor wire),
+             server/routes.ts (append only)
+3. NEVER touch: bandarmologyCore.ts, bandarmologyDecisionV2.ts,
+   unifiedDecision.ts, bandarmologyCoreV1.ts
+4. NEVER modify existing endpoints
+5. Run npx drizzle-kit push after schema change
+6. Run runTests.ts — BBCA=74 UNVR=10 must pass
+7. Test /api/monitor/scores returns valid JSON
+8. Test /api/backtest/BBCA returns 404 with correct message
+   (no historical data yet — expected)
+9. Verify BBCA NOT flagged as gorengan (whitelist)
+10. Report all files created and modified

@@ -29,7 +29,8 @@ function computeStatus(
   baselineScore: number | null,
   currentCycle: string | null,
   currentRegime: string | null,
-  previousStatus: SignalStatus
+  previousStatus: SignalStatus,
+  consecutiveDiragukan: number
 ): { status: SignalStatus; reason: string } {
   if (previousStatus === 'GUGUR') {
     return {
@@ -63,10 +64,17 @@ function computeStatus(
     }
 
     if (drift <= -15) {
-      return {
-        status: 'DIRAGUKAN',
-        reason: `Skor turun ${Math.abs(drift).toFixed(0)} poin dari baseline (${baselineScore}→${currentScore}). Pantau ketat.`,
-      };
+      if (consecutiveDiragukan >= 1) {
+        return {
+          status: 'DIRAGUKAN',
+          reason: `Skor turun ${Math.abs(drift).toFixed(0)} poin selama ${consecutiveDiragukan + 1} sesi berturut-turut. Pantau ketat.`,
+        };
+      } else {
+        return {
+          status: 'AKTIF',
+          reason: `Skor turun ${Math.abs(drift).toFixed(0)} poin sesi ini. Pantau — konfirmasi diperlukan sesi berikutnya.`,
+        };
+      }
     }
   }
 
@@ -108,12 +116,18 @@ export async function updateSignalLifecycle(
 
     const scoreDrift = input.currentScore - baselineScore;
 
+    const prevConsecutive = record?.diragudanSessions ?? 0;
+    const newConsecutive = (scoreDrift <= -15 && scoreDrift > -25)
+      ? prevConsecutive + 1
+      : 0;
+
     const { status, reason } = computeStatus(
       input.currentScore,
       baselineScore,
       input.currentCycle,
       input.currentRegime,
-      previousStatus
+      previousStatus,
+      newConsecutive
     );
 
     const output: SignalLifecycleOutput = {
@@ -141,6 +155,7 @@ export async function updateSignalLifecycle(
         currentCycle:   input.currentCycle  ?? null,
         scoreDrift:     output.scoreDrift,
         statusReason:   reason,
+        diragudanSessions: newConsecutive,
         firedAt,
         updatedAt:      now,
       })
@@ -154,6 +169,7 @@ export async function updateSignalLifecycle(
           currentCycle:  input.currentCycle  ?? null,
           scoreDrift:    output.scoreDrift,
           statusReason:  reason,
+          diragudanSessions: newConsecutive,
           updatedAt:     now,
         },
       });
