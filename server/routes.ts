@@ -973,7 +973,7 @@ export async function registerRoutes(
 
       // GORENGAN DETECTOR
       const gorenganResult = computeGorenganFromStock({
-        symbol,
+        symbol: stockSymbol,
         changePercent: String(stockData?.changePercent || "0"),
         flowBias,
         flowIntensity,
@@ -1342,7 +1342,7 @@ export async function registerRoutes(
       event_analysis: {
         impact: "Sedang",
         relevance: "Struktural",
-        thesis: `${payload.event_specifics.event_type} (${payload.event_specifics.headline}) konsisten dengan tren operasional yang diamati. Meski peningkatan efisiensi struktural terlihat, sensitivitas makro tetap menjadi variabel utama untuk persistensi valuasi.`,
+        thesis: `${payload.event_specifics?.event_type ?? 'Event'} (${payload.event_specifics?.headline ?? 'N/A'}) konsisten dengan tren operasional yang diamati. Meski peningkatan efisiensi struktural terlihat, sensitivitas makro tetap menjadi variabel utama untuk persistensi valuasi.`,
         confidence: "Tinggi",
         conditions: "Persistensi tesis mengasumsikan stabilitas permintaan kredit domestik dan tidak ada kontraksi signifikan pada Net Interest Margin (NIM) yang berlaku."
       },
