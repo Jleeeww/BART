@@ -135,6 +135,25 @@ export default function StockDashboard() {
   const [aiLoading, setAiLoading] = useState(false);
   const [sessionStatus, setSessionStatus] = useState(getIDXSessionStatus());
   const [valuationData, setValuationData] = useState<any>(null);
+  const [distWarning, setDistWarning] = useState<any>(null);
+
+  useEffect(() => {
+    if (!symbol) return;
+    let cancelled = false;
+    fetch(`/api/distribution/${symbol}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled) return;
+        const validLevels = ['AMAN', 'PANTAU_DISTRIBUSI', 'WASPADA_DISTRIBUSI', 'BAHAYA_DISTRIBUSI'];
+        if (data && validLevels.includes(data.alertLevel)) {
+          setDistWarning(data);
+        } else {
+          setDistWarning(null);
+        }
+      })
+      .catch(() => { if (!cancelled) setDistWarning(null); });
+    return () => { cancelled = true; };
+  }, [symbol]);
 
   const decisionV2 = useMemo(() => {
     if (!aiData?.actionGuidance) return null;
@@ -500,6 +519,92 @@ export default function StockDashboard() {
                           </Collapsible>
                         </div>
                       </Card>
+                    )}
+
+                    {distWarning && distWarning.alertLevel !== 'AMAN' && (
+                      <div
+                        className={`rounded-md p-4 mb-4 border ${
+                          distWarning.alertLevel === 'BAHAYA_DISTRIBUSI'
+                            ? 'bg-red-500/5 border-red-500/30'
+                            : distWarning.alertLevel === 'WASPADA_DISTRIBUSI'
+                            ? 'bg-orange-500/5 border-orange-500/30'
+                            : 'bg-amber-500/5 border-amber-500/20'
+                        }`}
+                        data-testid="card-distribution-warning"
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle
+                              className={`w-4 h-4 ${
+                                distWarning.alertLevel === 'BAHAYA_DISTRIBUSI'
+                                  ? 'text-red-400'
+                                  : distWarning.alertLevel === 'WASPADA_DISTRIBUSI'
+                                  ? 'text-orange-400'
+                                  : 'text-amber-400'
+                              }`}
+                            />
+                            <span className="font-mono text-[9px] tracking-widest text-[#6b7280] uppercase">
+                              PERINGATAN DISTRIBUSI DINI
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`font-mono text-[9px] px-2 py-0.5 rounded-sm border ${
+                                distWarning.alertLevel === 'BAHAYA_DISTRIBUSI'
+                                  ? 'bg-red-500/10 text-red-400 border-red-500/30'
+                                  : distWarning.alertLevel === 'WASPADA_DISTRIBUSI'
+                                  ? 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+                                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                              }`}
+                              data-testid="badge-distribution-conditions"
+                            >
+                              {distWarning.conditionsMet}/{distWarning.totalConditions} kondisi
+                            </span>
+                            <span className="font-mono text-[9px] text-[#6b7280]">
+                              {distWarning.confidence}
+                            </span>
+                          </div>
+                        </div>
+                        <p
+                          className={`text-sm font-bold mb-2 ${
+                            distWarning.alertLevel === 'BAHAYA_DISTRIBUSI'
+                              ? 'text-red-400'
+                              : distWarning.alertLevel === 'WASPADA_DISTRIBUSI'
+                              ? 'text-orange-400'
+                              : 'text-amber-400'
+                          }`}
+                          data-testid="text-distribution-level"
+                        >
+                          {distWarning.alertLevel === 'BAHAYA_DISTRIBUSI' &&
+                            'Bahaya — Sinyal Distribusi Terkonfirmasi'}
+                          {distWarning.alertLevel === 'WASPADA_DISTRIBUSI' &&
+                            'Waspada — Tanda Distribusi Mulai Terdeteksi'}
+                          {distWarning.alertLevel === 'PANTAU_DISTRIBUSI' &&
+                            'Pantau — Sinyal Awal Perlu Diperhatikan'}
+                        </p>
+                        <div className="space-y-1 mb-3">
+                          {(distWarning.details ?? [])
+                            .filter(
+                              (d: string) =>
+                                !d.startsWith('C3:') ||
+                                distWarning.conditions?.c3_brokerSideSwitch !== null
+                            )
+                            .map((detail: string, i: number) => (
+                              <p key={i} className="font-mono text-[10px] text-[#9ca3af]">
+                                {detail}
+                              </p>
+                            ))}
+                        </div>
+                        <div className="bg-[#ffffff04] rounded-sm px-3 py-2 flex items-start gap-2">
+                          <span className="text-[#38BDF8] text-xs mt-0.5">→</span>
+                          <p
+                            className="font-mono text-[10px] text-[#6b7280]"
+                            data-testid="text-distribution-recommendation"
+                          >
+                            {distWarning.recommendation}
+                          </p>
+                        </div>
+                      </div>
                     )}
 
                     {valuationData?.synthesis && (

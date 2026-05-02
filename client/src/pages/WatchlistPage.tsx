@@ -168,6 +168,7 @@ export default function WatchlistPage() {
   const [removedSymbols, setRemovedSymbols] = useState<Set<string>>(new Set());
 
   const [refreshingSignals, setRefreshingSignals] = useState(false);
+  const [distWarnings, setDistWarnings] = useState<Record<string, any>>({});
 
   const { data: watchlistItems } = useQuery<WatchlistItem[]>({
     queryKey: ["/api/watchlist"],
@@ -193,6 +194,31 @@ export default function WatchlistPage() {
     const m = new Map<string, WatchlistItem>();
     watchlistItems?.forEach((w) => m.set(w.symbol, w));
     return m;
+  }, [watchlistItems]);
+
+  useEffect(() => {
+    const symbols = (watchlistItems ?? []).map(w => w.symbol);
+    if (!symbols.length) {
+      setDistWarnings({});
+      return;
+    }
+    let cancelled = false;
+    const fetchWarnings = async () => {
+      const results: Record<string, any> = {};
+      await Promise.allSettled(
+        symbols.map(async (sym) => {
+          try {
+            const r = await fetch(`/api/distribution/${sym}`);
+            if (!r.ok) return;
+            const d = await r.json();
+            if (d && d.alertLevel && d.alertLevel !== 'AMAN') results[sym] = d;
+          } catch {}
+        })
+      );
+      if (!cancelled) setDistWarnings(results);
+    };
+    fetchWarnings();
+    return () => { cancelled = true; };
   }, [watchlistItems]);
 
   const watchlistedStocks = useMemo(() => {
@@ -451,6 +477,24 @@ export default function WatchlistPage() {
                               <div style={{ fontFamily: mono, fontSize: 9, color: '#6b7280', marginTop: 2 }}>
                                 {drift > 0 ? `▲ +${drift}` : `▼ ${drift} poin`}
                               </div>
+                            )}
+                            {distWarnings[stock.symbol] && (
+                              <span
+                                className={`block font-mono text-[8px] mt-1 ${
+                                  distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI'
+                                    ? 'text-red-400'
+                                    : distWarnings[stock.symbol].alertLevel === 'WASPADA_DISTRIBUSI'
+                                    ? 'text-orange-400'
+                                    : 'text-amber-400'
+                                }`}
+                                data-testid={`badge-distwarn-${stock.symbol}`}
+                              >
+                                ⚠ {distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI'
+                                  ? 'Bahaya Distribusi'
+                                  : distWarnings[stock.symbol].alertLevel === 'WASPADA_DISTRIBUSI'
+                                  ? 'Waspada Distribusi'
+                                  : 'Pantau Distribusi'}
+                              </span>
                             )}
                           </div>
                         );

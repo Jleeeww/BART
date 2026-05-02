@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Star } from "lucide-react";
@@ -75,10 +75,33 @@ interface WatchlistItem {
 export default function RadarPage() {
   const [filter, setFilter] = useState<FilterType>("semua");
   const [optimisticOverrides, setOptimisticOverrides] = useState<Record<string, boolean>>({});
+  const [distWarnings, setDistWarnings] = useState<Record<string, any>>({});
 
   const { data: stocks, isLoading } = useQuery<StockData[]>({
     queryKey: ["/api/stocks"],
   });
+
+  useEffect(() => {
+    if (!stocks?.length) return;
+    let cancelled = false;
+    const fetchWarnings = async () => {
+      const symbols = stocks.map((s) => s.symbol);
+      const results: Record<string, any> = {};
+      await Promise.allSettled(
+        symbols.map(async (sym: string) => {
+          try {
+            const r = await fetch(`/api/distribution/${sym}`);
+            if (!r.ok) return;
+            const d = await r.json();
+            if (d && d.alertLevel && d.alertLevel !== 'AMAN') results[sym] = d;
+          } catch {}
+        })
+      );
+      if (!cancelled) setDistWarnings(results);
+    };
+    fetchWarnings();
+    return () => { cancelled = true; };
+  }, [stocks]);
 
   const { data: watchlistData } = useQuery<WatchlistItem[]>({
     queryKey: ["/api/watchlist"],
@@ -279,6 +302,22 @@ export default function RadarPage() {
                           >
                             {stock.name}
                           </p>
+                          {distWarnings[stock.symbol] && (
+                            <span
+                              className={`inline-block font-mono text-[8px] px-1.5 py-0.5 rounded-sm border mt-0.5 w-fit ${
+                                distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI'
+                                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                  : distWarnings[stock.symbol].alertLevel === 'WASPADA_DISTRIBUSI'
+                                  ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                              }`}
+                              data-testid={`badge-distwarn-${stock.symbol}`}
+                            >
+                              {distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI' && '⚠ BAHAYA DISTRIBUSI'}
+                              {distWarnings[stock.symbol].alertLevel === 'WASPADA_DISTRIBUSI' && '⚠ WASPADA DISTRIBUSI'}
+                              {distWarnings[stock.symbol].alertLevel === 'PANTAU_DISTRIBUSI' && '· PANTAU DISTRIBUSI'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>

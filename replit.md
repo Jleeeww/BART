@@ -62,6 +62,7 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 - `server/engine/gorenganDetector.ts`: Standalone gorengan detection (extracted from bandarmologyCoreV1) with 50-stock blue-chip whitelist
 - `server/engine/scoreMonitor.ts`: Score distribution monitor (HEALTHY/WARNING/CRITICAL health status)
 - `server/engine/backtestEngine.ts`: Backtesting pipeline for historical signal accuracy validation
+- `server/engine/distributionWarning.ts`: Distribution Early Warning System (5-condition detector for accumulation→distribution transitions)
 
 ### Key Design Patterns
 - **Shared Types**: Centralized definition of database schemas and API contracts for type safety.
