@@ -1,0 +1,853 @@
+Now we have meaningful sector coverage across 6 sectors:
+Financials:             BBCA, BMRI, BBRI
+Energy:                 ADRO, BUMI, SGER
+Industrials:            UNTR, BULL, PIPA
+Communication Services: TLKM, WIFI, MORA
+Consumer Staples:       UNVR, ICBP
+Consumer Discretionary: ASII
+Real Estate:            DADA
+That's enough diversity to make sector rotation actually meaningful in demo mode. Now build:
+
+Build the Sector Rotation Intelligence system.
+Read everything before starting.
+
+CRITICAL CONSTRAINTS:
+- Do NOT touch any existing engine files
+- Do NOT modify any existing API endpoints
+- Do NOT break BBCA=74 or UNVR=10
+- All changes are additive only
+
+---
+
+PART 1 — Create server/engine/sectorRotationEngine.ts
+
+/**
+ * ============================================================
+ * SECTOR ROTATION ENGINE v1.0
+ * ============================================================
+ * Aggregates individual stock bandarmology scores by sector
+ * to detect institutional money rotation across IDX sectors.
+ *
+ * DESIGN:
+ *   - Reads from /api/stocks (existing endpoint)
+ *   - Groups stocks by sector
+ *   - Computes sector rotation score (0-100)
+ *   - Detects rotation direction (MASUK/KELUAR/NETRAL)
+ *   - Identifies top stock leaders per sector
+ *   - Cache: 15min during market hours, 60min off-hours
+ *
+ * SECTOR ROTATION SCORE:
+ *   weightedAvg(readinessScore) for all stocks in sector
+ *   Adjusted by: count of AKTIF signals, flow bias distribution
+ *
+ * ROTATION DIRECTION:
+ *   MASUK:  score > 60 AND majority flowBias = Akumulasi
+ *   KELUAR: score < 40 AND majority flowBias = Distribusi
+ *   NETRAL: everything else
+ * ============================================================
+ */
+
+export type RotationDirection = 'MASUK' | 'KELUAR' | 'NETRAL';
+
+export interface SectorRotationResult {
+  sector: string;
+  displayName: string;
+  rotationScore: number;        // 0-100
+  direction: RotationDirection;
+  stockCount: number;
+  akumulasiCount: number;
+  distribusiCount: number;
+  topStocks: {
+    symbol: string;
+    companyName: string;
+    readinessScore: number;
+    cyclePosition: string | null;
+    flowBias: string | null;
+  }[];
+  momentum: 'NAIK' | 'TURUN' | 'STABIL'; // vs previous cache
+  previousScore: number | null;
+}
+
+export interface SectorRotationSnapshot {
+  sectors: SectorRotationResult[];
+  hotSectors: string[];      // sectors with direction=MASUK, score>60
+  coldSectors: string[];     // sectors with direction=KELUAR, score<40
+  rotationStrength: 'KUAT' | 'SEDANG' | 'LEMAH';
+  dominantTheme: string;     // e.g. "Rotasi ke Energi & Pertambangan"
+  computedAt: string;
+  isStale: boolean;
+}
+
+// Sector display names in Bahasa Indonesia
+const SECTOR_DISPLAY_NAMES: Record<string, string> = {
+  'Financials':             'Keuangan & Perbankan',
+  'Energy':                 'Energi',
+  'Industrials':            'Industri',
+  'Communication Services': 'Telekomunikasi',
+  'Consumer Staples':       'Konsumer Primer',
+  'Consumer Discretionary': 'Konsumer Sekunder',
+  'Real Estate':            'Properti',
+  'Basic Materials':        'Material & Tambang',
+  'Healthcare':             'Kesehatan',
+  'Technology':             'Teknologi',
+  'Infrastructure':         'Infrastruktur',
+};
+
+// ── Cache ─────────────────────────────────────────────────
+
+let _cache: SectorRotationSnapshot | null = null;
+let _previousScores: Record<string, number> = {};
+let _cacheTimestamp = 0;
+
+const CACHE_TTL_MARKET  = 15 * 60 * 1000;
+const CACHE_TTL_OFFHOUR = 60 * 60 * 1000;
+
+function isMarketHours(): boolean {
+  const now = new Date();
+  const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const day  = wib.getUTCDay();
+  const hour = wib.getUTCHours();
+  const min  = wib.getUTCMinutes();
+  const t    = hour * 60 + min;
+  if (day === 0 || day === 6) return false;
+  return (t >= 540 && t < 720) || (t >= 810 && t < 950);
+}
+
+function isCacheValid(): boolean {
+  if (!_cache) return false;
+  const ttl = isMarketHours() ? CACHE_TTL_MARKET : CACHE_TTL_OFFHOUR;
+  return Date.now() - _cacheTimestamp < ttl;
+}
+
+// ── Core computation ──────────────────────────────────────
+
+function computeSectorResult(
+  sector: string,
+  stocks: any[]
+): SectorRotationResult {
+  if (stocks.length === 0) {
+    return {
+      sector,
+      displayName: SECTOR_DISPLAY_NAMES[sector] ?? sector,
+      rotationScore: 50,
+      direction: 'NETRAL',
+      stockCount: 0,
+      akumulasiCount: 0,
+      distribusiCount: 0,
+      topStocks: [],
+      momentum: 'STABIL',
+      previousScore: null,
+    };
+  }
+
+  // Weighted average readiness score
+  const scores = stocks.map(s => Number(s.readiness ?? s.readinessScore ?? 0));
+  const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+  // Flow bias counts
+  const akumulasiCount  = stocks.filter(s =>
+    (s.flowBias ?? '').toLowerCase().includes('akumulasi')).length;
+  const distribusiCount = stocks.filter(s =>
+    (s.flowBias ?? '').toLowerCase().includes('distribusi')).length;
+
+  // Rotation direction
+  let direction: RotationDirection = 'NETRAL';
+  const akumulasiRatio = akumulasiCount / stocks.length;
+  const distribusiRatio = distribusiCount / stocks.length;
+
+  if (avgScore > 60 && akumulasiRatio > 0.4) {
+    direction = 'MASUK';
+  } else if (avgScore < 40 && distribusiRatio > 0.4) {
+    direction = 'KELUAR';
+  }
+
+  // Top 3 stocks by readiness score
+  const topStocks = [...stocks]
+    .sort((a, b) =>
+      Number(b.readiness ?? b.readinessScore ?? 0) -
+      Number(a.readiness ?? a.readinessScore ?? 0))
+    .slice(0, 3)
+    .map(s => ({
+      symbol:        s.symbol,
+      companyName:   s.name ?? s.companyName ?? s.symbol,
+      readinessScore: Number(s.readiness ?? s.readinessScore ?? 0),
+      cyclePosition: s.cyclePosition ?? null,
+      flowBias:      s.flowBias ?? null,
+    }));
+
+  // Momentum vs previous cache
+  const prevScore = _previousScores[sector] ?? null;
+  let momentum: SectorRotationResult['momentum'] = 'STABIL';
+  if (prevScore !== null) {
+    if (avgScore > prevScore + 3)  momentum = 'NAIK';
+    if (avgScore < prevScore - 3)  momentum = 'TURUN';
+  }
+
+  return {
+    sector,
+    displayName: SECTOR_DISPLAY_NAMES[sector] ?? sector,
+    rotationScore: Number(avgScore.toFixed(1)),
+    direction,
+    stockCount:    stocks.length,
+    akumulasiCount,
+    distribusiCount,
+    topStocks,
+    momentum,
+    previousScore: prevScore,
+  };
+}
+
+function buildSnapshot(sectors: SectorRotationResult[]): SectorRotationSnapshot {
+  const hotSectors  = sectors.filter(s => s.direction === 'MASUK' && s.rotationScore > 60)
+    .sort((a, b) => b.rotationScore - a.rotationScore)
+    .map(s => s.sector);
+  const coldSectors = sectors.filter(s => s.direction === 'KELUAR' && s.rotationScore < 40)
+    .sort((a, b) => a.rotationScore - b.rotationScore)
+    .map(s => s.sector);
+
+  // Rotation strength: how many sectors are clearly moving
+  const movingCount = sectors.filter(s => s.direction !== 'NETRAL').length;
+  const rotationStrength: SectorRotationSnapshot['rotationStrength'] =
+    movingCount >= 3 ? 'KUAT' :
+    movingCount >= 1 ? 'SEDANG' : 'LEMAH';
+
+  // Dominant theme
+  let dominantTheme = 'Tidak ada rotasi signifikan terdeteksi';
+  if (hotSectors.length > 0 && coldSectors.length > 0) {
+    const hotNames  = hotSectors.slice(0, 2)
+      .map(s => SECTOR_DISPLAY_NAMES[s] ?? s).join(' & ');
+    const coldNames = coldSectors.slice(0, 2)
+      .map(s => SECTOR_DISPLAY_NAMES[s] ?? s).join(' & ');
+    dominantTheme = `Rotasi dari ${coldNames} ke ${hotNames}`;
+  } else if (hotSectors.length > 0) {
+    const hotNames = hotSectors.slice(0, 2)
+      .map(s => SECTOR_DISPLAY_NAMES[s] ?? s).join(' & ');
+    dominantTheme = `Akumulasi institusional di ${hotNames}`;
+  } else if (coldSectors.length > 0) {
+    const coldNames = coldSectors.slice(0, 2)
+      .map(s => SECTOR_DISPLAY_NAMES[s] ?? s).join(' & ');
+    dominantTheme = `Distribusi terdeteksi di ${coldNames}`;
+  }
+
+  return {
+    sectors: sectors.sort((a, b) => b.rotationScore - a.rotationScore),
+    hotSectors,
+    coldSectors,
+    rotationStrength,
+    dominantTheme,
+    computedAt: new Date().toISOString(),
+    isStale: false,
+  };
+}
+
+// ── Public API ────────────────────────────────────────────
+
+export async function computeSectorRotation(
+  allStocks: any[]
+): Promise<SectorRotationSnapshot> {
+  if (isCacheValid() && _cache) {
+    return _cache;
+  }
+
+  try {
+    // Save previous scores before recomputing
+    if (_cache) {
+      _previousScores = {};
+      _cache.sectors.forEach(s => {
+        _previousScores[s.sector] = s.rotationScore;
+      });
+    }
+
+    // Group stocks by sector
+    const sectorMap = new Map<string, any[]>();
+    for (const stock of allStocks) {
+      const sector = stock.sector ?? 'Unknown';
+      if (!sectorMap.has(sector)) sectorMap.set(sector, []);
+      sectorMap.get(sector)!.push(stock);
+    }
+
+    // Remove unknown sector from display if too many nulls
+    sectorMap.delete('Unknown');
+
+    // Compute per sector
+    const results: SectorRotationResult[] = [];
+    for (const [sector, stocks] of sectorMap) {
+      results.push(computeSectorResult(sector, stocks));
+    }
+
+    const snapshot = buildSnapshot(results);
+
+    // Update cache
+    _cache = snapshot;
+    _cacheTimestamp = Date.now();
+
+    return snapshot;
+
+  } catch (err) {
+    console.error('[sectorRotationEngine] Error:', err);
+    if (_cache) return { ..._cache, isStale: true };
+    return {
+      sectors: [], hotSectors: [], coldSectors: [],
+      rotationStrength: 'LEMAH',
+      dominantTheme: 'Data tidak tersedia',
+      computedAt: new Date().toISOString(),
+      isStale: true,
+    };
+  }
+}
+
+export function invalidateSectorCache(): void {
+  _cache = null;
+  _cacheTimestamp = 0;
+}
+
+---
+
+PART 2 — Create server/engine/macroContext.ts
+
+/**
+ * ============================================================
+ * MACRO CONTEXT ENGINE v1.0
+ * ============================================================
+ * Fetches commodity prices and forex data from free public APIs.
+ * Maps macro signals to sector implications.
+ * Cross-references with sector rotation data.
+ *
+ * DATA SOURCES (all free, no API key required):
+ *   Oil (WTI): https://query1.finance.yahoo.com/v8/finance/chart/CL=F
+ *   Gold:      https://query1.finance.yahoo.com/v8/finance/chart/GC=F
+ *   USD/IDR:   https://query1.finance.yahoo.com/v8/finance/chart/USDIDR=X
+ *   CPO/Coal:  already in altDataFetcher.ts
+ *
+ * CACHE TTL: 60 minutes (macro data changes slowly)
+ * ============================================================
+ */
+
+export interface CommodityPrice {
+  name: string;
+  currentPrice: number | null;
+  change5d: number | null;      // % change over 5 days
+  change5dAbs: number | null;   // absolute change
+  trend: 'NAIK' | 'TURUN' | 'STABIL' | null;
+  unit: string;
+  fetchedAt: string;
+  source: 'LIVE' | 'FALLBACK';
+}
+
+export interface MacroSignal {
+  type: string;                 // e.g. 'oil_up', 'idr_weak'
+  sector: string;               // affected sector
+  effect: 'POSITIF' | 'NEGATIF' | 'NETRAL';
+  strength: 'KUAT' | 'SEDANG' | 'LEMAH';
+  description: string;          // Bahasa Indonesia
+}
+
+export interface MacroContextResult {
+  oil:     CommodityPrice;
+  gold:    CommodityPrice;
+  usdIdr:  CommodityPrice;
+  signals: MacroSignal[];
+  marketSentiment: 'RISK_ON' | 'RISK_OFF' | 'NETRAL';
+  sentimentReason: string;
+  computedAt: string;
+  isStale: boolean;
+}
+
+// ── Fallback prices (updated periodically) ───────────────
+
+const FALLBACKS = {
+  oil:    { price: 82.5,   unit: 'USD/barrel', name: 'Minyak WTI' },
+  gold:   { price: 2320.0, unit: 'USD/oz',     name: 'Emas' },
+  usdIdr: { price: 15850,  unit: 'IDR/USD',    name: 'USD/IDR' },
+};
+
+// ── Cache ─────────────────────────────────────────────────
+
+let _macroCache: MacroContextResult | null = null;
+let _macroCacheTime = 0;
+const MACRO_TTL = 60 * 60 * 1000; // 60 minutes
+
+function isMacroCacheValid(): boolean {
+  return _macroCache !== null && Date.now() - _macroCacheTime < MACRO_TTL;
+}
+
+// ── Yahoo Finance fetcher ─────────────────────────────────
+
+async function fetchYahooPrice(
+  ticker: string,
+  name: string,
+  unit: string
+): Promise<CommodityPrice> {
+  const now = new Date().toISOString();
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=10d`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    const closes = data?.chart?.result?.[0]?.indicators
+      ?.quote?.[0]?.close as (number | null)[];
+
+    if (!closes || closes.length < 2) throw new Error('No price data');
+
+    // Filter nulls
+    const valid = closes.filter((p): p is number => p !== null && isFinite(p));
+    if (valid.length < 2) throw new Error('Insufficient valid prices');
+
+    const current = valid[valid.length - 1];
+    const fiveDayAgo = valid[Math.max(0, valid.length - 6)];
+    const change5d = fiveDayAgo > 0
+      ? Number(((current - fiveDayAgo) / fiveDayAgo * 100).toFixed(2))
+      : null;
+    const change5dAbs = fiveDayAgo > 0
+      ? Number((current - fiveDayAgo).toFixed(2))
+      : null;
+
+    const trend: CommodityPrice['trend'] =
+      change5d === null ? null :
+      change5d > 1 ? 'NAIK' :
+      change5d < -1 ? 'TURUN' : 'STABIL';
+
+    return {
+      name, currentPrice: Number(current.toFixed(2)),
+      change5d, change5dAbs, trend, unit,
+      fetchedAt: now, source: 'LIVE',
+    };
+
+  } catch (err) {
+    console.warn(`[macroContext] ${ticker} fetch failed:`, err);
+    const fallback = ticker === 'CL=F' ? FALLBACKS.oil
+      : ticker === 'GC=F' ? FALLBACKS.gold
+      : FALLBACKS.usdIdr;
+
+    return {
+      name: fallback.name,
+      currentPrice: fallback.price,
+      change5d: null, change5dAbs: null, trend: null,
+      unit: fallback.unit, fetchedAt: now, source: 'FALLBACK',
+    };
+  }
+}
+
+// ── Signal generator ──────────────────────────────────────
+
+function generateMacroSignals(
+  oil: CommodityPrice,
+  gold: CommodityPrice,
+  usdIdr: CommodityPrice,
+  cpoTrend: string | null,
+  coalTrend: string | null,
+): MacroSignal[] {
+  const signals: MacroSignal[] = [];
+
+  // Oil signals
+  if (oil.change5d !== null) {
+    if (oil.change5d > 5) {
+      signals.push({
+        type: 'oil_surge',
+        sector: 'Energy',
+        effect: 'POSITIF',
+        strength: 'KUAT',
+        description: `Minyak naik ${oil.change5d.toFixed(1)}% dalam 5 hari — menguntungkan saham energi`,
+      });
+    } else if (oil.change5d > 2) {
+      signals.push({
+        type: 'oil_up',
+        sector: 'Energy',
+        effect: 'POSITIF',
+        strength: 'SEDANG',
+        description: `Minyak menguat ${oil.change5d.toFixed(1)}% — positif untuk sektor energi`,
+      });
+    } else if (oil.change5d < -5) {
+      signals.push({
+        type: 'oil_drop',
+        sector: 'Energy',
+        effect: 'NEGATIF',
+        strength: 'KUAT',
+        description: `Minyak turun ${Math.abs(oil.change5d).toFixed(1)}% — tekanan pada saham energi`,
+      });
+    }
+  }
+
+  // USD/IDR signals
+  if (usdIdr.change5d !== null) {
+    // IDR weakening = USD/IDR rate going up
+    if (usdIdr.change5d > 1.5) {
+      signals.push({
+        type: 'idr_weak',
+        sector: 'Financials',
+        effect: 'NEGATIF',
+        strength: 'SEDANG',
+        description: `Rupiah melemah ${usdIdr.change5d.toFixed(1)}% — waspada tekanan aliran asing`,
+      });
+    } else if (usdIdr.change5d < -1.0) {
+      signals.push({
+        type: 'idr_strong',
+        sector: 'Financials',
+        effect: 'POSITIF',
+        strength: 'SEDANG',
+        description: `Rupiah menguat ${Math.abs(usdIdr.change5d).toFixed(1)}% — positif untuk aliran asing masuk`,
+      });
+    }
+  }
+
+  // Gold signals (risk-off indicator)
+  if (gold.change5d !== null) {
+    if (gold.change5d > 3) {
+      signals.push({
+        type: 'gold_surge',
+        sector: 'ALL',
+        effect: 'NEGATIF',
+        strength: 'SEDANG',
+        description: `Emas naik ${gold.change5d.toFixed(1)}% — indikasi risk-off, investor cari aset aman`,
+      });
+    }
+  }
+
+  // CPO signal
+  if (cpoTrend === 'NAIK') {
+    signals.push({
+      type: 'cpo_up',
+      sector: 'Consumer Staples',
+      effect: 'POSITIF',
+      strength: 'SEDANG',
+      description: 'Harga CPO menguat — positif untuk emiten perkebunan dan konsumer',
+    });
+  } else if (cpoTrend === 'TURUN') {
+    signals.push({
+      type: 'cpo_down',
+      sector: 'Consumer Staples',
+      effect: 'NEGATIF',
+      strength: 'LEMAH',
+      description: 'Harga CPO melemah — tekanan marginal pada emiten perkebunan',
+    });
+  }
+
+  // Coal signal
+  if (coalTrend === 'TURUN') {
+    signals.push({
+      type: 'coal_down',
+      sector: 'Energy',
+      effect: 'NEGATIF',
+      strength: 'SEDANG',
+      description: 'Harga batu bara HBA menurun — tekanan pada emiten pertambangan batu bara',
+    });
+  } else if (coalTrend === 'NAIK') {
+    signals.push({
+      type: 'coal_up',
+      sector: 'Energy',
+      effect: 'POSITIF',
+      strength: 'KUAT',
+      description: 'Harga batu bara HBA menguat — katalis positif untuk ADRO, BUMI, SGER',
+    });
+  }
+
+  return signals;
+}
+
+function computeSentiment(
+  signals: MacroSignal[],
+  goldChange: number | null
+): { sentiment: MacroContextResult['marketSentiment']; reason: string } {
+  const negativeCount = signals.filter(s => s.effect === 'NEGATIF').length;
+  const positiveCount = signals.filter(s => s.effect === 'POSITIF').length;
+
+  if (goldChange !== null && goldChange > 3 && negativeCount > positiveCount) {
+    return {
+      sentiment: 'RISK_OFF',
+      reason: 'Emas menguat dan sinyal makro negatif mendominasi — investor defensif',
+    };
+  }
+  if (positiveCount > negativeCount && positiveCount >= 2) {
+    return {
+      sentiment: 'RISK_ON',
+      reason: 'Sinyal makro positif mendominasi — kondisi mendukung untuk ekuitas',
+    };
+  }
+  return {
+    sentiment: 'NETRAL',
+    reason: 'Sinyal makro campuran — tidak ada bias jelas saat ini',
+  };
+}
+
+// ── Public API ────────────────────────────────────────────
+
+export async function getMacroContext(
+  cpoTrend: string | null = null,
+  coalTrend: string | null = null
+): Promise<MacroContextResult> {
+  if (isMacroCacheValid() && _macroCache) {
+    return _macroCache;
+  }
+
+  const [oil, gold, usdIdr] = await Promise.allSettled([
+    fetchYahooPrice('CL=F',     'Minyak WTI', 'USD/barrel'),
+    fetchYahooPrice('GC=F',     'Emas',        'USD/oz'),
+    fetchYahooPrice('USDIDR=X', 'USD/IDR',     'IDR/USD'),
+  ]);
+
+  const oilData    = oil.status    === 'fulfilled' ? oil.value
+    : { name:'Minyak WTI', currentPrice: FALLBACKS.oil.price, change5d:null, change5dAbs:null, trend:null, unit:'USD/barrel', fetchedAt:new Date().toISOString(), source:'FALLBACK' as const };
+  const goldData   = gold.status   === 'fulfilled' ? gold.value
+    : { name:'Emas', currentPrice: FALLBACKS.gold.price, change5d:null, change5dAbs:null, trend:null, unit:'USD/oz', fetchedAt:new Date().toISOString(), source:'FALLBACK' as const };
+  const usdIdrData = usdIdr.status === 'fulfilled' ? usdIdr.value
+    : { name:'USD/IDR', currentPrice: FALLBACKS.usdIdr.price, change5d:null, change5dAbs:null, trend:null, unit:'IDR/USD', fetchedAt:new Date().toISOString(), source:'FALLBACK' as const };
+
+  const signals = generateMacroSignals(
+    oilData, goldData, usdIdrData, cpoTrend, coalTrend
+  );
+
+  const { sentiment, reason } = computeSentiment(signals, goldData.change5d);
+
+  const result: MacroContextResult = {
+    oil:    oilData,
+    gold:   goldData,
+    usdIdr: usdIdrData,
+    signals,
+    marketSentiment: sentiment,
+    sentimentReason: reason,
+    computedAt: new Date().toISOString(),
+    isStale: false,
+  };
+
+  _macroCache    = result;
+  _macroCacheTime = Date.now();
+  return result;
+}
+
+export function invalidateMacroCache(): void {
+  _macroCache    = null;
+  _macroCacheTime = 0;
+}
+
+---
+
+PART 3 — Add API endpoints to server/routes.ts
+
+Append AFTER all existing endpoints. Do not touch anything else.
+
+// GET /api/sector-rotation
+// Returns sector rotation snapshot
+app.get('/api/sector-rotation', async (req, res) => {
+  try {
+    const { storage } = await import('./storage');
+    const { computeSectorRotation } = await import('./engine/sectorRotationEngine');
+    const allStocks = await storage.getAllStocks();
+    const snapshot = await computeSectorRotation(allStocks as any[]);
+    res.status(200).json(snapshot);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+// GET /api/macro-context
+// Returns macro context with commodity prices and sector signals
+app.get('/api/macro-context', async (req, res) => {
+  try {
+    const { getMacroContext } = await import('./engine/macroContext');
+    const { getAltDataSnapshot } = await import('./engine/altDataFetcher');
+
+    // Get CPO and coal trends from existing alt data
+    const altData = await getAltDataSnapshot();
+    const cpoTrend  = altData.cpo.trend;
+    const coalTrend = altData.coal.trend;
+
+    const result = await getMacroContext(cpoTrend, coalTrend);
+    res.status(200).json(result);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
+---
+
+PART 4 — Enhance PasarPage.tsx
+
+Modify client/src/pages/PasarPage.tsx.
+
+Add two new fetches on mount alongside existing alt data fetch:
+
+  const [sectorRotation, setSectorRotation] = useState<any>(null);
+  const [macroContext, setMacroContext] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/sector-rotation')
+      .then(r => r.json())
+      .then(setSectorRotation)
+      .catch(() => {});
+
+    fetch('/api/macro-context')
+      .then(r => r.json())
+      .then(setMacroContext)
+      .catch(() => {});
+  }, []);
+
+SECTION A — Add "KONDISI MAKRO SAAT INI" panel
+Insert this ABOVE the existing alt data section (DATA ALTERNATIF).
+
+Only render if macroContext exists.
+
+Container:
+  mt-6 mb-4
+  Label: "KONDISI MAKRO SAAT INI" IBM Plex Mono text-[10px]
+    tracking-[0.2em] text-[#38BDF8] uppercase mb-3
+  Sub: "Sinyal komoditas dan forex yang mempengaruhi sektor IDX"
+    IBM Plex Mono text-[10px] text-[#6b7280] mb-4
+
+Market sentiment bar:
+  bg-[#161616] border border-[#ffffff08] rounded-md px-4 py-3 mb-4
+  flex items-center justify-between
+
+  Left: sentiment badge
+    RISK_ON:  bg-emerald-500/10 text-emerald-400 border-emerald-500/30
+    RISK_OFF: bg-red-500/10 text-red-400 border-red-500/30
+    NETRAL:   bg-[#ffffff06] text-[#6b7280] border-[#ffffff10]
+    Border rounded-sm px-3 py-1 IBM Plex Mono text-xs
+    Text: "RISK ON" / "RISK OFF" / "NETRAL"
+
+  Right: sentiment reason
+    IBM Plex Mono text-[10px] text-[#6b7280] max-w-sm text-right
+    macroContext.sentimentReason
+
+4-column commodity grid: grid grid-cols-4 gap-3 mb-4
+
+Each commodity card (oil, gold, usdIdr, CPO from altData):
+  bg-[#161616] border border-[#ffffff08] rounded-md p-3
+  
+  Label: IBM Plex Mono text-[9px] tracking-widest text-[#6b7280] uppercase mb-1
+  Price: IBM Plex Mono text-lg font-bold text-white
+    Format prices appropriately:
+      oil/gold: USD {price.toLocaleString('en-US', {minimumFractionDigits:2})}
+      usdIdr: Rp {price.toLocaleString('id-ID')}
+      cpo from altData: Rp {priceIDR}/kg or USD {priceUSD}/MT
+
+  Change badge (if change5d available):
+    change5d > 0: text-emerald-400 "▲ +{change5d}%"
+    change5d < 0: text-red-400 "▼ {change5d}%"
+    null: text-[#ffffff20] "—"
+    IBM Plex Mono text-[10px] mt-1
+
+  Source badge: "Live" emerald or "Fallback" amber (same as existing alt data)
+
+Macro signals list (if signals exist):
+  bg-[#161616] border border-[#ffffff08] rounded-md p-4 mb-4
+  Label: "SINYAL MAKRO AKTIF" IBM Plex Mono text-[9px]
+    tracking-widest text-[#6b7280] uppercase mb-3
+
+  Each signal row: flex items-start gap-3 py-2
+    border-b border-[#ffffff06] last:border-0
+    
+    Effect badge:
+      POSITIF: text-emerald-400 "↑"
+      NEGATIF: text-red-400 "↓"
+      IBM Plex Mono text-sm font-bold w-4 flex-shrink-0
+    
+    Sector badge:
+      bg-[#ffffff06] border border-[#ffffff10] rounded-sm
+      px-2 py-0.5 IBM Plex Mono text-[9px] text-[#38BDF8]
+      Use SECTOR_DISPLAY_NAMES equivalent (map inline)
+    
+    Description:
+      IBM Plex Mono text-[10px] text-[#9ca3af] flex-1
+      macroSignal.description
+
+  If no signals: IBM Plex Mono text-[10px] text-[#ffffff20]
+    "Tidak ada sinyal makro signifikan saat ini"
+
+SECTION B — Replace existing sector heatmap placeholder
+Find the "PERFORMA SEKTOR HARI INI" card (currently showing
+static —% placeholders). Replace its content with live data.
+
+Only render live data if sectorRotation exists.
+
+Keep the card container and header exactly as is.
+Replace the static grid content with:
+
+Dominant theme banner (if sectorRotation.dominantTheme exists):
+  bg-[#0d1a0d] border border-emerald-500/15 rounded-sm
+  px-3 py-2 mb-3 IBM Plex Mono text-[10px] text-emerald-400/80
+  "◎ {sectorRotation.dominantTheme}"
+
+Sector grid: grid grid-cols-3 gap-2
+
+Each sector block (from sectorRotation.sectors):
+  bg-[#111111] border rounded-sm p-3
+  Border color:
+    MASUK:  border-emerald-500/30
+    KELUAR: border-red-500/30
+    NETRAL: border-[#ffffff08]
+  
+  Sector name: IBM Plex Mono text-[10px] text-[#6b7280] truncate mb-1
+    Use sector.displayName
+  
+  Score: IBM Plex Mono text-xl font-bold
+    MASUK:  text-emerald-400
+    KELUAR: text-red-400
+    NETRAL: text-white
+    Value: sector.rotationScore
+  
+  Direction badge below score:
+    MASUK:  text-emerald-400 text-[9px] "↑ Masuk"
+    KELUAR: text-red-400 text-[9px]    "↓ Keluar"
+    NETRAL: text-[#6b7280] text-[9px]  "→ Netral"
+  
+  Momentum indicator (top right corner, absolute):
+    NAIK:  "▲" text-emerald-400/60 text-[9px]
+    TURUN: "▼" text-red-400/60 text-[9px]
+
+SECTION C — Add "SAHAM UNGGULAN PER SEKTOR" panel
+Add this BELOW the sector heatmap card, ABOVE the Top Akumulasi card.
+
+Only render if sectorRotation?.hotSectors?.length > 0
+
+Container: bg-[#161616] border border-[#ffffff08] rounded-md p-4 mb-4
+
+Header: "SAHAM UNGGULAN DI SEKTOR PANAS"
+  IBM Plex Mono text-[9px] tracking-widest text-[#6b7280] uppercase mb-3
+
+For each hot sector (max 2), show top 3 stocks:
+
+Sector label: IBM Plex Mono text-[10px] text-[#38BDF8] mb-2
+  Use displayName
+
+Each stock row: flex items-center gap-3 py-1.5
+  border-b border-[#ffffff06] last:border-0
+
+  Logo: same Stockbit CDN pattern w-5 h-5
+  Symbol: Sora text-sm font-bold text-white w-14
+  Score badge: IBM Plex Mono text-xs font-bold
+    emerald if ≥60, amber if 40-59, red if <40
+  
+  cyclePosition badge (if available):
+    ENTRY_WINDOW: "Entry Window" text-emerald-400/70
+    KONFIRMASI_MULAI: "Konfirmasi" text-sky-400/70
+    IBM Plex Mono text-[9px]
+  
+  DETAIL → button: same style as Radar
+    Navigates to /stock/:symbol
+
+---
+
+SAFETY RULES:
+1. New files: server/engine/sectorRotationEngine.ts,
+              server/engine/macroContext.ts
+2. Modified: server/routes.ts (append only),
+             client/src/pages/PasarPage.tsx
+3. NEVER touch any existing engine files
+4. NEVER modify existing endpoints
+5. Run runTests.ts — BBCA=74 and UNVR=10 must pass
+6. Test GET /api/sector-rotation returns valid JSON
+   with sectors array containing at least Financials and Energy
+7. Test GET /api/macro-context returns valid JSON
+   with oil, gold, usdIdr fields
+8. Verify PasarPage loads without console errors
+9. Verify sector heatmap shows real scores not — placeholders
+10. Report all files created or modified
