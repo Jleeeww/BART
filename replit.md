@@ -63,6 +63,8 @@ A Market Replay Simulator is included for pre-live validation of AI analysis usi
 - `server/engine/scoreMonitor.ts`: Score distribution monitor (HEALTHY/WARNING/CRITICAL health status)
 - `server/engine/backtestEngine.ts`: Backtesting pipeline for historical signal accuracy validation
 - `server/engine/distributionWarning.ts`: Distribution Early Warning System (5-condition detector for accumulation→distribution transitions)
+- `server/engine/sectorRotationEngine.ts`: Sector Rotation Intelligence — groups stocks by sector, computes weighted rotation scores, MASUK/KELUAR/NETRAL direction, momentum, dominantTheme. 15min/60min cache. Exposes `computeSectorRotation`, `getCachedSectorRotation`, `invalidateSectorCache`.
+- `server/engine/macroContext.ts`: Macro Context — Yahoo Finance live oil/gold/USDIDR (6s timeout, AbortController) + cpo/coal trends → sector signals + RISK_ON/RISK_OFF/NETRAL sentiment. 60min cache, input-aware key (cpo/coal trends).
 
 ### Key Design Patterns
 - **Shared Types**: Centralized definition of database schemas and API contracts for type safety.

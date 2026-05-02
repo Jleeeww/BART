@@ -2539,5 +2539,54 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/sector-rotation
+  // Returns sector rotation snapshot
+  // Reads from /api/stocks (merged DB + fallback universe) to ensure all
+  // sectors are represented, including Energy/Industrials/Real Estate which
+  // currently exist only as fallback rows.
+  // Cache-aware: skips the internal /api/stocks fetch when the engine cache
+  // is still warm (15min market hours / 60min off-hours).
+  app.get('/api/sector-rotation', async (req, res) => {
+    try {
+      const { computeSectorRotation, getCachedSectorRotation } =
+        await import('./engine/sectorRotationEngine');
+
+      // Fast path — return cached snapshot without fetching stocks
+      const cached = getCachedSectorRotation();
+      if (cached) {
+        return res.status(200).json(cached);
+      }
+
+      // Slow path — fetch merged universe and recompute
+      const port = process.env.PORT || 5000;
+      const stocksRes = await fetch(`http://localhost:${port}/api/stocks`);
+      if (!stocksRes.ok) throw new Error(`Failed to fetch /api/stocks: ${stocksRes.status}`);
+      const allStocks = await stocksRes.json();
+      const snapshot = await computeSectorRotation(allStocks as any[]);
+      res.status(200).json(snapshot);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // GET /api/macro-context
+  // Returns macro context with commodity prices and sector signals
+  app.get('/api/macro-context', async (req, res) => {
+    try {
+      const { getMacroContext } = await import('./engine/macroContext');
+      const { getAltDataSnapshot } = await import('./engine/altDataFetcher');
+
+      // Get CPO and coal trends from existing alt data
+      const altData = await getAltDataSnapshot();
+      const cpoTrend  = altData.cpo.trend;
+      const coalTrend = altData.coal.trend;
+
+      const result = await getMacroContext(cpoTrend, coalTrend);
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   return httpServer;
 }

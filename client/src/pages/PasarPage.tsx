@@ -14,6 +14,63 @@ interface StockData {
   flowBias?: string;
 }
 
+interface SectorRotationSector {
+  sector: string;
+  displayName: string;
+  rotationScore: number;
+  direction: "MASUK" | "KELUAR" | "NETRAL";
+  stockCount: number;
+  akumulasiCount: number;
+  distribusiCount: number;
+  topStocks: {
+    symbol: string;
+    companyName: string;
+    readinessScore: number;
+    cyclePosition: string | null;
+    flowBias: string | null;
+  }[];
+  momentum: "NAIK" | "TURUN" | "STABIL";
+  previousScore: number | null;
+}
+
+interface SectorRotationSnapshot {
+  sectors: SectorRotationSector[];
+  hotSectors: string[];
+  coldSectors: string[];
+  rotationStrength: "KUAT" | "SEDANG" | "LEMAH";
+  dominantTheme: string;
+  computedAt: string;
+  isStale: boolean;
+}
+
+interface MacroCommodity {
+  name: string;
+  currentPrice: number | null;
+  change5d: number | null;
+  trend: "NAIK" | "TURUN" | "STABIL" | null;
+  unit: string;
+  source: "LIVE" | "FALLBACK";
+}
+
+interface MacroSignal {
+  type: string;
+  sector: string;
+  effect: "POSITIF" | "NEGATIF" | "NETRAL";
+  strength: "KUAT" | "SEDANG" | "LEMAH";
+  description: string;
+}
+
+interface MacroContextSnapshot {
+  oil: MacroCommodity;
+  gold: MacroCommodity;
+  usdIdr: MacroCommodity;
+  signals: MacroSignal[];
+  marketSentiment: "RISK_ON" | "RISK_OFF" | "NETRAL";
+  sentimentReason: string;
+  computedAt: string;
+  isStale: boolean;
+}
+
 interface AltDataSnapshot {
   weather: {
     regionId: string;
@@ -139,6 +196,8 @@ export default function PasarPage() {
   const [altData, setAltData] = useState<AltDataSnapshot | null>(null);
   const [altLoading, setAltLoading] = useState(true);
   const [altError, setAltError] = useState(false);
+  const [sectorRotation, setSectorRotation] = useState<SectorRotationSnapshot | null>(null);
+  const [macroContext, setMacroContext] = useState<MacroContextSnapshot | null>(null);
 
   const { data: stocks } = useQuery<StockData[]>({ queryKey: ["/api/stocks"] });
 
@@ -154,6 +213,26 @@ export default function PasarPage() {
       .then((d) => { setAltData(d); setAltError(false); })
       .catch(() => setAltError(true))
       .finally(() => setAltLoading(false));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/sector-rotation")
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        if (data && Array.isArray(data.sectors)) setSectorRotation(data);
+      })
+      .catch(() => {});
+
+    fetch("/api/macro-context")
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        if (data && data.oil && data.gold && data.usdIdr && Array.isArray(data.signals)) {
+          setMacroContext(data);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const topAkumulasi = useMemo(() => {
@@ -247,19 +326,167 @@ export default function PasarPage() {
               </span>
               <LiveIDXBadge />
             </div>
-            <div className="grid grid-cols-3 gap-2 mt-2">
-              {SECTORS.map((s) => (
-                <div
-                  key={s}
-                  className="rounded-sm p-3 transition-colors hover:border-[#ffffff15]"
-                  style={{ background: "#111111", border: "1px solid rgba(255,255,255,0.03)" }}
-                >
-                  <p className="text-[10px] truncate" style={{ fontFamily: mono, color: "#6b7280" }}>{s}</p>
-                  <p className="text-sm font-bold" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>—%</p>
+
+            {sectorRotation ? (
+              <>
+                {sectorRotation.dominantTheme && (
+                  <div
+                    className="rounded-sm px-3 py-2 mb-3"
+                    style={{
+                      background: "#0d1a0d",
+                      border: "1px solid rgba(16,185,129,0.15)",
+                      fontFamily: mono,
+                      fontSize: 10,
+                      color: "rgba(52,211,153,0.8)",
+                    }}
+                    data-testid="banner-dominant-theme"
+                  >
+                    ◎ {sectorRotation.dominantTheme}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-2">
+                  {sectorRotation.sectors?.map((s: any) => {
+                    const borderColor =
+                      s.direction === "MASUK" ? "rgba(16,185,129,0.3)" :
+                      s.direction === "KELUAR" ? "rgba(239,68,68,0.3)" :
+                      "rgba(255,255,255,0.03)";
+                    const scoreColor =
+                      s.direction === "MASUK" ? "#34d399" :
+                      s.direction === "KELUAR" ? "#f87171" :
+                      "#ffffff";
+                    const dirLabel =
+                      s.direction === "MASUK" ? "↑ Masuk" :
+                      s.direction === "KELUAR" ? "↓ Keluar" :
+                      "→ Netral";
+                    const dirColor =
+                      s.direction === "MASUK" ? "#34d399" :
+                      s.direction === "KELUAR" ? "#f87171" :
+                      "#6b7280";
+                    return (
+                      <div
+                        key={s.sector}
+                        className="rounded-sm p-3 transition-colors hover:border-[#ffffff15] relative"
+                        style={{ background: "#111111", border: `1px solid ${borderColor}` }}
+                        data-testid={`sector-tile-${s.sector}`}
+                      >
+                        {(s.momentum === "NAIK" || s.momentum === "TURUN") && (
+                          <span
+                            className="absolute top-2 right-2"
+                            style={{
+                              fontFamily: mono,
+                              fontSize: 9,
+                              color: s.momentum === "NAIK" ? "rgba(52,211,153,0.6)" : "rgba(248,113,113,0.6)",
+                            }}
+                          >
+                            {s.momentum === "NAIK" ? "▲" : "▼"}
+                          </span>
+                        )}
+                        <p className="text-[10px] truncate mb-1" style={{ fontFamily: mono, color: "#6b7280" }}>
+                          {s.displayName}
+                        </p>
+                        <p className="text-xl font-bold" style={{ fontFamily: mono, color: scoreColor }}>
+                          {s.rotationScore}
+                        </p>
+                        <p className="text-[9px] mt-0.5" style={{ fontFamily: mono, color: dirColor }}>
+                          {dirLabel}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {SECTORS.map((s) => (
+                  <div
+                    key={s}
+                    className="rounded-sm p-3"
+                    style={{ background: "#111111", border: "1px solid rgba(255,255,255,0.03)" }}
+                  >
+                    <p className="text-[10px] truncate" style={{ fontFamily: mono, color: "#6b7280" }}>{s}</p>
+                    <p className="text-sm font-bold" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>—%</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
+          {sectorRotation && sectorRotation.hotSectors.length > 0 && (
+            <div
+              className="rounded-md p-4 mb-4"
+              style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
+              data-testid="card-saham-unggulan"
+            >
+              <p className="text-[9px] tracking-widest uppercase mb-3" style={{ fontFamily: mono, color: "#6b7280" }}>
+                SAHAM UNGGULAN DI SEKTOR PANAS
+              </p>
+              {sectorRotation.hotSectors.slice(0, 2).map((sectorKey: string) => {
+                const sectorObj = sectorRotation.sectors.find((x) => x.sector === sectorKey);
+                if (!sectorObj) return null;
+                return (
+                  <div key={sectorKey} className="mb-4 last:mb-0">
+                    <p className="text-[10px] mb-2" style={{ fontFamily: mono, color: "#38BDF8" }}>
+                      {sectorObj.displayName}
+                    </p>
+                    {sectorObj.topStocks.map((ts, i) => {
+                      const scoreColor =
+                        ts.readinessScore >= 60 ? "#34d399" :
+                        ts.readinessScore >= 40 ? "#fbbf24" :
+                        "#f87171";
+                      const cycleLabel =
+                        ts.cyclePosition === "ENTRY_WINDOW" ? "Entry Window" :
+                        ts.cyclePosition === "KONFIRMASI_MULAI" ? "Konfirmasi" :
+                        null;
+                      const cycleColor =
+                        ts.cyclePosition === "ENTRY_WINDOW" ? "rgba(52,211,153,0.7)" :
+                        ts.cyclePosition === "KONFIRMASI_MULAI" ? "rgba(56,189,248,0.7)" :
+                        "#6b7280";
+                      return (
+                        <div
+                          key={ts.symbol}
+                          className="flex items-center gap-3 py-1.5"
+                          style={{ borderBottom: i < sectorObj.topStocks.length - 1 ? "1px solid rgba(255,255,255,0.02)" : "none" }}
+                          data-testid={`row-saham-unggulan-${ts.symbol}`}
+                        >
+                          <div
+                            className="w-5 h-5 rounded-sm flex-shrink-0 flex items-center justify-center overflow-hidden"
+                            style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
+                          >
+                            <img
+                              src={`https://assets.stockbit.com/logos/companies/${ts.symbol}.png`}
+                              alt={ts.symbol}
+                              className="w-3.5 h-3.5 object-contain"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          </div>
+                          <span className="text-sm font-bold text-white w-14" style={{ fontFamily: sora }}>
+                            {ts.symbol}
+                          </span>
+                          <span className="text-xs font-bold" style={{ fontFamily: mono, color: scoreColor }}>
+                            {ts.readinessScore}
+                          </span>
+                          {cycleLabel && (
+                            <span className="text-[9px]" style={{ fontFamily: mono, color: cycleColor }}>
+                              {cycleLabel}
+                            </span>
+                          )}
+                          <a
+                            href={`/stock/${ts.symbol}`}
+                            className="ml-auto text-[10px] hover:text-white transition-colors"
+                            style={{ fontFamily: mono, color: "#6b7280" }}
+                            data-testid={`link-detail-${ts.symbol}`}
+                          >
+                            DETAIL →
+                          </a>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div>
@@ -357,6 +584,191 @@ export default function PasarPage() {
           </div>
         </div>
       </div>
+
+      {macroContext && (
+        <div className="mt-6 mb-4" data-testid="section-macro-context">
+          <p className="text-[10px] tracking-[0.2em] uppercase mb-3" style={{ fontFamily: mono, color: "#38BDF8" }}>
+            KONDISI MAKRO SAAT INI
+          </p>
+          <p className="text-[10px] mb-4" style={{ fontFamily: mono, color: "#6b7280" }}>
+            Sinyal komoditas dan forex yang mempengaruhi sektor IDX
+          </p>
+
+          <div
+            className="rounded-md px-4 py-3 mb-4 flex items-center justify-between"
+            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
+            data-testid="bar-market-sentiment"
+          >
+            {(() => {
+              const sentiment = macroContext.marketSentiment;
+              const bg =
+                sentiment === "RISK_ON" ? "rgba(16,185,129,0.1)" :
+                sentiment === "RISK_OFF" ? "rgba(239,68,68,0.1)" :
+                "rgba(255,255,255,0.02)";
+              const color =
+                sentiment === "RISK_ON" ? "#34d399" :
+                sentiment === "RISK_OFF" ? "#f87171" :
+                "#6b7280";
+              const border =
+                sentiment === "RISK_ON" ? "rgba(16,185,129,0.3)" :
+                sentiment === "RISK_OFF" ? "rgba(239,68,68,0.3)" :
+                "rgba(255,255,255,0.06)";
+              const label =
+                sentiment === "RISK_ON" ? "RISK ON" :
+                sentiment === "RISK_OFF" ? "RISK OFF" :
+                "NETRAL";
+              return (
+                <span
+                  className="px-3 py-1 rounded-sm border"
+                  style={{ background: bg, color, borderColor: border, fontFamily: mono, fontSize: 12 }}
+                  data-testid={`badge-sentiment-${sentiment}`}
+                >
+                  {label}
+                </span>
+              );
+            })()}
+            <span
+              className="max-w-sm text-right"
+              style={{ fontFamily: mono, fontSize: 10, color: "#6b7280" }}
+            >
+              {macroContext.sentimentReason}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            {(() => {
+              const cards: Array<{ key: string; label: string; price: string; change: number | null; source: string }> = [
+                {
+                  key: "oil",
+                  label: "MINYAK WTI",
+                  price: macroContext.oil?.currentPrice != null ? `USD ${macroContext.oil.currentPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—",
+                  change: macroContext.oil?.change5d ?? null,
+                  source: macroContext.oil?.source ?? "FALLBACK",
+                },
+                {
+                  key: "gold",
+                  label: "EMAS",
+                  price: macroContext.gold?.currentPrice != null ? `USD ${macroContext.gold.currentPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—",
+                  change: macroContext.gold?.change5d ?? null,
+                  source: macroContext.gold?.source ?? "FALLBACK",
+                },
+                {
+                  key: "usdIdr",
+                  label: "USD/IDR",
+                  price: macroContext.usdIdr?.currentPrice != null ? `Rp ${macroContext.usdIdr.currentPrice.toLocaleString("id-ID")}` : "—",
+                  change: macroContext.usdIdr?.change5d ?? null,
+                  source: macroContext.usdIdr?.source ?? "FALLBACK",
+                },
+                {
+                  key: "cpo",
+                  label: "CPO",
+                  price: altData?.cpo?.priceIDR
+                    ? `Rp ${altData.cpo.priceIDR.toLocaleString("id-ID")}/kg`
+                    : altData?.cpo?.priceUSD
+                      ? `USD ${altData.cpo.priceUSD}/MT`
+                      : "—",
+                  change: null,
+                  source: altData?.cpo?.source ?? "FALLBACK",
+                },
+              ];
+              return cards.map((c) => (
+                <div
+                  key={c.key}
+                  className="rounded-md p-3"
+                  style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
+                  data-testid={`card-macro-${c.key}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
+                      {c.label}
+                    </p>
+                    <SourceBadge source={c.source} />
+                  </div>
+                  <p className="text-lg font-bold text-white" style={{ fontFamily: mono }}>
+                    {c.price}
+                  </p>
+                  <p
+                    className="mt-1"
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 10,
+                      color: c.change == null ? "rgba(255,255,255,0.2)" : c.change > 0 ? "#34d399" : c.change < 0 ? "#f87171" : "#6b7280",
+                    }}
+                  >
+                    {c.change == null ? "—" : c.change > 0 ? `▲ +${c.change.toFixed(2)}%` : c.change < 0 ? `▼ ${c.change.toFixed(2)}%` : `→ 0.00%`}
+                  </p>
+                </div>
+              ));
+            })()}
+          </div>
+
+          <div
+            className="rounded-md p-4 mb-4"
+            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
+            data-testid="card-macro-signals"
+          >
+            <p className="text-[9px] tracking-widest uppercase mb-3" style={{ fontFamily: mono, color: "#6b7280" }}>
+              SINYAL MAKRO AKTIF
+            </p>
+            {macroContext.signals?.length ? (
+              macroContext.signals.map((sig: any, i: number) => {
+                const sectorMap: Record<string, string> = {
+                  "Financials": "Keuangan",
+                  "Energy": "Energi",
+                  "Industrials": "Industri",
+                  "Communication Services": "Telekomunikasi",
+                  "Consumer Staples": "Konsumer Primer",
+                  "Consumer Discretionary": "Konsumer Sekunder",
+                  "Real Estate": "Properti",
+                  "Basic Materials": "Material & Tambang",
+                  "ALL": "Semua Sektor",
+                };
+                return (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 py-2"
+                    style={{ borderBottom: i < macroContext.signals.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}
+                    data-testid={`row-signal-${sig.type}`}
+                  >
+                    <span
+                      className="font-bold w-4 flex-shrink-0"
+                      style={{
+                        fontFamily: mono,
+                        fontSize: 14,
+                        color: sig.effect === "POSITIF" ? "#34d399" : sig.effect === "NEGATIF" ? "#f87171" : "#6b7280",
+                      }}
+                    >
+                      {sig.effect === "POSITIF" ? "↑" : sig.effect === "NEGATIF" ? "↓" : "→"}
+                    </span>
+                    <span
+                      className="px-2 py-0.5 rounded-sm border flex-shrink-0"
+                      style={{
+                        background: "rgba(255,255,255,0.02)",
+                        borderColor: "rgba(255,255,255,0.06)",
+                        fontFamily: mono,
+                        fontSize: 9,
+                        color: "#38BDF8",
+                      }}
+                    >
+                      {sectorMap[sig.sector] ?? sig.sector}
+                    </span>
+                    <span
+                      className="flex-1"
+                      style={{ fontFamily: mono, fontSize: 10, color: "#9ca3af" }}
+                    >
+                      {sig.description}
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <p style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.2)" }}>
+                Tidak ada sinyal makro signifikan saat ini
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6">
         <p className="text-[10px] tracking-[0.2em] uppercase mb-3" style={{ fontFamily: mono, color: "#38BDF8" }} data-testid="text-alt-data-label">
