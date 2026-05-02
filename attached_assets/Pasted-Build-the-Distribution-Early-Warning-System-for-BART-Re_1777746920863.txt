@@ -1,0 +1,635 @@
+Build the Distribution Early Warning System for BART.
+Read everything before starting.
+
+CRITICAL CONSTRAINTS:
+- Do NOT touch bandarmologyCore.ts, bandarmologyCoreV1.ts,
+  radarEngine.ts, or any existing engine file
+- Do NOT modify any existing API endpoints
+- Do NOT break BBCA=74/WATCHLIST_PRIORITAS or UNVR=10/HINDARI_DULU
+- All changes are additive only
+
+---
+
+PART 1 — Create server/engine/distributionWarning.ts
+
+/**
+ * ============================================================
+ * DISTRIBUTION EARLY WARNING SYSTEM v1.0
+ * ============================================================
+ * Detects early signs of accumulation-to-distribution
+ * transition before price reacts.
+ *
+ * TRIGGER CONDITIONS (need ≥3 of 5 for WARNING):
+ *
+ * C1 — Campaign Aging (M14)
+ *   cyclePosition = WASPADAI_DISTRIBUSI
+ *   OR campaignAge > 12 AND score declining 2+ sessions
+ *
+ * C2 — Flow Weakening (M6)
+ *   M6 score declined ≥10pts over last 3 sessions
+ *   AND current M6 < 55
+ *
+ * C3 — Broker Side-Switch
+ *   Top-3 accumulators from prior 5 sessions now
+ *   appearing on net sell side. Skipped if brokerData null.
+ *
+ * C4 — Price Elasticity Rising (M15)
+ *   M15 score < 40 (price moving more per unit flow)
+ *
+ * C5 — Flow Decomposition Diverging (M11)
+ *   M11 alignmentScore < 20 (foreign/domestic decoupling)
+ *
+ * ALERT LEVELS:
+ *   PANTAU_DISTRIBUSI   1-2 conditions  amber
+ *   WASPADA_DISTRIBUSI  3 conditions    orange
+ *   BAHAYA_DISTRIBUSI   4-5 conditions  red
+ *   AMAN                0 conditions    none
+ * ============================================================
+ */
+
+import { db } from '../db';
+import { sessionHistory } from '../../shared/schema';
+import { eq, and, desc } from 'drizzle-orm';
+
+export type DistributionAlertLevel =
+  | 'AMAN'
+  | 'PANTAU_DISTRIBUSI'
+  | 'WASPADA_DISTRIBUSI'
+  | 'BAHAYA_DISTRIBUSI';
+
+export interface DistributionWarningResult {
+  symbol: string;
+  alertLevel: DistributionAlertLevel;
+  conditionsMet: number;
+  totalConditions: number;
+  conditions: {
+    c1_campaignAging:      boolean;
+    c2_flowWeakening:      boolean;
+    c3_brokerSideSwitch:   boolean | null; // null = data unavailable
+    c4_elasticityRising:   boolean;
+    c5_flowDiverging:      boolean;
+  };
+  details: string[];        // Bahasa Indonesia explanations
+  recommendation: string;   // What user should do
+  confidence: 'TINGGI' | 'SEDANG' | 'RENDAH';
+  checkedAt: string;
+}
+
+// ── Condition evaluators ──────────────────────────────────
+
+function evaluateC1(
+  cyclePosition: string | null,
+  campaignAge: number | null,
+  recentScores: number[]
+): { met: boolean; detail: string } {
+  if (cyclePosition === 'WASPADAI_DISTRIBUSI') {
+    return {
+      met: true,
+      detail: 'Kampanye sudah memasuki fase distribusi (>15 sesi)',
+    };
+  }
+  if (campaignAge !== null && campaignAge > 12) {
+    const declining = recentScores.length >= 2 &&
+      recentScores[recentScores.length - 1] 
+      recentScores[recentScores.length - 2];
+    if (declining) {
+      return {
+        met: true,
+        detail: `Kampanye ${campaignAge} sesi dan skor mulai menurun`,
+      };
+    }
+  }
+  return { met: false, detail: 'Kampanye masih dalam fase aktif normal' };
+}
+
+function evaluateC2(
+  m6ScoreHistory: number[]
+): { met: boolean; detail: string } {
+  if (m6ScoreHistory.length < 3) {
+    return { met: false, detail: 'Riwayat M6 tidak cukup' };
+  }
+  const recent3 = m6ScoreHistory.slice(-3);
+  const current = recent3[2];
+  const oldest  = recent3[0];
+  const drop    = oldest - current;
+
+  if (drop >= 10 && current < 55) {
+    return {
+      met: true,
+      detail: `Aliran dana melemah ${drop.toFixed(0)} poin dalam 3 sesi (M6: ${current.toFixed(0)})`,
+    };
+  }
+  return { met: false, detail: 'Aliran dana masih stabil' };
+}
+
+function evaluateC3(
+  currentBrokerData: unknown | null,
+  historicalBrokerData: (unknown | null)[]
+): { met: boolean | null; detail: string } {
+  // Skip if no broker data available (demo mode)
+  if (!currentBrokerData || !historicalBrokerData.some(b => b !== null)) {
+    return { met: null, detail: 'Data broker tidak tersedia (aktif dengan data live)' };
+  }
+
+  try {
+    // Parse current session sellers
+    const current = Array.isArray(currentBrokerData)
+      ? currentBrokerData as any[]
+      : JSON.parse(currentBrokerData as string);
+
+    // Get net sellers this session
+    const currentSellers = new Set(
+      current
+        .filter((b: any) => {
+          const netBuy  = Number(b.buyValue  ?? b.netBuy  ?? 0);
+          const netSell = Number(b.sellValue ?? b.netSell ?? 0);
+          return netSell > netBuy;
+        })
+        .map((b: any) => String(b.code ?? b.brokerCode ?? ''))
+        .filter(Boolean)
+    );
+
+    // Get top-3 accumulators from prior sessions
+    const priorAccumulators = new Map<string, number>();
+    for (const hist of historicalBrokerData) {
+      if (!hist) continue;
+      const brokers = Array.isArray(hist)
+        ? hist as any[]
+        : JSON.parse(hist as string);
+      brokers.forEach((b: any) => {
+        const netBuy  = Number(b.buyValue  ?? b.netBuy  ?? 0);
+        const netSell = Number(b.sellValue ?? b.netSell ?? 0);
+        if (netBuy > netSell) {
+          const code = String(b.code ?? b.brokerCode ?? '');
+          if (code) {
+            priorAccumulators.set(
+              code,
+              (priorAccumulators.get(code) ?? 0) + (netBuy - netSell)
+            );
+          }
+        }
+      });
+    }
+
+    // Top 3 prior accumulators
+    const top3 = Array.from(priorAccumulators.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([code]) => code);
+
+    // Check if any top accumulator is now selling
+    const switched = top3.filter(code => currentSellers.has(code));
+
+    if (switched.length > 0) {
+      return {
+        met: true,
+        detail: `Broker ${switched.join(', ')} yang sebelumnya akumulasi kini menjual`,
+      };
+    }
+    return { met: false, detail: 'Broker akumulator masih konsisten beli' };
+
+  } catch {
+    return { met: null, detail: 'Error parsing data broker' };
+  }
+}
+
+function evaluateC4(
+  m15Score: number | null
+): { met: boolean; detail: string } {
+  if (m15Score === null) {
+    return { met: false, detail: 'Skor elastisitas tidak tersedia' };
+  }
+  if (m15Score < 40) {
+    return {
+      met: true,
+      detail: `Kontrol harga melemah — elastisitas tinggi (M15: ${m15Score.toFixed(0)})`,
+    };
+  }
+  return { met: false, detail: 'Kontrol harga institusional masih kuat' };
+}
+
+function evaluateC5(
+  m11AlignmentScore: number | null
+): { met: boolean; detail: string } {
+  if (m11AlignmentScore === null) {
+    return { met: false, detail: 'Skor dekomposisi tidak tersedia' };
+  }
+  if (m11AlignmentScore < 20) {
+    return {
+      met: true,
+      detail: `Aliran asing dan domestik tidak sinkron (alignment: ${m11AlignmentScore.toFixed(0)})`,
+    };
+  }
+  return { met: false, detail: 'Aliran asing dan domestik masih selaras' };
+}
+
+// ── Alert level mapper ────────────────────────────────────
+
+function getAlertLevel(count: number): DistributionAlertLevel {
+  if (count >= 4) return 'BAHAYA_DISTRIBUSI';
+  if (count === 3) return 'WASPADA_DISTRIBUSI';
+  if (count >= 1) return 'PANTAU_DISTRIBUSI';
+  return 'AMAN';
+}
+
+function getRecommendation(
+  level: DistributionAlertLevel,
+  conditionsMet: number
+): string {
+  switch (level) {
+    case 'BAHAYA_DISTRIBUSI':
+      return 'Evaluasi posisi segera. Beberapa sinyal distribusi terkonfirmasi secara bersamaan.';
+    case 'WASPADA_DISTRIBUSI':
+      return 'Pantau dengan ketat. Jangan tambah posisi sampai sinyal membaik.';
+    case 'PANTAU_DISTRIBUSI':
+      return 'Waspadai perkembangan. Tesis masih berlaku tapi ada tanda-tanda awal perubahan.';
+    case 'AMAN':
+      return 'Struktur akumulasi masih intact. Tidak ada tanda distribusi terdeteksi.';
+  }
+}
+
+function getConfidence(
+  conditionsMet: number,
+  c3Available: boolean
+): 'TINGGI' | 'SEDANG' | 'RENDAH' {
+  if (!c3Available && conditionsMet >= 2) return 'SEDANG'; // missing broker data
+  if (conditionsMet >= 4) return 'TINGGI';
+  if (conditionsMet >= 2) return 'SEDANG';
+  return 'RENDAH';
+}
+
+// ── Main export ───────────────────────────────────────────
+
+export interface DistributionWarningInput {
+  symbol: string;
+  cyclePosition: string | null;
+  campaignAge: number | null;
+  recentCompositeScores: number[];   // last 3-5 scores oldest→newest
+  m6ScoreHistory: number[];          // last 3+ scores oldest→newest
+  m15Score: number | null;
+  m11AlignmentScore: number | null;
+  currentBrokerData: unknown | null;
+  historicalBrokerData: (unknown | null)[];
+}
+
+export function computeDistributionWarning(
+  input: DistributionWarningInput
+): DistributionWarningResult {
+  const now = new Date().toISOString();
+
+  const c1 = evaluateC1(
+    input.cyclePosition,
+    input.campaignAge,
+    input.recentCompositeScores
+  );
+  const c2 = evaluateC2(input.m6ScoreHistory);
+  const c3 = evaluateC3(
+    input.currentBrokerData,
+    input.historicalBrokerData
+  );
+  const c4 = evaluateC4(input.m15Score);
+  const c5 = evaluateC5(input.m11AlignmentScore);
+
+  // Count met conditions (null = skip, not count)
+  const conditions = {
+    c1_campaignAging:    c1.met,
+    c2_flowWeakening:    c2.met,
+    c3_brokerSideSwitch: c3.met,
+    c4_elasticityRising: c4.met,
+    c5_flowDiverging:    c5.met,
+  };
+
+  const conditionsMet = [c1.met, c2.met, c3.met, c4.met, c5.met]
+    .filter(v => v === true).length;
+
+  const totalConditions = [c1.met, c2.met, c3.met, c4.met, c5.met]
+    .filter(v => v !== null).length;
+
+  const alertLevel = getAlertLevel(conditionsMet);
+
+  // Collect details for met conditions only
+  const details: string[] = [];
+  if (c1.met) details.push('C1: ' + c1.detail);
+  if (c2.met) details.push('C2: ' + c2.detail);
+  if (c3.met === true) details.push('C3: ' + c3.detail);
+  if (c4.met) details.push('C4: ' + c4.detail);
+  if (c5.met) details.push('C5: ' + c5.detail);
+  if (c3.met === null) details.push('C3: ' + c3.detail);
+
+  return {
+    symbol:          input.symbol.toUpperCase(),
+    alertLevel,
+    conditionsMet,
+    totalConditions,
+    conditions,
+    details,
+    recommendation: getRecommendation(alertLevel, conditionsMet),
+    confidence:     getConfidence(conditionsMet, c3.met !== null),
+    checkedAt:      now,
+  };
+}
+
+// ── Async helper: load history from DB ───────────────────
+
+export async function computeDistributionWarningFromDB(
+  symbol: string,
+  currentEngineResult: {
+    cyclePosition: string | null;
+    campaignAge: number | null;
+    compositeScore: number | null;
+    m6Score: number | null;
+    m15Score: number | null;
+    m11AlignmentScore: number | null;
+    brokerData: unknown | null;
+  }
+): Promise<DistributionWarningResult> {
+  try {
+    // Load last 5 sessions from DB
+    const records = await db
+      .select()
+      .from(sessionHistory)
+      .where(
+        and(
+          eq(sessionHistory.symbol, symbol.toUpperCase()),
+          eq(sessionHistory.session, 0)
+        )
+      )
+      .orderBy(desc(sessionHistory.date))
+      .limit(5);
+
+    // Reverse to oldest→newest
+    const ordered = [...records].reverse();
+
+    const recentCompositeScores = ordered
+      .map(r => r.compositeScore)
+      .filter((s): s is number => s !== null);
+
+    const m6ScoreHistory = ordered
+      .map(r => r.m6Score)
+      .filter((s): s is number => s !== null);
+
+    const historicalBrokerData = ordered
+      .map(r => r.brokerData ?? null);
+
+    return computeDistributionWarning({
+      symbol,
+      cyclePosition:         currentEngineResult.cyclePosition,
+      campaignAge:           currentEngineResult.campaignAge,
+      recentCompositeScores: [
+        ...recentCompositeScores,
+        ...(currentEngineResult.compositeScore !== null
+          ? [currentEngineResult.compositeScore] : [])
+      ],
+      m6ScoreHistory: [
+        ...m6ScoreHistory,
+        ...(currentEngineResult.m6Score !== null
+          ? [currentEngineResult.m6Score] : [])
+      ],
+      m15Score:            currentEngineResult.m15Score,
+      m11AlignmentScore:   currentEngineResult.m11AlignmentScore,
+      currentBrokerData:   currentEngineResult.brokerData,
+      historicalBrokerData,
+    });
+
+  } catch (err) {
+    console.error(`[distributionWarning] DB error for ${symbol}:`, err);
+    // Safe fallback — AMAN if we can't compute
+    return {
+      symbol:          symbol.toUpperCase(),
+      alertLevel:      'AMAN',
+      conditionsMet:   0,
+      totalConditions: 0,
+      conditions: {
+        c1_campaignAging:    false,
+        c2_flowWeakening:    false,
+        c3_brokerSideSwitch: null,
+        c4_elasticityRising: false,
+        c5_flowDiverging:    false,
+      },
+      details:        ['Data tidak cukup untuk evaluasi distribusi.'],
+      recommendation: 'Pantau setelah data lebih tersedia.',
+      confidence:     'RENDAH',
+      checkedAt:      new Date().toISOString(),
+    };
+  }
+}
+
+---
+
+PART 2 — Add /api/distribution/:symbol endpoint to routes.ts
+
+Append AFTER all existing endpoints:
+
+app.get('/api/distribution/:symbol', async (req, res) => {
+  try {
+    const symbol = req.params.symbol?.toUpperCase();
+    if (!symbol) return res.status(400).json({ error: 'Symbol required' });
+
+    const { storage } = await import('./storage');
+    const stock = await storage.getStock(symbol);
+    if (!stock) return res.status(404).json({ error: 'Stock not found' });
+
+    const { computeDistributionWarningFromDB } = 
+      await import('./engine/distributionWarning');
+
+    // Extract engine outputs from stock data
+    // These fields come from the existing decision pipeline
+    const stockData = stock as any;
+    const cyclePosition = stockData.cyclePosition ?? null;
+    const campaignAge   = stockData.campaignAge   ?? null;
+
+    const result = await computeDistributionWarningFromDB(symbol, {
+      cyclePosition,
+      campaignAge,
+      compositeScore:    stockData.readinessScore  ?? null,
+      m6Score:           stockData.m6Score         ?? null,
+      m15Score:          stockData.m15Score        ?? null,
+      m11AlignmentScore: stockData.m11Alignment    ?? null,
+      brokerData:        stockData.brokerData      ?? null,
+    });
+
+    res.status(200).json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: message });
+  }
+});
+
+---
+
+PART 3 — Update StockDashboard.tsx
+
+In client/src/pages/StockDashboard.tsx:
+
+Add fetch for distribution warning when stock loads:
+  const [distWarning, setDistWarning] = useState<any>(null);
+
+  useEffect(() => {
+    if (!symbol) return;
+    fetch(`/api/distribution/${symbol}`)
+      .then(r => r.json())
+      .then(data => setDistWarning(data))
+      .catch(() => {});
+  }, [symbol]);
+
+In the Ringkasan tab, find the synthesis card.
+INSERT the distribution warning card DIRECTLY ABOVE it
+(between Action Guidance and Synthesis card).
+
+Only render if alertLevel !== 'AMAN':
+
+{distWarning && distWarning.alertLevel !== 'AMAN' && (
+  <div className={`rounded-md p-4 mb-4 border ${
+    distWarning.alertLevel === 'BAHAYA_DISTRIBUSI'
+      ? 'bg-red-500/5 border-red-500/30'
+      : distWarning.alertLevel === 'WASPADA_DISTRIBUSI'
+      ? 'bg-orange-500/5 border-orange-500/30'
+      : 'bg-amber-500/5 border-amber-500/20'
+  }`}>
+    {/* Header */}
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className={`w-4 h-4 ${
+          distWarning.alertLevel === 'BAHAYA_DISTRIBUSI' ? 'text-red-400'
+          : distWarning.alertLevel === 'WASPADA_DISTRIBUSI' ? 'text-orange-400'
+          : 'text-amber-400'
+        }`} />
+        <span className="font-mono text-[9px] tracking-widest text-[#6b7280] uppercase">
+          PERINGATAN DISTRIBUSI DINI
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className={`font-mono text-[9px] px-2 py-0.5 rounded-sm border ${
+          distWarning.alertLevel === 'BAHAYA_DISTRIBUSI'
+            ? 'bg-red-500/10 text-red-400 border-red-500/30'
+            : distWarning.alertLevel === 'WASPADA_DISTRIBUSI'
+            ? 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+        }`}>
+          {distWarning.conditionsMet}/{distWarning.totalConditions} kondisi
+        </span>
+        <span className="font-mono text-[9px] text-[#6b7280]">
+          {distWarning.confidence}
+        </span>
+      </div>
+    </div>
+
+    {/* Alert level label */}
+    <p className={`text-sm font-bold mb-2 ${
+      distWarning.alertLevel === 'BAHAYA_DISTRIBUSI' ? 'text-red-400'
+      : distWarning.alertLevel === 'WASPADA_DISTRIBUSI' ? 'text-orange-400'
+      : 'text-amber-400'
+    }`}>
+      {distWarning.alertLevel === 'BAHAYA_DISTRIBUSI' && 'Bahaya — Sinyal Distribusi Terkonfirmasi'}
+      {distWarning.alertLevel === 'WASPADA_DISTRIBUSI' && 'Waspada — Tanda Distribusi Mulai Terdeteksi'}
+      {distWarning.alertLevel === 'PANTAU_DISTRIBUSI' && 'Pantau — Sinyal Awal Perlu Diperhatikan'}
+    </p>
+
+    {/* Conditions list */}
+    <div className="space-y-1 mb-3">
+      {distWarning.details
+        .filter((d: string) => !d.startsWith('C3:') || distWarning.conditions.c3_brokerSideSwitch !== null)
+        .map((detail: string, i: number) => (
+          <p key={i} className="font-mono text-[10px] text-[#9ca3af]">
+            {detail}
+          </p>
+        ))}
+    </div>
+
+    {/* Recommendation */}
+    <div className="bg-[#ffffff04] rounded-sm px-3 py-2 flex items-start gap-2">
+      <span className="text-[#38BDF8] text-xs mt-0.5">→</span>
+      <p className="font-mono text-[10px] text-[#6b7280]">
+        {distWarning.recommendation}
+      </p>
+    </div>
+  </div>
+)}
+
+---
+
+PART 4 — Update RadarPage.tsx
+
+In the Radar table, find the AKSI column.
+Before the star button, add a distribution warning badge
+when alertLevel is not AMAN:
+
+Fetch /api/distribution/:symbol for each visible stock
+on Radar load. Store as a map: 
+  const [distWarnings, setDistWarnings] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    // Fetch distribution warnings for all visible stocks
+    const fetchWarnings = async () => {
+      const symbols = (radarStocks ?? []).map((s: any) => s.symbol);
+      const results: Record<string, any> = {};
+      await Promise.allSettled(
+        symbols.map(async (sym: string) => {
+          try {
+            const r = await fetch(`/api/distribution/${sym}`);
+            const d = await r.json();
+            if (d.alertLevel !== 'AMAN') results[sym] = d;
+          } catch {}
+        })
+      );
+      setDistWarnings(results);
+    };
+    if (radarStocks?.length) fetchWarnings();
+  }, [radarStocks]);
+
+In each radar row SAHAM column, below the company name,
+add a small badge if distWarnings[stock.symbol] exists:
+
+{distWarnings[stock.symbol] && (
+  <span className={`inline-block font-mono text-[8px] px-1.5 py-0.5 
+    rounded-sm border mt-0.5 ${
+    distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI'
+      ? 'bg-red-500/10 text-red-400 border-red-500/20'
+      : distWarnings[stock.symbol].alertLevel === 'WASPADA_DISTRIBUSI'
+      ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+  }`}>
+    {distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI' && '⚠ BAHAYA DISTRIBUSI'}
+    {distWarnings[stock.symbol].alertLevel === 'WASPADA_DISTRIBUSI' && '⚠ WASPADA DISTRIBUSI'}
+    {distWarnings[stock.symbol].alertLevel === 'PANTAU_DISTRIBUSI' && '· PANTAU DISTRIBUSI'}
+  </span>
+)}
+
+---
+
+PART 5 — Update WatchlistPage.tsx
+
+In the STATUS column, after the AKTIF/DIRAGUKAN/GUGUR badge,
+add a second line for distribution warning if present:
+
+Add fetch for distribution warnings same as RadarPage.
+Store in distWarnings state map.
+
+Below the lifecycle status badge in each row, add:
+
+{distWarnings[stock.symbol] && (
+  <span className={`block font-mono text-[8px] mt-0.5 ${
+    distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI'
+      ? 'text-red-400' : 'text-amber-400'
+  }`}>
+    ⚠ {distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI'
+      ? 'Bahaya Distribusi' : 'Pantau Distribusi'}
+  </span>
+)}
+
+---
+
+SAFETY RULES:
+1. New file: server/engine/distributionWarning.ts
+2. Modified: server/routes.ts (append only),
+             client/src/pages/StockDashboard.tsx,
+             client/src/pages/RadarPage.tsx,
+             client/src/pages/WatchlistPage.tsx
+3. NEVER touch any existing engine files
+4. NEVER modify existing endpoints
+5. Run runTests.ts — BBCA=74 and UNVR=10 must pass
+6. Test GET /api/distribution/BBCA returns valid JSON
+7. Test GET /api/distribution/UNVR returns valid JSON
+8. Verify BBCA shows AMAN (no alert — it's in accumulation)
+9. Verify StockDashboard Ringkasan tab loads without errors
+10. Report all files created or modified
