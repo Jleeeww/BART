@@ -8,6 +8,9 @@ import { computeBandarmology, buildBandarmologyInput, computeGorenganFromStock }
 import { testBandarmologyRouter } from "./routes/testBandarmology";
 import { computeValuation } from "./engine/valuationEngine";
 import { applyValuationModifier } from "./engine/valuationModifier";
+import { db } from "./db";
+import { stocks as stocksTable } from "@shared/schema";
+import { inArray, isNull, and as andOp } from "drizzle-orm";
 
 // ========================================
 // UNIFIED BRAIN ENGINE
@@ -643,6 +646,47 @@ export async function registerRoutes(
     MORA: "Mora Telematika Indonesia Tbk",
   };
 
+  const UNIVERSE_STOCK_SECTORS: Record<string, { sector: string; subsector: string; sectorBadge: string }> = {
+    ICBP: { sector: "Consumer Staples",       subsector: "Food & Beverages",       sectorBadge: "SEKTOR KONSUMER" },
+    ADRO: { sector: "Energy",                 subsector: "Coal Mining",            sectorBadge: "SEKTOR ENERGI" },
+    UNTR: { sector: "Industrials",            subsector: "Heavy Equipment",        sectorBadge: "SEKTOR INDUSTRI" },
+    BUMI: { sector: "Energy",                 subsector: "Coal Mining",            sectorBadge: "SEKTOR ENERGI" },
+    DADA: { sector: "Real Estate",            subsector: "Property Development",   sectorBadge: "SEKTOR PROPERTI" },
+    BULL: { sector: "Industrials",            subsector: "Shipping & Logistics",   sectorBadge: "SEKTOR INDUSTRI" },
+    PIPA: { sector: "Industrials",            subsector: "Metal Fabrication",      sectorBadge: "SEKTOR INDUSTRI" },
+    WIFI: { sector: "Communication Services", subsector: "Telecommunications",     sectorBadge: "SEKTOR TELEKOMUNIKASI" },
+    SGER: { sector: "Energy",                 subsector: "Oil & Gas",              sectorBadge: "SEKTOR ENERGI" },
+    MORA: { sector: "Communication Services", subsector: "Telecommunications",     sectorBadge: "SEKTOR TELEKOMUNIKASI" },
+  };
+
+  // Backfill: update DB rows whose sector is NULL for the known universe stocks.
+  // Runs once at startup; safe to re-run (only touches rows still missing sector).
+  (async () => {
+    try {
+      const symbols = Object.keys(UNIVERSE_STOCK_SECTORS);
+      const rowsNeedingFix = await db
+        .select({ symbol: stocksTable.symbol })
+        .from(stocksTable)
+        .where(andOp(inArray(stocksTable.symbol, symbols), isNull(stocksTable.sector)));
+      if (rowsNeedingFix.length > 0) {
+        for (const row of rowsNeedingFix) {
+          const meta = UNIVERSE_STOCK_SECTORS[row.symbol];
+          if (!meta) continue;
+          await db
+            .update(stocksTable)
+            .set({ sector: meta.sector, subsector: meta.subsector, sectorBadge: meta.sectorBadge })
+            .where(eq(stocksTable.symbol, row.symbol));
+          console.log(`[SECTOR BACKFILL] Updated ${row.symbol}: sector=${meta.sector}, subsector=${meta.subsector}`);
+        }
+        console.log(`[SECTOR BACKFILL] Completed: ${rowsNeedingFix.length} stock(s) updated`);
+      } else {
+        console.log(`[SECTOR BACKFILL] No null-sector rows found for universe stocks`);
+      }
+    } catch (err) {
+      console.error(`[SECTOR BACKFILL] Failed:`, err);
+    }
+  })();
+
   app.get("/api/stocks", async (_req, res) => {
     try {
       const allStocks = await storage.getAllStocks();
@@ -661,6 +705,8 @@ export async function registerRoutes(
         missingSymbols.push(symbol);
         console.log(`[UNIVERSE AUDIT] Stock ${symbol} missing from DB — using fallback`);
 
+        const sectorMeta = UNIVERSE_STOCK_SECTORS[symbol] ?? null;
+
         return {
           id: 0,
           symbol,
@@ -675,8 +721,8 @@ export async function registerRoutes(
           dividendYield: null,
           updatedAt: null,
           aiConfidence: null,
-          sector: null,
-          subsector: null,
+          sector: sectorMeta?.sector ?? null,
+          subsector: sectorMeta?.subsector ?? null,
           roe: null,
           netMargin: null,
           growth: "0",
@@ -701,7 +747,7 @@ export async function registerRoutes(
           investorInterpretation: null, eventAnalysis: null,
           financialsAnalystView: null, flowAnalystView: null, riskAnalystView: null,
           riskData: null, insiderData: null,
-          idxIndices: null, sectorBadge: null,
+          idxIndices: null, sectorBadge: sectorMeta?.sectorBadge ?? null,
           stockTags: null, stockCharacter: null, stockCharacterDesc: null,
           retailSentiment: null, foreignDomesticInterpretation: null,
           localRiskFactors: null, retailSummary: null,

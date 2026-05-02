@@ -1,0 +1,85 @@
+Fix sector data for the 6 fallback stocks in server/routes.ts.
+This is a targeted data fix only — no logic changes.
+
+Find the section in routes.ts where fallback stocks are seeded.
+The 6 stocks with sector: null are:
+ICBP, ADRO, UNTR, BUMI, DADA, BULL, PIPA, WIFI, SGER, MORA
+
+These stocks are seeded either as individual inserts or as
+part of a bulk seed. Find wherever their sector field is set
+to null and update with the correct values below.
+
+If the stocks are seeded individually, find each one and
+update sector and subsector. If they are seeded via a
+fallback map or object, add sector/subsector to that map.
+
+CORRECT SECTOR VALUES:
+
+ICBP:
+  sector: "Consumer Staples"
+  subsector: "Food & Beverages"
+  sectorBadge: "SEKTOR KONSUMER"
+
+ADRO:
+  sector: "Energy"
+  subsector: "Coal Mining"
+  sectorBadge: "SEKTOR ENERGI"
+
+UNTR:
+  sector: "Industrials"
+  subsector: "Heavy Equipment"
+  sectorBadge: "SEKTOR INDUSTRI"
+
+BUMI:
+  sector: "Energy"
+  subsector: "Coal Mining"
+  sectorBadge: "SEKTOR ENERGI"
+
+DADA:
+  sector: "Real Estate"
+  subsector: "Property Development"
+  sectorBadge: "SEKTOR PROPERTI"
+
+BULL:
+  sector: "Industrials"
+  subsector: "Shipping & Logistics"
+  sectorBadge: "SEKTOR INDUSTRI"
+
+PIPA:
+  sector: "Industrials"
+  subsector: "Metal Fabrication"
+  sectorBadge: "SEKTOR INDUSTRI"
+
+WIFI:
+  sector: "Communication Services"
+  subsector: "Telecommunications"
+  sectorBadge: "SEKTOR TELEKOMUNIKASI"
+
+SGER:
+  sector: "Energy"
+  subsector: "Oil & Gas"
+  sectorBadge: "SEKTOR ENERGI"
+
+MORA:
+  sector: "Communication Services"
+  subsector: "Telecommunications"
+  sectorBadge: "SEKTOR TELEKOMUNIKASI"
+
+IMPORTANT: The server seeds stocks on startup. After this
+change, the stocks table in Neon DB will have stale null
+sector values for these stocks. Add this logic after the
+sector fix: for each of the 6 stocks, if they already exist
+in the DB with sector=null, run an UPDATE to set the correct
+sector and subsector values.
+
+Use upsert or UPDATE WHERE sector IS NULL pattern.
+Do not re-seed entire stocks — only update the sector fields.
+
+SAFETY RULES:
+1. Only modify server/routes.ts
+2. Do not touch any engine files or frontend files
+3. Do not modify any existing endpoints
+4. Run runTests.ts — BBCA=74 and UNVR=10 must pass
+5. Verify GET /api/stocks returns sector values for ADRO, BUMI,
+   SGER (should now show "Energy" not null)
+6. Report exactly what changed
