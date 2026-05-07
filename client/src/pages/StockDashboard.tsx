@@ -136,6 +136,8 @@ export default function StockDashboard() {
   const [sessionStatus, setSessionStatus] = useState(getIDXSessionStatus());
   const [valuationData, setValuationData] = useState<any>(null);
   const [distWarning, setDistWarning] = useState<any>(null);
+  const [newsData, setNewsData] = useState<any>(null);
+  const [managementData, setManagementData] = useState<any>(null);
 
   useEffect(() => {
     if (!symbol) return;
@@ -245,6 +247,22 @@ export default function StockDashboard() {
       .then(r => { if (!r.ok) throw new Error('Valuation fetch failed'); return r.json(); })
       .then(data => { if (data.error) throw new Error(data.error); setValuationData(data); })
       .catch(err => { console.error(err); setValuationData(null); });
+  }, [stock]);
+
+  useEffect(() => {
+    if (!stock) return;
+    fetch(`/api/news/${stock.symbol}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && Array.isArray(data.impacts)) setNewsData(data); })
+      .catch(() => {});
+  }, [stock]);
+
+  useEffect(() => {
+    if (!stock) return;
+    fetch(`/api/management/${stock.symbol}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && typeof data.compositeScore === 'number') setManagementData(data); })
+      .catch(() => {});
   }, [stock]);
 
   if (isLoading) {
@@ -1565,120 +1583,122 @@ export default function StockDashboard() {
 
                   {/* News Tab */}
                   <TabsContent value="news" className="mt-0 focus-visible:outline-none space-y-6">
-                    {/* SECTION 1: Smart News Summary (Hero) */}
-                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5" data-testid="section-news-summary">
-                      <h3 className="text-lg font-bold font-display mb-3 text-foreground">Ringkasan Berita yang Relevan</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Sistem ini menyaring berita berdasarkan dampak terhadap fundamental dan sentimen pasar. 
-                        Berita yang tidak signifikan disaring secara otomatis.
-                      </p>
-                      {aiData?.smartNewsFilter && (
-                        <div className="flex flex-wrap items-center gap-3" data-testid="news-category-counts">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                            {aiData.smartNewsFilter.summary.fundamentalCount} berita fundamental
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                            {aiData.smartNewsFilter.summary.sentimentCount} berita sentimen
-                          </span>
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                            <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                            {aiData.smartNewsFilter.summary.noiseCount} berita disaring
-                          </span>
+                    {/* WEB SEARCH ANALYSIS — shown only when AI enrichment is available */}
+                    {aiData?.webSearchAnalysis && (
+                      <Card className="p-5 border border-[#38BDF8]/20 bg-gradient-to-br from-[#0d1a2a] to-[#0a1520] shadow-sm" data-testid="card-web-search-analysis">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Sparkles className="w-4 h-4 text-[#38BDF8]" />
+                          <p className="text-xs font-bold text-[#38BDF8] uppercase tracking-widest" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                            Analisis Live — Web Search
+                          </p>
+                          <span className="ml-auto text-[10px] text-[#6b7280] font-mono">claude-sonnet</span>
                         </div>
-                      )}
-                    </Card>
+                        <p className="text-sm text-[#d1d5db] leading-relaxed whitespace-pre-wrap">
+                          {aiData.webSearchAnalysis}
+                        </p>
+                      </Card>
+                    )}
 
-                    {/* SECTION 2: Filtered News List (Fundamental + Sentiment only) */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-bold font-display text-foreground px-1">Berita Relevan</h3>
-                      {aiData?.smartNewsFilter?.news
-                        .filter((item: any) => item.category !== "noise")
-                        .map((item: any, index: number) => (
-                          <Card key={item.id} className="overflow-hidden border-border/50 shadow-sm" data-testid={`card-news-${item.id}`}>
-                            <div className="p-5">
-                              <div className="flex items-start justify-between gap-4 mb-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                      item.category === "fundamental" 
-                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                    }`} data-testid={`badge-category-${item.id}`}>
-                                      <span className={`w-1.5 h-1.5 rounded-full ${item.category === "fundamental" ? "bg-blue-500" : "bg-amber-500"}`}></span>
-                                      {item.categoryLabel}
-                                    </span>
-                                    <span className="text-[10px] font-mono text-muted-foreground">{item.date}</span>
-                                  </div>
-                                  <h4 className="text-sm font-bold text-foreground leading-tight mb-1" data-testid={`text-headline-${item.id}`}>
-                                    {item.headline}
-                                  </h4>
-                                  <span className="text-xs text-muted-foreground">{item.source}</span>
-                                </div>
+                    {/* MACRO OVERRIDE BANNER — shown when any impact has YES_HARD */}
+                    {newsData?.impacts?.some((i: any) => i.macroOverride === 'YES_HARD') && (
+                      <div className="bg-red-500/5 border border-red-500/20 rounded-md px-4 py-2 mb-3">
+                        <p className="text-red-400 text-[10px] uppercase tracking-widest font-bold" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                          ⚠ OVERRIDE MAKRO AKTIF — sinyal positif saham ini dikurangi signifikan oleh kondisi makro
+                        </p>
+                      </div>
+                    )}
+
+                    {/* SECTION 1: Analyzed News Impacts */}
+                    {newsData?.impacts?.length > 0 ? (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-bold text-foreground px-1 uppercase tracking-widest" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                          Dampak Berita Teranalisis
+                        </h3>
+                        {newsData.impacts.map((impact: any, idx: number) => {
+                          const directionStyle =
+                            impact.direction === 'POSITIF'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                              : impact.direction === 'NEGATIF'
+                              ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                              : 'bg-[#ffffff06] text-[#6b7280] border border-[#ffffff10]';
+                          const horizonLabel =
+                            impact.timeHorizon === 'IMMEDIATE' ? '0-2 sesi'
+                            : impact.timeHorizon === 'SHORT' ? '3-10 sesi'
+                            : '11-30 sesi';
+                          return (
+                            <Card key={`${impact.articleId}-${idx}`} className="p-4 border-border/40 bg-[#0d0d0d]">
+                              <div className="flex flex-wrap items-center gap-2 mb-2">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${directionStyle}`}>
+                                  {impact.direction}
+                                </span>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${directionStyle}`}>
+                                  {impact.strength}
+                                </span>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#ffffff06] border border-[#ffffff10] text-[10px] text-[#6b7280]">
+                                  {horizonLabel}
+                                </span>
+                                {impact.requiresImmediateAttention && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-[10px] text-red-400 font-bold">
+                                    SEGERA
+                                  </span>
+                                )}
                               </div>
-                              
-                              {/* AI Interpretation */}
-                              <div className="pt-3 border-t border-border/30">
-                                <p className="text-xs text-muted-foreground leading-relaxed mb-2" data-testid={`text-interpretation-${item.id}`}>
-                                  {item.aiInterpretation}
-                                </p>
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-muted/50 text-[10px] font-medium text-muted-foreground" data-testid={`tag-context-${item.id}`}>
-                                  <Activity className="w-3 h-3" />
-                                  {item.contextTag}
+                              <p className="text-xs text-[#d1d5db] leading-relaxed mb-2">{impact.mechanism}</p>
+                              <p className="text-[10px] text-[#6b7280] leading-relaxed italic">{impact.traderImplication}</p>
+                              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#ffffff08]">
+                                <span className="text-[9px] text-[#4b5563] font-mono">{impact.eventType}</span>
+                                <span className="text-[9px] text-[#4b5563]">·</span>
+                                <span className="text-[9px] text-[#4b5563] font-mono">
+                                  {new Date(impact.analyzedAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="py-6 text-center">
+                        <p className="text-sm text-[#6b7280]" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                          Berita sedang dimuat — pipeline aktif setiap 15 menit
+                        </p>
+                      </div>
+                    )}
+
+                    {/* SECTION 2: Recent Raw Articles */}
+                    {newsData?.cachedArticles?.length > 0 && (
+                      <div className="space-y-3">
+                        <h3 className="text-sm font-bold text-foreground px-1 uppercase tracking-widest" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                          Berita Terkini
+                        </h3>
+                        {newsData.cachedArticles.map((article: any) => (
+                          <Card key={article.id} className="p-4 border-border/40 bg-[#0d0d0d]">
+                            <a
+                              href={article.url || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm font-semibold text-[#d1d5db] hover:text-[#38BDF8] leading-tight block mb-1 transition-colors"
+                            >
+                              {article.title}
+                            </a>
+                            <p className="text-xs text-[#6b7280] leading-relaxed mb-2 line-clamp-2">{article.summary}</p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-[#4b5563] font-mono">{article.source}</span>
+                              <span className="text-[9px] text-[#4b5563]">·</span>
+                              <span className="text-[10px] text-[#4b5563] font-mono">
+                                {new Date(article.publishedAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </span>
                             </div>
                           </Card>
                         ))}
-                    </div>
-
-                    {/* SECTION 3: Noise Toggle (Hidden by default) */}
-                    <Collapsible className="border border-border/50 rounded-lg overflow-hidden">
-                      <CollapsibleTrigger className="flex items-center justify-between w-full px-5 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors group" data-testid="button-toggle-noise">
-                        <span className="flex items-center gap-2">
-                          <EyeOff className="w-4 h-4" />
-                          Tampilkan berita tidak signifikan ({aiData?.smartNewsFilter?.summary.noiseCount || 0})
-                        </span>
-                        <ChevronDown className="w-4 h-4 transition-transform group-data-[state=open]:rotate-180" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="px-5 pb-5 space-y-3 pt-2 border-t border-border/30">
-                          <p className="text-xs text-muted-foreground italic mb-3">
-                            Berita berikut dinilai tidak memiliki dampak signifikan terhadap fundamental atau perilaku institusi.
-                          </p>
-                          {aiData?.smartNewsFilter?.news
-                            .filter((item: any) => item.category === "noise")
-                            .map((item: any) => (
-                              <div key={item.id} className="p-3 rounded-lg bg-muted/30 border border-border/30" data-testid={`card-noise-${item.id}`}>
-                                <div className="flex items-start justify-between gap-3 mb-2">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-500" data-testid={`badge-noise-${item.id}`}>
-                                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-                                        Tidak Signifikan
-                                      </span>
-                                      <span className="text-[10px] font-mono text-muted-foreground">{item.date}</span>
-                                    </div>
-                                    <h5 className="text-xs font-medium text-muted-foreground leading-tight">{item.headline}</h5>
-                                  </div>
-                                </div>
-                                <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-                                  {item.aiInterpretation}
-                                </p>
-                              </div>
-                            ))}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
+                      </div>
+                    )}
 
                     {/* Disclaimer */}
                     <div className="p-4 rounded-lg bg-muted/30 border border-border/30" data-testid="news-disclaimer">
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        <span className="font-semibold text-foreground">Catatan Penting:</span> Berita tidak menghasilkan sinyal beli atau jual. 
-                        Klasifikasi bersifat indikatif dan bukan rekomendasi investasi. 
-                        Berita tidak mengubah skor kesiapan, analisis aliran dana, atau penilaian rezim pasar. 
-                        Gunakan sebagai konteks tambahan dalam analisis menyeluruh, bukan sebagai satu-satunya dasar keputusan.
+                        <span className="font-semibold text-foreground">Catatan Penting:</span> Berita tidak menghasilkan sinyal beli atau jual.
+                        Analisis bersifat indikatif dan bukan rekomendasi investasi.
+                        Gunakan sebagai konteks tambahan dalam analisis menyeluruh.
                       </p>
                     </div>
                   </TabsContent>
@@ -1901,6 +1921,90 @@ export default function StockDashboard() {
 
                   {/* Insider Tab */}
                   <TabsContent value="insider" className="mt-0 focus-visible:outline-none space-y-6">
+
+                    {/* MANAGEMENT INTELLIGENCE — shown when research data is available */}
+                    {managementData && (
+                      <div className="space-y-3">
+                        {/* Critical red flag banner */}
+                        {managementData.hasCriticalRedFlag && (
+                          <div className="bg-red-500/10 border border-red-500/30 rounded-md px-4 py-3">
+                            <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mb-1" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                              ⛔ RED FLAG KRITIS TERIDENTIFIKASI
+                            </p>
+                            <p className="text-red-300 text-xs leading-relaxed">
+                              {managementData.criticalRedFlagMember}: {managementData.criticalRedFlagReason}
+                            </p>
+                            <p className="text-red-400/70 text-[10px] mt-1 font-mono">
+                              Skor manajemen dipaksa 0 — override HINDARI aktif
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Management composite score card */}
+                        <Card className="p-5 border-border/40 bg-[#0d0d0d]">
+                          <div className="flex items-center justify-between mb-4">
+                            <div>
+                              <p className="text-[10px] text-[#6b7280] font-mono uppercase tracking-widest mb-1">
+                                Skor Manajemen
+                              </p>
+                              <h3 className="text-sm font-bold text-foreground">Integritas &amp; Rekam Jejak BOD</h3>
+                            </div>
+                            <div className="text-right">
+                              <p className={`text-3xl font-bold font-mono ${
+                                managementData.compositeScore > 70 ? 'text-emerald-400'
+                                : managementData.compositeScore >= 40 ? 'text-amber-400'
+                                : 'text-red-400'
+                              }`}>
+                                {managementData.compositeScore}
+                              </p>
+                              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${
+                                managementData.qualityLabel === 'KUAT'   ? 'bg-emerald-500/10 text-emerald-400'
+                                : managementData.qualityLabel === 'LEMAH' ? 'bg-red-500/10 text-red-400'
+                                : 'bg-amber-500/10 text-amber-400'
+                              }`}>
+                                {managementData.qualityLabel}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex gap-3 text-[10px] text-[#6b7280] font-mono">
+                            <span>{managementData.scoredMemberCount} anggota dinilai</span>
+                            {managementData.excludedMemberCount > 0 && (
+                              <span>· {managementData.excludedMemberCount} dikecualikan (data tidak cukup)</span>
+                            )}
+                            <span className="ml-auto">Reliabilitas: {managementData.reliability}</span>
+                          </div>
+                        </Card>
+
+                        {/* BOD member cards */}
+                        {managementData.memberScores?.filter((m: any) => !m.excluded).map((member: any, idx: number) => (
+                          <Card key={`${member.name}-${idx}`} className="p-4 border-border/40 bg-[#0d0d0d]">
+                            <div className="flex items-start justify-between gap-3 mb-2">
+                              <div>
+                                <p className="text-sm font-bold text-foreground">{member.name}</p>
+                                <p className="text-[10px] text-[#6b7280] font-mono">{member.title}</p>
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className={`text-xl font-bold font-mono ${
+                                  member.compositeScore > 70 ? 'text-emerald-400'
+                                  : member.compositeScore >= 40 ? 'text-amber-400'
+                                  : 'text-red-400'
+                                }`}>{member.compositeScore}</p>
+                              </div>
+                            </div>
+                            {member.hasCriticalRedFlag && (
+                              <div className="mb-2 px-2 py-1 rounded bg-red-500/10 border border-red-500/20">
+                                <p className="text-[10px] text-red-400 font-bold font-mono">⛔ RED FLAG KRITIS</p>
+                              </div>
+                            )}
+                            {member.keyInsight && (
+                              <p className="text-xs text-[#9ca3af] leading-relaxed">{member.keyInsight}</p>
+                            )}
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* ── existing insider transaction content below ── */}
                     {(() => {
                       try {
                         const insider = stock.insiderData ? JSON.parse(stock.insiderData) : null;

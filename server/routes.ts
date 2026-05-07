@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
+import Anthropic from "@anthropic-ai/sdk";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { getStockDecision, mapStockDataToInput } from "./engine/unifiedDecision";
@@ -8,9 +9,20 @@ import { computeBandarmology, buildBandarmologyInput, computeGorenganFromStock }
 import { testBandarmologyRouter } from "./routes/testBandarmology";
 import { computeValuation } from "./engine/valuationEngine";
 import { applyValuationModifier } from "./engine/valuationModifier";
+import { computeCompositeV3 } from "./engine/compositeEngineV3";
+import { retrieveContext, buildRetrievalQuery } from "./engine/ragEngine";
 import { db } from "./db";
 import { stocks as stocksTable } from "@shared/schema";
-import { inArray, isNull, and as andOp } from "drizzle-orm";
+import { inArray, isNull, and as andOp, eq } from "drizzle-orm";
+
+// ─── Claude web-search client (initialised once, null if no API key) ──────────
+const anthropicClient = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
+
+// ─── Per-symbol AI analysis cache (15-min TTL) ────────────────────────────────
+const aiAnalysisCache = new Map<string, { text: string; timestamp: number }>();
+const AI_CACHE_TTL = 15 * 60 * 1000;
 
 // ========================================
 // UNIFIED BRAIN ENGINE
@@ -763,8 +775,7 @@ export async function registerRoutes(
         console.log(`[UNIVERSE AUDIT] missingSymbols: none`);
       }
 
-      const bulkComputeValuation = computeValuation;
-      const bulkApplyModifier = applyValuationModifier;
+      const safeParseBulk = (v: any): number | null => { const n = parseFloat(String(v)); return isFinite(n) ? n : null; };
 
       // Calculate readiness score for each stock using UNIFIED BRAIN
       // RULE: Never filter out stocks. If analysis fails, use fallback state.
@@ -826,29 +837,17 @@ export async function registerRoutes(
           // GET DECISION from unified brain
           const decision = getStockDecision(brainInput);
 
-          const homepageBucket = decision.bucket === "Siap Dipantau" ? "siap_dipantau"
-            : decision.bucket === "Watchlist Prioritas" ? "watchlist_prioritas"
-            : "hindari_dulu";
-
-          let adjustedReadiness = decision.readiness;
-          let bulkValuationModifier: number | null = null;
-          try {
-            const safeParse = (v: any): number | null => { const n = parseFloat(String(v)); return isFinite(n) ? n : null; };
-            const valOut = bulkComputeValuation({
-              peRatio: safeParse(stock.peRatio), dividendYield: safeParse(stock.dividendYield),
-              roe: safeParse(stock.roe), netMargin: safeParse(stock.netMargin), sector: stock.sector ?? null,
-            });
-            const modResult = bulkApplyModifier({
-              valuationLabel: valOut.valuation.label, qualityLabel: valOut.quality.label,
-              currentReadiness: decision.readiness,
-            });
-            if (modResult.wasAdjusted) {
-              adjustedReadiness = modResult.adjustedReadiness;
-              bulkValuationModifier = modResult.modifier;
-            }
-          } catch (modErr) {
-            console.error(`[/api/stocks] Valuation modifier error for ${stock.symbol}:`, modErr);
-          }
+          // COMPOSITE v3 — weighted 6-layer score
+          const compositeResult = computeCompositeV3({
+            symbol:            stock.symbol,
+            sector:            stock.sector ?? null,
+            bandarmologyScore: decision.readiness,
+            isGorengan:        gorenganResult.isGorengan,
+            peRatio:           safeParseBulk(stock.peRatio),
+            dividendYield:     safeParseBulk(stock.dividendYield),
+            roe:               safeParseBulk(stock.roe),
+            netMargin:         safeParseBulk(stock.netMargin),
+          });
 
           return {
             symbol: stock.symbol,
@@ -858,18 +857,21 @@ export async function registerRoutes(
             changePercent: stock.changePercent,
             sector: stock.sector,
             sectorBadge: stock.sectorBadge,
-            readinessScore: adjustedReadiness,
+            readinessScore: compositeResult.compositeScore,
             marketRegime: decision.marketRegime,
-            actionGuidance: decision.bucket,
-            actionColor: decision.color,
-            actionState: decision.actionState,
-            homepageBucket,
+            actionGuidance: compositeResult.actionGuidance,
+            actionColor: compositeResult.actionColor,
+            actionState: compositeResult.actionState,
+            homepageBucket: compositeResult.homepageBucket,
             aiSentence: decision.shortSummary,
             isInWatchlist: watchlistSymbols.has(stock.symbol),
             isGorengan: gorenganResult.isGorengan,
             gorenganWarning: gorenganResult.isGorengan ? "Aktivitas spekulatif ritel terdeteksi" : null,
             riskOverride: gorenganResult.riskOverride,
-            valuationModifier: bulkValuationModifier,
+            hardOverride: compositeResult.hardOverride,
+            macroHardCap: compositeResult.macroHardCap,
+            activeWeightSum: compositeResult.activeWeightSum,
+            compositeV3Layers: compositeResult.layers,
           };
         } catch (analysisError) {
           console.error(`[UNIVERSE AUDIT] ${stock.symbol}: analysis FAILED — ${analysisError}`);
@@ -1128,34 +1130,45 @@ export async function registerRoutes(
       };
     })();
 
-    let valuationModifierValue: number | null = null;
-    let valuationLabelForResponse: string | null = null;
-    let qualityLabelForResponse: string | null = null;
-    try {
-      const safeParse = (v: any): number | null => { const n = parseFloat(String(v)); return isFinite(n) ? n : null; };
-      const valuationOutput = computeValuation({
-        peRatio:       safeParse(stockData?.peRatio),
-        dividendYield: safeParse(stockData?.dividendYield),
-        roe:           safeParse(stockData?.roe),
-        netMargin:     safeParse(stockData?.netMargin),
-        sector:        stockData?.sector ?? null,
-      });
+    // COMPOSITE v3 — weighted 6-layer score (replaces additive modifier chain)
+    // actionGuidance._debug.readinessScore == decision.readiness at this point (set inside the IIFE above)
+    const safeParseAI = (v: any): number | null => { const n = parseFloat(String(v)); return isFinite(n) ? n : null; };
+    const bandarmologyScoreForAI = actionGuidance._debug.readinessScore; // capture before overwriting
+    const aiGorenganResult = computeGorenganFromStock({
+      symbol: stockSymbol,
+      changePercent: typeof stockData?.changePercent === 'number' ? String(stockData.changePercent) : (stockData?.changePercent ?? '0'),
+      flowBias: stockData?.flowBias || "Netral",
+      flowIntensity: stockData?.flowIntensity || "Tidak Ada Data",
+      flowReliability: stockData?.flowReliability || "Rendah",
+      brokerData: stockData?.brokerData || "[]",
+      foreignActivityData: stockData?.foreignActivityData || "{}",
+      stockCharacter: stockData?.stockCharacter || null,
+    });
+    const aiCompositeResult = computeCompositeV3({
+      symbol:            stockSymbol,
+      sector:            stockData?.sector ?? null,
+      bandarmologyScore: bandarmologyScoreForAI,
+      isGorengan:        aiGorenganResult.isGorengan,
+      peRatio:           safeParseAI(stockData?.peRatio),
+      dividendYield:     safeParseAI(stockData?.dividendYield),
+      roe:               safeParseAI(stockData?.roe),
+      netMargin:         safeParseAI(stockData?.netMargin),
+    });
+    // Update actionGuidance debug score to composite v3 score
+    actionGuidance._debug.readinessScore = aiCompositeResult.compositeScore;
 
-      const modifierResult = applyValuationModifier({
-        valuationLabel: valuationOutput.valuation.label,
-        qualityLabel:   valuationOutput.quality.label,
-        currentReadiness: actionGuidance._debug.readinessScore,
-      });
-
-      if (modifierResult.wasAdjusted) {
-        actionGuidance._debug.readinessScore = modifierResult.adjustedReadiness;
-        valuationModifierValue = modifierResult.modifier;
-        valuationLabelForResponse = valuationOutput.valuation.label;
-        qualityLabelForResponse = valuationOutput.quality.label;
-      }
-    } catch (err) {
-      console.error('[/api/ai] Valuation modifier error:', err);
-    }
+    // Expose layer detail for smartMoneyReadinessScore response
+    const valuationLabelForResponse: string | null = null;
+    const qualityLabelForResponse:   string | null = null;
+    const newsModifierForResponse:   number | null = null;
+    const newsIsHardOverride = aiCompositeResult.macroHardCap;
+    const activeNewsContext:  string[] = [];
+    const mgmtModifierForResponse:   number | null = null;
+    const mgmtHindariOverride = aiCompositeResult.hardOverride === 'MANAGEMENT_CRITICAL';
+    const mgmtQualityLabel:   string | null = aiCompositeResult.layers.management.score !== null
+      ? (aiCompositeResult.layers.management.score >= 70 ? 'KUAT'
+        : aiCompositeResult.layers.management.score >= 40 ? 'SEDANG' : 'LEMAH')
+      : null;
 
     // ========================================
     // SMART NEWS FILTER ENGINE
@@ -1333,6 +1346,103 @@ export async function registerRoutes(
       };
     })();
 
+    // ────────────────────────────────────────────────────────────
+    // CLAUDE WEB SEARCH ENRICHMENT
+    // Adds real-time news & macro context to the analysis.
+    // Uses 15-min in-memory cache per symbol to control API cost.
+    // Non-critical: failures return null, never block the response.
+    // ────────────────────────────────────────────────────────────
+    let webSearchAnalysis: string | null = null;
+
+    const wssCacheKey = stockSymbol;
+    const wssCached = aiAnalysisCache.get(wssCacheKey);
+
+    if (wssCached && Date.now() - wssCached.timestamp < AI_CACHE_TTL) {
+      webSearchAnalysis = wssCached.text;
+    } else if (anthropicClient) {
+      try {
+        const sector = stockData?.sector ?? 'Unknown';
+        const readiness = actionGuidance._debug.readinessScore;
+        const decision = actionGuidance.primaryAction;
+        const flowBias = stockData?.flowBias ?? 'Netral';
+
+        // Retrieve relevant historical context from RAG knowledge base
+        const ragDocs = await retrieveContext(
+          buildRetrievalQuery(stockSymbol, `${sector} ${decision} ${flowBias}`),
+          stockSymbol,
+          5
+        );
+        const historicalCtx = ragDocs.length > 0
+          ? `\n\nKONTEKS HISTORIS BART:\n${ragDocs.map((d) => `[${d.type}] ${d.content}`).join('\n\n')}`
+          : '';
+
+        const wssResponse = await Promise.race<Anthropic.Message>([
+          anthropicClient.messages.create({
+            model: "claude-sonnet-4-5",
+            max_tokens: 2000,
+            tools: [
+              {
+                type: "web_search_20250305" as "web_search_20250305",
+                name: "web_search",
+                max_uses: 3,
+              } as any,
+            ],
+            system: `Kamu adalah BART — sistem intelijen trading institusional untuk pasar saham IDX Indonesia. Kamu menganalisis saham untuk trader ritel Indonesia dengan horizon trading 5-60 sesi.
+
+PENTING: Kamu BUKAN memberikan rekomendasi beli/jual. Kamu memberikan analisis konteks dan panduan berpikir.
+
+Saat menganalisis saham:
+1. Gunakan web search untuk mencari berita terbaru tentang saham ini
+2. Cari kondisi makro terkini yang mempengaruhi sektor saham ini
+3. Cari apakah ada perubahan regulasi atau peringkat yang relevan
+4. Gunakan data dari BART engine sebagai foundation analisis
+5. Integrasikan semua konteks untuk analisis komprehensif
+
+Search domains yang dipercaya:
+idx.co.id, ojk.go.id, bi.go.id, kontan.co.id, bisnis.com,
+cnbcindonesia.com, tempo.co, reuters.com, bloomberg.com
+
+Selalu nyatakan sumber informasi yang kamu temukan dari web search.
+Jika ada konflik antara berita terbaru dan data engine BART,
+prioritaskan konteks makro terbaru.${historicalCtx}`,
+            messages: [
+              {
+                role: "user",
+                content: `Analisis saham ${stockSymbol} (${stockData?.name ?? stockSymbol}) di sektor ${sector}.
+
+Data BART Engine:
+- Skor kesiapan: ${readiness}/100
+- Keputusan engine: ${decision}
+- Aliran dana: ${flowBias} (${stockData?.flowIntensity ?? ''})
+- P/E Ratio: ${stockData?.peRatio ?? 'N/A'}
+- ROE: ${stockData?.roe ?? 'N/A'}%
+- Net Margin: ${stockData?.netMargin ?? 'N/A'}%
+
+Tolong cari berita terbaru dan konteks makro untuk saham ini, lalu berikan analisis singkat (3-4 paragraf) yang mengintegrasikan temuan web search dengan data engine BART di atas. Fokus pada: (1) berita atau event terbaru yang relevan, (2) kondisi sektor saat ini, (3) implikasi untuk trader jangka menengah.`,
+              },
+            ],
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("AI analysis timeout")), 30000)
+          ),
+        ]);
+
+        const fullText = wssResponse.content
+          .filter((block) => block.type === "text")
+          .map((block) => (block.type === "text" ? block.text : ""))
+          .join("\n")
+          .trim();
+
+        if (fullText) {
+          webSearchAnalysis = fullText;
+          aiAnalysisCache.set(wssCacheKey, { text: fullText, timestamp: Date.now() });
+        }
+      } catch (wssErr) {
+        console.error("[/api/ai] Claude web search error:", wssErr);
+        webSearchAnalysis = null;
+      }
+    }
+
     // Structured analyst-style response without buy/sell signals
     res.json({
       // Decision Engine (Part A)
@@ -1369,14 +1479,24 @@ export async function registerRoutes(
       // Insider-Bandar Alignment (Part D)
       insiderBandarAlignment,
       
-      // Smart Money Readiness Score (Core Intelligence)
-      // IMPORTANT: Override score with consistent value from actionGuidance
+      // Smart Money Readiness Score (Core Intelligence) — Composite v3
       smartMoneyReadinessScore: {
         ...smartMoneyReadinessScore,
-        score: actionGuidance._debug.readinessScore,
-        valuationModifier: valuationModifierValue,
-        valuationLabel: valuationLabelForResponse,
-        qualityLabel: qualityLabelForResponse,
+        score:              aiCompositeResult.compositeScore,
+        compositeV3:        aiCompositeResult.layers,
+        hardOverride:       aiCompositeResult.hardOverride,
+        macroHardCap:       aiCompositeResult.macroHardCap,
+        activeWeightSum:    aiCompositeResult.activeWeightSum,
+        // legacy fields (kept for API compatibility)
+        valuationModifier:  valuationLabelForResponse,
+        valuationLabel:     valuationLabelForResponse,
+        qualityLabel:       qualityLabelForResponse,
+        newsModifier:       newsModifierForResponse,
+        newsIsHardOverride,
+        activeNewsContext,
+        managementModifier: mgmtModifierForResponse,
+        managementHindari:  mgmtHindariOverride,
+        managementQuality:  mgmtQualityLabel,
       },
       
       // Action Guidance Mode (Decision Layer)
@@ -1384,7 +1504,10 @@ export async function registerRoutes(
       
       // Smart News Filter (Contextual Intelligence)
       smartNewsFilter,
-      
+
+      // Claude Web Search Analysis (real-time enrichment)
+      webSearchAnalysis,
+
       event_analysis: {
         impact: "Sedang",
         relevance: "Struktural",
@@ -2539,6 +2662,22 @@ export async function registerRoutes(
     }
   });
 
+  // ── News Pipeline endpoints ──────────────────────────────────────────────────
+
+  // GET /api/news/status — fetcher health check (used for 2a verification)
+  app.get('/api/news/status', async (_req, res) => {
+    try {
+      const { getNewsFetcherStatus, fetchLatestNews, screenArticle } =
+        await import('./engine/newsFetcher');
+      // Trigger a fresh fetch if cache is cold
+      await fetchLatestNews();
+      const status = getNewsFetcherStatus();
+      res.status(200).json(status);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // GET /api/sector-rotation
   // Returns sector rotation snapshot
   // Reads from /api/stocks (merged DB + fallback universe) to ensure all
@@ -2583,6 +2722,177 @@ export async function registerRoutes(
 
       const result = await getMacroContext(cpoTrend, coalTrend);
       res.status(200).json(result);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // ── News Impact endpoints (Step 2c) ──────────────────────────────────────────
+  // IMPORTANT: /api/news/market/alerts MUST be registered before /api/news/:symbol
+  // to prevent Express matching "market" as a symbol param.
+
+  // GET /api/news/market/alerts
+  // Returns all CRITICAL/HIGH severity analyses from the last 24h.
+  app.get('/api/news/market/alerts', async (_req, res) => {
+    try {
+      const { getMarketAlerts, getNewsRouterStats } = await import('./engine/newsRouter');
+      const alerts = getMarketAlerts();
+      const stats  = getNewsRouterStats();
+      res.status(200).json({ alerts, stats });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // GET /api/news/:symbol
+  // Returns news impacts for a specific stock + recent screened articles.
+  app.get('/api/news/:symbol', async (req, res) => {
+    try {
+      const symbol = req.params.symbol.toUpperCase();
+
+      // Look up sector from DB for sector matching in newsRouter
+      const stockRows = await db
+        .select({ sector: stocksTable.sector })
+        .from(stocksTable)
+        .where(eq(stocksTable.symbol, symbol));
+      const sector = stockRows[0]?.sector ?? '';
+
+      // Trigger fetch if cache cold, get screened articles
+      const { fetchLatestNews, screenArticle } = await import('./engine/newsFetcher');
+      const allArticles = await fetchLatestNews();
+      const relevant = allArticles.filter(screenArticle);
+
+      // Get mapped impacts from analyzer cache
+      const { getImpactsForSymbol } = await import('./engine/newsRouter');
+      const impacts = getImpactsForSymbol(symbol, sector);
+
+      res.status(200).json({
+        symbol,
+        sector,
+        impacts,
+        articleCount: relevant.length,
+        cachedArticles: relevant.slice(0, 10).map((a) => ({
+          id:          a.id,
+          title:       a.title,
+          summary:     a.summary.slice(0, 250),
+          source:      a.source,
+          url:         a.url,
+          publishedAt: a.publishedAt,
+        })),
+      });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // POST /api/news/analyze/:articleId
+  // Triggers immediate analysis of a specific cached article.
+  // Returns the impact analysis or 404 if articleId not found in cache.
+  app.post('/api/news/analyze/:articleId', async (req, res) => {
+    try {
+      if (!anthropicClient) {
+        return res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured' });
+      }
+
+      const { articleId } = req.params;
+      const { getNewsCache, screenArticle } = await import('./engine/newsFetcher');
+      const { analyzeNewsImpact }           = await import('./engine/newsAnalyzer');
+
+      const article = getNewsCache().find((a) => a.id === articleId);
+      if (!article) {
+        return res.status(404).json({ error: 'Article not found in cache', articleId });
+      }
+
+      if (!screenArticle(article)) {
+        return res.status(400).json({ error: 'Article did not pass relevance screen', articleId });
+      }
+
+      const analysis = await analyzeNewsImpact(article, anthropicClient);
+      if (!analysis) {
+        return res.status(422).json({ error: 'Analysis failed — Claude returned no valid JSON', articleId });
+      }
+
+      res.status(200).json(analysis);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // ── Management Intelligence endpoints (Step 3d) ──────────────────────────────
+
+  // GET /api/management/:symbol
+  // Returns cached management score result (in-memory, 7-day TTL).
+  // 404 if no research has been run yet for this symbol.
+  app.get('/api/management/:symbol', async (req, res) => {
+    try {
+      const symbol = req.params.symbol.toUpperCase();
+      const { getCachedManagementResult } = await import('./engine/managementScorer');
+      const result = getCachedManagementResult(symbol);
+      if (!result) {
+        return res.status(404).json({
+          error:   'No management research found for this symbol',
+          symbol,
+          hint:    'Trigger research via POST /api/management/:symbol/research',
+        });
+      }
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // POST /api/management/:symbol/research
+  // Triggers Claude web-search research for a symbol's BOD members.
+  // Body: { members: [{ name, title }], companyName?: string }
+  // Auth: Bearer MANAGEMENT_TOKEN env var
+  app.post('/api/management/:symbol/research', async (req, res) => {
+    try {
+      if (!anthropicClient) {
+        return res.status(503).json({ error: 'ANTHROPIC_API_KEY not configured' });
+      }
+
+      const authHeader = req.headers.authorization;
+      const token      = process.env.MANAGEMENT_TOKEN;
+      if (!token || authHeader !== `Bearer ${token}`) {
+        return res.status(401).json({ error: 'Unauthorized — MANAGEMENT_TOKEN required' });
+      }
+
+      const symbol      = req.params.symbol.toUpperCase();
+      const { members, companyName } = req.body as {
+        members:     Array<{ name: string; title: string }>;
+        companyName?: string;
+      };
+
+      if (!Array.isArray(members) || members.length === 0) {
+        return res.status(400).json({
+          error: 'Body must include: { members: [{ name, title }], companyName?: string }',
+        });
+      }
+      if (members.length > 10) {
+        return res.status(400).json({
+          error: 'Maximum 10 BOD members per request to control API costs',
+          received: members.length,
+        });
+      }
+
+      const { researchManagement }       = await import('./engine/managementResearch');
+      const { scoreManagement, cacheManagementResult } = await import('./engine/managementScorer');
+
+      const profiles = await researchManagement(
+        members,
+        symbol,
+        companyName ?? symbol,
+        anthropicClient
+      );
+
+      const result = scoreManagement(profiles, symbol);
+      cacheManagementResult(symbol, result);
+
+      res.status(200).json({
+        ...result,
+        profilesResearched: profiles.length,
+        profilesRequested:  members.length,
+      });
     } catch (err) {
       res.status(500).json({ error: String(err) });
     }

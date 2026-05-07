@@ -205,7 +205,7 @@ export default function Homepage() {
           className="text-xl font-bold text-white text-center mb-8"
           style={{ fontFamily: sora }}
         >
-          Dirancang untuk investor yang berpikir seperti institusi.
+          Dirancang untuk trader yang berpikir seperti institusi.
         </h2>
 
         <div className="grid grid-cols-3 gap-6 max-w-4xl mx-auto">

@@ -3,6 +3,28 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
+// Schedules fn() daily at the given local clock time (hour:minute in tzOffsetHours UTC offset)
+function scheduleDaily(
+  hour: number, minute: number, tzOffsetHours: number,
+  fn: () => Promise<void>, label: string
+): void {
+  function msUntilNext(): number {
+    const now  = new Date();
+    const next = new Date();
+    next.setUTCHours(hour - tzOffsetHours, minute, 0, 0);
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    return next.getTime() - now.getTime();
+  }
+  function tick(): void {
+    setTimeout(async () => {
+      try { await fn(); } catch (err) { console.warn(`[${label}] error:`, err); }
+      tick();
+    }, msUntilNext());
+  }
+  tick();
+  log(`${label} scheduled daily at ${hour.toString().padStart(2,'0')}:${minute.toString().padStart(2,'0')} WIB`, label);
+}
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -84,11 +106,11 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "3000", 10);
   httpServer.listen(
     {
       port,
-      host: "0.0.0.0",
+      host: "127.0.0.1",
       reusePort: true,
     },
     () => {
@@ -97,6 +119,28 @@ app.use((req, res, next) => {
       import('./engine/altDataFetcher')
         .then(({ warmAltDataCaches }) => warmAltDataCaches())
         .catch(err => console.warn('[startup] altDataFetcher warmup error:', err));
+
+      // News pipeline — first run after 30s (let server warm up), then every 15min
+      setTimeout(() => {
+        import('./engine/newsFetcher')
+          .then(({ runNewsCycle }) => {
+            runNewsCycle().catch(() => {});
+            setInterval(() => runNewsCycle().catch(() => {}), 15 * 60 * 1000);
+            log('News pipeline scheduled (15min interval)', 'newsPipeline');
+          })
+          .catch(err => console.warn('[startup] news pipeline schedule error:', err));
+      }, 30000);
+
+      // RAG schema init (non-blocking)
+      import('./engine/ragEngine')
+        .then(({ ensureRagSchema }) => ensureRagSchema())
+        .catch(err => console.warn('[startup] RAG schema init error:', err));
+
+      // Outcome tracker — daily at 17:00 WIB (10:00 UTC)
+      scheduleDaily(17, 0, 7, async () => {
+        const { runDailyOutcomeTracking } = await import('./engine/outcomeTracker');
+        await runDailyOutcomeTracking();
+      }, 'outcomeTracker');
     },
   );
 })();

@@ -1,4 +1,14 @@
-import { pgTable, text, serial, numeric, timestamp, real, integer, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, numeric, timestamp, real, integer, jsonb, uniqueIndex, index, customType } from "drizzle-orm/pg-core";
+
+// pgvector column — requires `CREATE EXTENSION IF NOT EXISTS vector` on the DB
+// IVFFlat index must be added via raw SQL (not expressible in Drizzle DSL):
+//   CREATE INDEX CONCURRENTLY ON rag_documents
+//   USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+const vector1536 = customType<{ data: number[]; driverData: string }>({
+  dataType() { return 'vector(1536)'; },
+  toDriver(v: number[]): string { return `[${v.join(',')}]`; },
+  fromDriver(v: string): number[] { return v.replace(/[\[\]]/g, '').split(',').map(Number); },
+});
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -241,3 +251,77 @@ export const signalLifecycle = pgTable('signal_lifecycle', {
 export const insertSignalLifecycleSchema = createInsertSchema(signalLifecycle).omit({ id: true });
 export type InsertSignalLifecycle = z.infer<typeof insertSignalLifecycleSchema>;
 export type SignalLifecycle = typeof signalLifecycle.$inferSelect;
+
+// News Impact records — one row per (article × affected symbol)
+export const newsImpacts = pgTable('news_impacts', {
+  id:           serial('id').primaryKey(),
+  articleId:    text('article_id').notNull(),
+  symbol:       text('symbol').notNull(),
+  sectorName:   text('sector_name'),
+  eventType:    text('event_type').notNull(),
+  eventSeverity: text('event_severity').notNull(),
+  direction:    text('direction').notNull(),
+  strength:     text('strength').notNull(),
+  macroOverride: text('macro_override').notNull(),
+  traderImplication: text('trader_implication'),
+  requiresImmediateAttention: text('requires_immediate_attention').default('false'),
+  expiryHorizon: text('expiry_horizon'),
+  rawInsight:   text('raw_insight'),
+  analyzedAt:   text('analyzed_at').notNull(),
+}, (table) => ({
+  articleSymbolIdx: uniqueIndex('news_impacts_article_symbol_idx')
+    .on(table.articleId, table.symbol),
+}));
+
+export const insertNewsImpactSchema = createInsertSchema(newsImpacts).omit({ id: true });
+export type InsertNewsImpact = z.infer<typeof insertNewsImpactSchema>;
+export type NewsImpact = typeof newsImpacts.$inferSelect;
+
+// Management profiles — one row per (symbol × BOD member)
+export const managementProfiles = pgTable('management_profiles', {
+  id:                   serial('id').primaryKey(),
+  symbol:               text('symbol').notNull(),
+  memberName:           text('member_name').notNull(),
+  title:                text('title'),
+  trackRecordScore:     real('track_record_score'),
+  governanceScore:      real('governance_score'),
+  insiderAlignmentScore: real('insider_alignment_score'),
+  stabilityScore:       real('stability_score'),
+  reputationScore:      real('reputation_score'),
+  compositeScore:       real('composite_score'),
+  hasCriticalRedFlag:   text('has_critical_red_flag').default('false'),
+  redFlags:             text('red_flags'),  // JSON array
+  keyInsight:           text('key_insight'),
+  trackRecordSummary:   text('track_record_summary'),
+  governanceSummary:    text('governance_summary'),
+  reputationSummary:    text('reputation_summary'),
+  rawFindings:          text('raw_findings'),
+  reliability:          text('reliability').notNull().default('LOW'),
+  researchedAt:         text('researched_at').notNull(),
+}, (table) => ({
+  symbolMemberIdx: uniqueIndex('management_profiles_symbol_member_idx')
+    .on(table.symbol, table.memberName),
+}));
+
+export const insertManagementProfileSchema = createInsertSchema(managementProfiles).omit({ id: true });
+export type InsertManagementProfile = z.infer<typeof insertManagementProfileSchema>;
+export type ManagementProfile = typeof managementProfiles.$inferSelect;
+
+// RAG knowledge base — stores embedded documents for retrieval-augmented generation
+export const ragDocuments = pgTable('rag_documents', {
+  id:         serial('id').primaryKey(),
+  type:       text('type').notNull(), // NEWS_OUTCOME | RESEARCH_REPORT | MANAGEMENT_PROFILE | MARKET_PATTERN | MACRO_CAUSAL
+  symbol:     text('symbol'),
+  sector:     text('sector'),
+  content:    text('content').notNull(),
+  metadata:   jsonb('metadata'),
+  embedding:  vector1536('embedding'),
+  validUntil: timestamp('valid_until'),
+  createdAt:  timestamp('created_at').defaultNow(),
+}, (table) => ({
+  symbolTypeIdx: index('rag_documents_symbol_type_idx').on(table.symbol, table.type),
+}));
+
+export const insertRagDocumentSchema = createInsertSchema(ragDocuments).omit({ id: true, createdAt: true });
+export type InsertRagDocument = z.infer<typeof insertRagDocumentSchema>;
+export type RagDocument = typeof ragDocuments.$inferSelect;

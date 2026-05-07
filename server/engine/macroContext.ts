@@ -330,3 +330,8 @@ export function invalidateMacroCache(): void {
   _macroCacheTime = 0;
   _macroCacheKey  = null;
 }
+
+export function getCachedMacroContext(): MacroContextResult | null {
+  if (_macroCache && Date.now() - _macroCacheTime < MACRO_TTL) return _macroCache;
+  return null;
+}
