@@ -132,7 +132,7 @@ export default function Homepage() {
                         <span style={{ fontFamily: mono, fontSize: 10, color: "#6b7280" }}>→ Netral</span>
                       </td>
                       <td className="px-4 py-2">
-                        <span style={{ fontFamily: mono, fontSize: 10, color: "#38BDF8" }}>DETAIL →</span>
+                        <span style={{ fontFamily: mono, fontSize: 10, color: "#38BDF8" }}>ANALISIS →</span>
                       </td>
                     </tr>
                   ))}

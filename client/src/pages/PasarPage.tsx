@@ -251,7 +251,7 @@ export default function PasarPage() {
     <div className="px-6 py-6 min-h-screen" style={{ background: "#0f0f0f" }}>
       <div className="flex items-start justify-between mb-5">
         <div>
-          <p className="text-[10px] tracking-[0.2em] uppercase mb-1" style={{ fontFamily: mono, color: "#38BDF8" }} data-testid="text-pasar-label">
+          <p className="text-[10px] tracking-[0.25em] uppercase mb-1" style={{ fontFamily: mono, color: "#38BDF8" }} data-testid="text-pasar-label">
             PASAR
           </p>
           <h1 className="text-2xl font-bold text-white" style={{ fontFamily: sora }} data-testid="text-pasar-title">
@@ -596,7 +596,7 @@ export default function PasarPage() {
 
       {macroContext && (
         <div className="mt-6 mb-4" data-testid="section-macro-context">
-          <p className="text-[10px] tracking-[0.2em] uppercase mb-3" style={{ fontFamily: mono, color: "#38BDF8" }}>
+          <p className="text-[10px] tracking-[0.25em] uppercase mb-3" style={{ fontFamily: mono, color: "#38BDF8" }}>
             KONDISI MAKRO SAAT INI
           </p>
           <p className="text-[10px] mb-4" style={{ fontFamily: mono, color: "#6b7280" }}>
@@ -799,7 +799,7 @@ export default function PasarPage() {
       )}
 
       <div className="mt-6">
-        <p className="text-[10px] tracking-[0.2em] uppercase mb-3" style={{ fontFamily: mono, color: "#38BDF8" }} data-testid="text-alt-data-label">
+        <p className="text-[10px] tracking-[0.25em] uppercase mb-3" style={{ fontFamily: mono, color: "#38BDF8" }} data-testid="text-alt-data-label">
           DATA ALTERNATIF
         </p>
         <p className="text-[10px] mb-4" style={{ fontFamily: mono, color: "#6b7280" }}>

@@ -84,7 +84,7 @@ export function StatusCard({
 
         {/* Score ring + reasons */}
         <div style={{ display: "flex", alignItems: "flex-start", gap: 24, marginBottom: 20 }}>
-          <ScoreRing score={score} size={110} strokeWidth={8} showLabel />
+          <ScoreRing score={score} size={120} strokeWidth={8} showLabel />
           <div style={{ flex: 1, paddingTop: 4 }}>
             {statusLabel && (
               <p style={{ fontFamily: inter, fontSize: 13, color: "#9CA3AF", marginBottom: 12, lineHeight: 1.55 }}>

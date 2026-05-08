@@ -491,10 +491,8 @@ export default function StockDashboard() {
                     <TabsTrigger
                       key={tab.id}
                       value={tab.id}
-                      className="flex items-center gap-1.5 px-4 py-3 rounded-none border-b-2 border-transparent transition-all"
-                      style={{
-                        fontFamily: mono, fontSize: 11,
-                      }}
+                      className="flex items-center gap-1.5 px-4 py-3 rounded-none border-b-2 border-transparent transition-all data-[state=active]:border-[#38BDF8] data-[state=active]:text-[#38BDF8] data-[state=inactive]:text-[#6B7280]"
+                      style={{ fontFamily: mono, fontSize: 11 }}
                       data-state={activeTab === tab.id ? "active" : "inactive"}
                     >
                       <tab.icon className="w-3.5 h-3.5" />
