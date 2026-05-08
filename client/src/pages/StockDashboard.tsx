@@ -1,6 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
+import { StatusCard } from "@/components/StatusCard";
+import { LayerBreakdown } from "@/components/LayerBreakdown";
+
+const mono = "'IBM Plex Mono', monospace";
+const sora = "'Sora', sans-serif";
 import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp, EyeOff, Eye, HelpCircle, BarChart3, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -312,70 +317,195 @@ export default function StockDashboard() {
     visible: { opacity: 1, y: 0 }
   };
 
+  const decision = aiData?.actionGuidance?.combinedStatus ?? 'NETRAL';
+  const readinessScore = aiData?.smartMoneyReadinessScore?.score ?? 0;
+  const mainReasons: string[] = aiData?.decisionEngine?.reasons ?? [];
+  const mainRisk: string = aiData?.decisionEngine?.primaryRisk ?? '';
+  const traderProfile: string = aiData?.decisionEngine?.investorFit ?? '';
+  const statusLabel: string = aiData?.smartMoneyReadinessScore?.statusLabel ?? '';
+  const aiConfidence: number = aiData?.actionGuidance?.confidence === 'Tinggi' ? 85 : aiData?.actionGuidance?.confidence === 'Sedang' ? 60 : 35;
+  const bandarmologyScore: number | null = aiData?.brokerControlScore?.score ?? null;
+  const managementScore: number | null = managementData?.compositeScore != null ? Math.min(100, Math.round(managementData.compositeScore * 20)) : null;
+  const fundamentalScore: number | null = (() => {
+    const roe = parseFloat(stock.roe); const nm = parseFloat(stock.netMargin); const gr = parseFloat(stock.growth);
+    if (isNaN(roe) && isNaN(nm) && isNaN(gr)) return null;
+    const roeS = Math.min(100, Math.max(0, roe * 3));
+    const nmS  = Math.min(100, Math.max(0, nm * 4));
+    const grS  = Math.min(100, Math.max(0, 50 + gr));
+    return Math.round((roeS + nmS + grS) / 3);
+  })();
+  const valuationScore: number | null = valuationData?.fairValueScore ?? null;
+  const newsScore: number | null = newsData?.impacts?.length > 0 ? (newsData.impacts.filter((n: any) => n.direction === 'POSITIF').length / newsData.impacts.length) * 100 : null;
+  const newsOverride = newsData?.impacts?.some((n: any) => n.macroOverride === 'true' || n.macroOverride === true) ?? false;
+  const managementRedFlag = managementData?.hasCriticalRedFlag === 'true';
+
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* BART Top Nav */}
-      <div className="border-b border-border/40 bg-background/95 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-1.5 flex items-center justify-end">
-          <div className="flex items-center gap-4">
-            {(() => {
-              const dotColor = sessionStatus.color === "green" ? "bg-emerald-500" : 
-                               sessionStatus.color === "yellow" ? "bg-amber-500" : "bg-rose-500";
-              const textColor = sessionStatus.color === "green" ? "text-emerald-400" : 
-                                sessionStatus.color === "yellow" ? "text-amber-400" : "text-rose-400";
-              return (
-                <div className={`hidden sm:flex items-center gap-2 text-xs font-mono ${textColor}`} data-testid="badge-session-status">
-                  <div className={`w-1.5 h-1.5 rounded-full ${dotColor} ${sessionStatus.color === "green" ? "animate-pulse" : ""}`} />
-                  {sessionStatus.label}
-                </div>
-              );
-            })()}
-            <div className="text-xs text-muted-foreground font-mono">IDX</div>
+    <div className="min-h-screen" style={{ background: "#080808", paddingBottom: 80 }}>
+
+      {/* SECTION A — Stock Identity Bar */}
+      <div
+        style={{
+          background: "#111111", borderBottom: "1px solid #1F2937",
+          padding: "16px 24px", display: "flex", alignItems: "center",
+          gap: 16, flexWrap: "wrap",
+        }}
+      >
+        {/* Logo + Symbol + Name + Sector */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            className="flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden"
+            style={{ width: 40, height: 40, background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <img
+              src={`https://assets.stockbit.com/logos/companies/${stock.symbol}.png`}
+              alt={stock.symbol}
+              className="w-8 h-8 object-contain"
+              onError={(e) => {
+                const el = e.currentTarget;
+                el.style.display = "none";
+                const parent = el.parentElement;
+                if (parent) {
+                  const span = document.createElement("span");
+                  span.textContent = stock.symbol.slice(0, 2);
+                  span.style.cssText = `font-family:${mono};font-size:11px;font-weight:700;color:#38BDF8`;
+                  parent.appendChild(span);
+                }
+              }}
+            />
           </div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontFamily: sora, fontSize: 22, fontWeight: 700, color: "#FFFFFF" }}>
+                {stock.symbol}
+              </span>
+              {stock.sector && (
+                <span style={{
+                  fontFamily: mono, fontSize: 9, letterSpacing: "0.12em",
+                  textTransform: "uppercase" as const, color: "#38BDF8",
+                  background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.2)",
+                  borderRadius: 4, padding: "2px 8px",
+                }}>
+                  {stock.sector}
+                </span>
+              )}
+            </div>
+            <p style={{ fontFamily: "'Inter', system-ui", fontSize: 13, color: "#6B7280", marginTop: 2 }}>
+              {stock.name}
+            </p>
+          </div>
+        </div>
+
+        {/* Price */}
+        <div style={{ marginLeft: "auto", textAlign: "right" }}>
+          <p style={{ fontFamily: mono, fontSize: 22, fontWeight: 700, color: "#FFFFFF", lineHeight: 1 }}>
+            Rp {parseFloat(String(stock.price).replace(/[^0-9.-]/g, "") || "0").toLocaleString("id-ID")}
+          </p>
+          <p style={{
+            fontFamily: mono, fontSize: 13, marginTop: 4,
+            color: parseFloat(stock.changePercent) > 0 ? "#34D399" : parseFloat(stock.changePercent) < 0 ? "#F87171" : "#6B7280",
+          }}>
+            {parseFloat(stock.changePercent) > 0
+              ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
+              : parseFloat(stock.changePercent) < 0
+                ? `▼ ${parseFloat(stock.changePercent).toFixed(2)}%`
+                : `— 0.00%`}
+          </p>
+        </div>
+
+        {/* Session status */}
+        <div style={{ textAlign: "right" }} data-testid="badge-session-status">
+          <div className={`flex items-center gap-2 text-xs justify-end ${
+            sessionStatus.color === "green" ? "text-emerald-400" : sessionStatus.color === "yellow" ? "text-amber-400" : "text-rose-400"
+          }`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              sessionStatus.color === "green" ? "bg-emerald-500 animate-pulse" : sessionStatus.color === "yellow" ? "bg-amber-500" : "bg-rose-500"
+            }`} />
+            <span style={{ fontFamily: mono }}>{sessionStatus.label}</span>
+          </div>
+          <p style={{ fontFamily: mono, fontSize: 9, color: "#6B7280", marginTop: 4 }}>
+            SESI IDX
+          </p>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <motion.div 
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 24px 0" }}>
+        <motion.div
           initial="hidden"
           animate="visible"
           variants={containerVariants}
-          className="space-y-8"
+          className="space-y-5"
         >
-          {/* Header Section */}
+
+          {/* SECTION B — Intelligence Summary Card */}
           <motion.div variants={itemVariants}>
-            <StockHeader stock={stock} />
+            {aiLoading ? (
+              <div style={{ height: 220, background: "#111111", borderRadius: 12, border: "1px solid #1F2937" }}
+                className="animate-pulse" />
+            ) : (
+              <StatusCard
+                score={readinessScore}
+                decision={decision}
+                mainReasons={mainReasons}
+                mainRisk={mainRisk}
+                traderProfile={traderProfile}
+                statusLabel={statusLabel}
+                newsOverride={newsOverride}
+                managementRedFlag={managementRedFlag}
+              />
+            )}
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Chart Section */}
-            <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
-              <PriceChart />
-              
-              <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="w-full justify-start h-auto p-1 bg-secondary/50 rounded-xl overflow-x-auto no-scrollbar">
+          {/* SECTION C — Layer Breakdown */}
+          <motion.div variants={itemVariants}>
+            <LayerBreakdown
+              bandarmologyScore={bandarmologyScore}
+              newsScore={newsScore !== null ? Math.round(newsScore) : null}
+              fundamentalScore={fundamentalScore}
+              managementScore={managementScore}
+              valuationScore={valuationScore}
+              macroScore={null}
+              confidence={aiConfidence}
+              defaultCollapsed={true}
+            />
+          </motion.div>
+
+          {/* SECTION D — PriceChart + Tabs */}
+          <motion.div variants={itemVariants} className="space-y-4">
+            <PriceChart />
+
+            <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <div style={{ borderBottom: "1px solid #1F2937", marginBottom: 0 }}>
+                <TabsList
+                  className="w-full justify-start h-auto bg-transparent overflow-x-auto no-scrollbar rounded-none p-0"
+                  style={{ borderBottom: "none" }}
+                >
                   {[
-                    { id: "overview", label: "Ringkasan", icon: PieChart },
-                    { id: "financials", label: "Keuangan", icon: DollarSign },
-                    { id: "valuation", label: "Valuasi", icon: TrendingUp },
-                    { id: "flow", label: "Flow", icon: Activity },
-                    { id: "news", label: "Berita", icon: Newspaper },
-                    { id: "risk", label: "Risiko", icon: AlertTriangle },
-                    { id: "insider", label: "Insider", icon: UserCheck },
+                    { id: "overview",   label: "Ringkasan",  icon: PieChart },
+                    { id: "flow",       label: "Flow Broker", icon: Activity },
+                    { id: "financials", label: "Keuangan",   icon: DollarSign },
+                    { id: "news",       label: "Berita",     icon: Newspaper },
+                    { id: "risk",       label: "Distribusi", icon: AlertTriangle },
+                    { id: "insider",    label: "Manajemen",  icon: UserCheck },
+                    { id: "valuation",  label: "Valuasi",    icon: TrendingUp },
                   ].map((tab) => (
-                    <TabsTrigger 
-                      key={tab.id} 
+                    <TabsTrigger
+                      key={tab.id}
                       value={tab.id}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm transition-all"
+                      className="flex items-center gap-1.5 px-4 py-3 rounded-none border-b-2 border-transparent transition-all"
+                      style={{
+                        fontFamily: mono, fontSize: 11,
+                      }}
+                      data-state={activeTab === tab.id ? "active" : "inactive"}
                     >
-                      <tab.icon className="w-4 h-4" />
+                      <tab.icon className="w-3.5 h-3.5" />
                       {tab.label}
                     </TabsTrigger>
                   ))}
                 </TabsList>
+              </div>
                 
-                <div className="mt-6">
-                  <TabsContent value="overview" className="mt-0 focus-visible:outline-none space-y-6">
+                <div className="mt-4">
+                  <TabsContent value="overview" className="mt-0 focus-visible:outline-none space-y-5">
                     {/* ACTION GUIDANCE MODE - HERO POSITION */}
                     {!aiLoading && aiData?.actionGuidance && (
                       <Card className={`p-6 border-2 shadow-lg ${
@@ -675,7 +805,7 @@ export default function StockDashboard() {
                                   ? "text-amber-700 dark:text-amber-400"
                                   : "text-red-700 dark:text-red-400"
                             }`} data-testid="text-decision-status">
-                              Status Saham: {aiData.decisionEngine.status}
+                              Status Saham: {aiData.decisionEngine.status === "Layak Dikoleksi Bertahap" ? "Siap Entry" : aiData.decisionEngine.status}
                             </h2>
                             {/* Sub-badge */}
                             <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wide ${
@@ -725,7 +855,7 @@ export default function StockDashboard() {
                           <div className="pt-4 border-t border-border/30">
                             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
                               <Users className="w-3 h-3 text-primary" />
-                              Cocok untuk Siapa
+                              Profil Trader
                             </p>
                             <p className="text-sm text-foreground font-medium" data-testid="text-investor-fit">
                               {aiData.decisionEngine.investorFit}
@@ -775,7 +905,7 @@ export default function StockDashboard() {
                               </div>
                               <div>
                                 <div className="flex items-center gap-1.5 mb-0.5">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Kesiapan Smart Money</p>
+                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Kesiapan Trading</p>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help" data-testid="tooltip-readiness-score" />
@@ -863,7 +993,7 @@ export default function StockDashboard() {
                               
                               {/* Component Breakdown Table */}
                               <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Komponen Penilaian</p>
+                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Analisis 6 Layer</p>
                                 <div className="overflow-x-auto">
                                   <table className="w-full text-sm">
                                     <thead>
@@ -2377,11 +2507,10 @@ export default function StockDashboard() {
               </Tabs>
             </motion.div>
 
-            {/* Sidebar Section */}
-            <motion.div variants={itemVariants} className="space-y-6">
-              <AIStockSummary summary={stock.summary} confidence={stock.aiConfidence as "High" | "Medium" | "Low"} />
-            </motion.div>
-          </div>
+          {/* AI Summary — full width below tabs */}
+          <motion.div variants={itemVariants}>
+            <AIStockSummary summary={stock.summary} confidence={stock.aiConfidence as "High" | "Medium" | "Low"} />
+          </motion.div>
         </motion.div>
       </main>
     </div>

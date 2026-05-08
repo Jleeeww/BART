@@ -347,10 +347,14 @@ export default function PasarPage() {
 
                 <div className="grid grid-cols-3 gap-2">
                   {sectorRotation.sectors?.map((s: any) => {
-                    const borderColor =
-                      s.direction === "MASUK" ? "rgba(16,185,129,0.3)" :
-                      s.direction === "KELUAR" ? "rgba(239,68,68,0.3)" :
-                      "rgba(255,255,255,0.03)";
+                    const sectorBorderLeft =
+                      s.direction === "MASUK" ? "2px solid #34d399" :
+                      s.direction === "KELUAR" ? "2px solid #f87171" :
+                      "2px solid rgba(255,255,255,0.04)";
+                    const sectorGlow =
+                      s.direction === "MASUK" ? "0 0 12px rgba(52,211,153,0.07)" :
+                      s.direction === "KELUAR" ? "0 0 12px rgba(248,113,113,0.07)" :
+                      "none";
                     const scoreColor =
                       s.direction === "MASUK" ? "#34d399" :
                       s.direction === "KELUAR" ? "#f87171" :
@@ -366,8 +370,13 @@ export default function PasarPage() {
                     return (
                       <div
                         key={s.sector}
-                        className="rounded-sm p-3 transition-colors hover:border-[#ffffff15] relative"
-                        style={{ background: "#111111", border: `1px solid ${borderColor}` }}
+                        className="rounded-sm p-3 relative"
+                        style={{
+                          background: "#111111",
+                          border: "1px solid rgba(255,255,255,0.04)",
+                          borderLeft: sectorBorderLeft,
+                          boxShadow: sectorGlow,
+                        }}
                         data-testid={`sector-tile-${s.sector}`}
                       >
                         {(s.momentum === "NAIK" || s.momentum === "TURUN") && (
@@ -477,7 +486,7 @@ export default function PasarPage() {
                             style={{ fontFamily: mono, color: "#6b7280" }}
                             data-testid={`link-detail-${ts.symbol}`}
                           >
-                            DETAIL →
+                            ANALISIS →
                           </a>
                         </div>
                       );
@@ -671,6 +680,12 @@ export default function PasarPage() {
                   source: altData?.cpo?.source ?? "FALLBACK",
                 },
               ];
+              const sectorImpactMap: Record<string, string> = {
+                oil: "Energi · Industri",
+                gold: "Material · Emas",
+                usdIdr: "Semua Sektor",
+                cpo: "Konsumer Primer",
+              };
               return cards.map((c) => (
                 <div
                   key={c.key}
@@ -678,25 +693,38 @@ export default function PasarPage() {
                   style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
                   data-testid={`card-macro-${c.key}`}
                 >
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-2">
                     <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
                       {c.label}
                     </p>
                     <SourceBadge source={c.source} />
                   </div>
-                  <p className="text-lg font-bold text-white" style={{ fontFamily: mono }}>
+                  <p className="font-bold text-white" style={{ fontFamily: mono, fontSize: 22 }}>
                     {c.price}
                   </p>
                   <p
-                    className="mt-1"
+                    className="mt-1 mb-2"
                     style={{
                       fontFamily: mono,
                       fontSize: 10,
                       color: c.change == null ? "rgba(255,255,255,0.2)" : c.change > 0 ? "#34d399" : c.change < 0 ? "#f87171" : "#6b7280",
                     }}
                   >
-                    {c.change == null ? "—" : c.change > 0 ? `▲ +${c.change.toFixed(2)}%` : c.change < 0 ? `▼ ${c.change.toFixed(2)}%` : `→ 0.00%`}
+                    {c.change == null ? "5d: —" : c.change > 0 ? `▲ +${c.change.toFixed(2)}% (5d)` : c.change < 0 ? `▼ ${c.change.toFixed(2)}% (5d)` : `→ 0.00% (5d)`}
                   </p>
+                  <span
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 8,
+                      color: "#38BDF8",
+                      background: "rgba(56,189,248,0.08)",
+                      border: "1px solid rgba(56,189,248,0.15)",
+                      borderRadius: 3,
+                      padding: "1px 6px",
+                    }}
+                  >
+                    {sectorImpactMap[c.key] ?? "—"}
+                  </span>
                 </div>
               ));
             })()}
@@ -797,7 +825,7 @@ export default function PasarPage() {
                 </span>
                 <SourceBadge source={altData.cpo.source} />
               </div>
-              <p className="text-2xl font-bold text-white mb-1" style={{ fontFamily: mono }}>
+              <p className="font-bold text-white mb-1" style={{ fontFamily: mono, fontSize: 22 }}>
                 {altData.cpo.priceIDR
                   ? `Rp ${altData.cpo.priceIDR.toLocaleString("id-ID")}/kg`
                   : altData.cpo.priceUSD
@@ -827,7 +855,7 @@ export default function PasarPage() {
                 </span>
                 <SourceBadge source={altData.coal.source} />
               </div>
-              <p className="text-2xl font-bold text-white mb-1" style={{ fontFamily: mono }}>
+              <p className="font-bold text-white mb-1" style={{ fontFamily: mono, fontSize: 22 }}>
                 {altData.coal.hba1USD ? `USD ${altData.coal.hba1USD}/ton (GAR 6322)` : "—"}
               </p>
               {altData.coal.trend && (

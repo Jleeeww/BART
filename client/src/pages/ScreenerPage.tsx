@@ -40,17 +40,12 @@ function deriveV2(stock: StockData) {
   else if (regime.includes("akumulasi")) cyclePosition = "TERLALU_DINI";
   else if (regime.includes("distribusi") || regime.includes("spekulatif")) cyclePosition = "WASPADAI_DISTRIBUSI";
 
-  let concentrationType: string | null = null;
-  if (score >= 70) concentrationType = "KENDALI_BANDAR";
-  else if (score >= 40 && score < 60) concentrationType = "TERSEBAR";
-  else if (stock.isGorengan || score < 40) concentrationType = "JEBAKAN_DISTRIBUSI";
-
   let flowBias: string | null = null;
   if (stock.homepageBucket === "siap_dipantau") flowBias = "Akumulasi";
   else if (stock.homepageBucket === "hindari_dulu") flowBias = "Distribusi";
   else flowBias = "Netral";
 
-  return { cyclePosition, concentrationType, flowBias };
+  return { cyclePosition, flowBias };
 }
 
 function scoreColor(score: number) {
@@ -65,26 +60,27 @@ function bucketAccent(bucket: string) {
   return "#f87171";
 }
 
-const pillStyle = (active: boolean) => ({
-  fontFamily: mono,
-  fontSize: 10,
-  background: active ? "rgba(56,189,248,0.15)" : "rgba(255,255,255,0.02)",
-  color: active ? "#38BDF8" : "#6b7280",
-  border: active ? "1px solid rgba(56,189,248,0.3)" : "1px solid rgba(255,255,255,0.03)",
-});
+function pillStyle(active: boolean) {
+  return {
+    fontFamily: mono,
+    fontSize: 10,
+    letterSpacing: "0.06em",
+    background: active ? "rgba(56,189,248,0.1)" : "rgba(255,255,255,0.02)",
+    color: active ? "#38BDF8" : "#6b7280",
+    border: active ? "1px solid rgba(56,189,248,0.40)" : "1px solid #1F2937",
+  };
+}
 
 const disabledPillStyle = {
   fontFamily: mono,
   fontSize: 10,
   background: "rgba(255,255,255,0.02)",
   color: "#6b7280",
-  border: "1px solid rgba(255,255,255,0.03)",
+  border: "1px solid #1F2937",
 };
 
 function MultiPills({
-  options,
-  selected,
-  onToggle,
+  options, selected, onToggle,
 }: {
   options: string[];
   selected: Set<string>;
@@ -96,7 +92,7 @@ function MultiPills({
         <button
           key={opt}
           onClick={() => onToggle(opt)}
-          className="px-3 py-1.5 rounded-sm cursor-pointer transition-colors"
+          className="px-3 py-1.5 rounded-md cursor-pointer transition-all duration-150"
           style={pillStyle(selected.has(opt))}
           data-testid={`screener-pill-${opt.toLowerCase().replace(/\s+/g, "-")}`}
         >
@@ -111,17 +107,13 @@ function DisabledGroup({ label, options }: { label: string; options: string[] })
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2">
-        <p
-          className="text-[9px] tracking-widest uppercase"
-          style={{ fontFamily: mono, color: "#6b7280" }}
-        >
+        <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
           {label}
         </p>
         <span
           className="px-2 py-0.5 rounded-sm"
           style={{
-            fontFamily: mono,
-            fontSize: 9,
+            fontFamily: mono, fontSize: 9,
             background: "rgba(56,189,248,0.06)",
             color: "rgba(56,189,248,0.4)",
             border: "1px solid rgba(56,189,248,0.15)",
@@ -133,11 +125,7 @@ function DisabledGroup({ label, options }: { label: string; options: string[] })
       </div>
       <div className="flex flex-wrap gap-1.5 opacity-30 pointer-events-none">
         {options.map((opt) => (
-          <span
-            key={opt}
-            className="px-3 py-1.5 rounded-sm cursor-not-allowed"
-            style={disabledPillStyle}
-          >
+          <span key={opt} className="px-3 py-1.5 rounded-md cursor-not-allowed" style={disabledPillStyle}>
             {opt}
           </span>
         ))}
@@ -149,6 +137,49 @@ function DisabledGroup({ label, options }: { label: string; options: string[] })
   );
 }
 
+function StockLogo({ symbol }: { symbol: string }) {
+  const [failed, setFailed] = useState(false);
+  const src = `https://assets.stockbit.com/logos/companies/${symbol}.png`;
+  return (
+    <div
+      className="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden"
+      style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
+    >
+      {failed ? (
+        <span className="text-[10px] font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>
+          {symbol.slice(0, 2)}
+        </span>
+      ) : (
+        <img
+          src={src}
+          alt={symbol}
+          className="w-6 h-6 object-contain rounded-sm"
+          onError={() => setFailed(true)}
+        />
+      )}
+    </div>
+  );
+}
+
+function CycleLabel({ position }: { position: string | null }) {
+  if (!position) return <span style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}>—</span>;
+  const map: Record<string, { label: string; color: string }> = {
+    ENTRY_WINDOW: { label: "▶ Entry Window", color: "#34d399" },
+    KONFIRMASI_MULAI: { label: "◎ Konfirmasi", color: "#38bdf8" },
+    TERLALU_DINI: { label: "○ Terlalu Dini", color: "#94a3b8" },
+    WASPADAI_DISTRIBUSI: { label: "▼ Waspada Distribusi", color: "#fbbf24" },
+  };
+  const entry = map[position] || { label: position, color: "#6b7280" };
+  return <span className="text-[11px]" style={{ fontFamily: mono, color: entry.color }}>{entry.label}</span>;
+}
+
+function FlowLabel({ bias }: { bias: string | null }) {
+  if (!bias) return <span style={{ fontFamily: mono, fontSize: 11, color: "#6b7280" }}>—</span>;
+  if (bias === "Akumulasi") return <span className="text-[11px]" style={{ fontFamily: mono, color: "#34d399" }}>↑ Akumulasi</span>;
+  if (bias === "Distribusi") return <span className="text-[11px]" style={{ fontFamily: mono, color: "#f87171" }}>↓ Distribusi</span>;
+  return <span className="text-[11px]" style={{ fontFamily: mono, color: "#6b7280" }}>→ Netral</span>;
+}
+
 export default function ScreenerPage() {
   const [rezimFilter, setRezimFilter] = useState<Set<string>>(new Set(["Semua"]));
   const [siklusFilter, setSiklusFilter] = useState<Set<string>>(new Set(["Semua"]));
@@ -158,13 +189,8 @@ export default function ScreenerPage() {
   const [sortKey, setSortKey] = useState<SortKey>("score_desc");
   const [optimisticOverrides, setOptimisticOverrides] = useState<Record<string, boolean>>({});
 
-  const { data: stocks, isLoading } = useQuery<StockData[]>({
-    queryKey: ["/api/stocks"],
-  });
-
-  const { data: watchlistData } = useQuery<WatchlistItem[]>({
-    queryKey: ["/api/watchlist"],
-  });
+  const { data: stocks, isLoading } = useQuery<StockData[]>({ queryKey: ["/api/stocks"] });
+  const { data: watchlistData } = useQuery<WatchlistItem[]>({ queryKey: ["/api/watchlist"] });
 
   const watchlistedSymbols = useMemo(() => {
     const base = new Set(watchlistData?.map((w) => w.symbol) ?? []);
@@ -179,11 +205,8 @@ export default function ScreenerPage() {
     const isStarred = watchlistedSymbols.has(symbol);
     setOptimisticOverrides((prev) => ({ ...prev, [symbol]: !isStarred }));
     try {
-      if (isStarred) {
-        await apiRequest("DELETE", `/api/watchlist/${symbol}`);
-      } else {
-        await apiRequest("POST", `/api/watchlist/${symbol}`);
-      }
+      if (isStarred) await apiRequest("DELETE", `/api/watchlist/${symbol}`);
+      else await apiRequest("POST", `/api/watchlist/${symbol}`);
       queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
     } catch {
       setOptimisticOverrides((prev) => ({ ...prev, [symbol]: isStarred }));
@@ -197,10 +220,7 @@ export default function ScreenerPage() {
   }, [stocks]);
 
   function toggleMulti(current: Set<string>, value: string, setter: (s: Set<string>) => void) {
-    if (value === "Semua") {
-      setter(new Set(["Semua"]));
-      return;
-    }
+    if (value === "Semua") { setter(new Set(["Semua"])); return; }
     const next = new Set(current);
     next.delete("Semua");
     if (next.has(value)) next.delete(value);
@@ -243,17 +263,9 @@ export default function ScreenerPage() {
       });
     }
 
-    if (minScore > 0) {
-      list = list.filter((s) => s.readinessScore >= minScore);
-    }
-
-    if (!sektorFilter.has("Semua")) {
-      list = list.filter((s) => s.sector && sektorFilter.has(s.sector));
-    }
-
-    if (!flowFilter.has("Semua")) {
-      list = list.filter((s) => s._v2.flowBias && flowFilter.has(s._v2.flowBias));
-    }
+    if (minScore > 0) list = list.filter((s) => s.readinessScore >= minScore);
+    if (!sektorFilter.has("Semua")) list = list.filter((s) => s.sector && sektorFilter.has(s.sector));
+    if (!flowFilter.has("Semua")) list = list.filter((s) => s._v2.flowBias && flowFilter.has(s._v2.flowBias));
 
     list.sort((a, b) => {
       if (sortKey === "score_desc") return b.readinessScore - a.readinessScore;
@@ -279,25 +291,19 @@ export default function ScreenerPage() {
 
   return (
     <div className="px-6 py-6 min-h-screen" style={{ background: "#0f0f0f" }}>
+      {/* SECTION A — Header */}
       <div className="mb-5">
         <p
-          className="text-[10px] tracking-[0.2em] uppercase mb-1"
+          className="text-[10px] tracking-[0.25em] uppercase mb-1.5"
           style={{ fontFamily: mono, color: "#38BDF8" }}
           data-testid="screener-label"
         >
           SCREENER
         </p>
-        <h1
-          className="text-2xl font-bold text-white"
-          style={{ fontFamily: sora }}
-          data-testid="screener-title"
-        >
+        <h1 className="text-2xl font-bold text-white" style={{ fontFamily: sora }} data-testid="screener-title">
           Filter Saham IDX
         </h1>
-        <p
-          className="text-sm mt-1"
-          style={{ fontFamily: mono, color: "#6b7280" }}
-        >
+        <p className="text-sm mt-1" style={{ fontFamily: mono, color: "#6b7280" }}>
           Tentukan kriteria — BART menampilkan saham yang cocok
         </p>
       </div>
@@ -313,7 +319,6 @@ export default function ScreenerPage() {
             Filter Kriteria
           </p>
 
-          {/* Group 1 — Rezim Pasar */}
           <div className="mb-4">
             <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
               REZIM PASAR
@@ -325,7 +330,6 @@ export default function ScreenerPage() {
             />
           </div>
 
-          {/* Group 2 — Posisi Siklus */}
           <div className="mb-4">
             <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
               POSISI SIKLUS
@@ -337,7 +341,6 @@ export default function ScreenerPage() {
             />
           </div>
 
-          {/* Group 3 — Skor Minimum */}
           <div className="mb-4">
             <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
               SKOR MINIMUM
@@ -353,16 +356,11 @@ export default function ScreenerPage() {
               data-testid="screener-slider-score"
             />
             <div className="flex justify-between mt-1">
-              <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
-                Min: {minScore}
-              </span>
-              <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
-                Maks: 100
-              </span>
+              <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>Min: {minScore}</span>
+              <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>Maks: 100</span>
             </div>
           </div>
 
-          {/* Group 4 — Sektor */}
           <div className="mb-4">
             <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
               SEKTOR
@@ -374,7 +372,6 @@ export default function ScreenerPage() {
             />
           </div>
 
-          {/* Group 5 — Aliran Dana */}
           <div className="mb-4">
             <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
               ALIRAN DANA
@@ -388,34 +385,19 @@ export default function ScreenerPage() {
 
           <div style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }} className="my-4" />
 
-          {/* Group 6 — Likuiditas (disabled) */}
-          <DisabledGroup
-            label="LIKUIDITAS"
-            options={["Semua", ">50B/hari", ">200B/hari", ">500B/hari"]}
-          />
-
-          {/* Group 7 — Volume Anomali (disabled) */}
-          <DisabledGroup
-            label="VOLUME ANOMALI"
-            options={["Semua", ">1.5× Rata-rata", ">2× Rata-rata", ">3× Rata-rata"]}
-          />
-
-          {/* Group 8 — Kapitalisasi Pasar (disabled) */}
-          <DisabledGroup
-            label="KAPITALISASI PASAR"
-            options={["Semua", "Small Cap", "Mid Cap", "Large Cap"]}
-          />
+          <DisabledGroup label="LIKUIDITAS" options={["Semua", ">50B/hari", ">200B/hari", ">500B/hari"]} />
+          <DisabledGroup label="VOLUME ANOMALI" options={["Semua", ">1.5× Rata-rata", ">2× Rata-rata", ">3× Rata-rata"]} />
+          <DisabledGroup label="KAPITALISASI PASAR" options={["Semua", "Small Cap", "Mid Cap", "Large Cap"]} />
 
           <div className="mt-4 flex flex-col gap-2">
             <button
               onClick={resetFilters}
-              className="w-full py-2 rounded-sm transition-all"
+              className="w-full py-2 rounded-md transition-all"
               style={{
-                fontFamily: mono,
-                fontSize: 10,
+                fontFamily: mono, fontSize: 10,
                 background: "rgba(255,255,255,0.02)",
                 color: "#6b7280",
-                border: "1px solid rgba(255,255,255,0.03)",
+                border: "1px solid #1F2937",
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
@@ -446,7 +428,7 @@ export default function ScreenerPage() {
                 <button
                   key={s.key}
                   onClick={() => setSortKey(s.key)}
-                  className="px-3 py-1.5 rounded-sm cursor-pointer transition-colors"
+                  className="px-3 py-1.5 rounded-md cursor-pointer transition-all duration-150"
                   style={pillStyle(sortKey === s.key)}
                   data-testid={`screener-sort-${s.key}`}
                 >
@@ -458,20 +440,21 @@ export default function ScreenerPage() {
 
           {/* Table */}
           <div className="w-full overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+            <table className="w-full min-w-[860px]">
               <thead>
-                <tr style={{ background: "#111111", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                  {["SAHAM", "SEKTOR", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "AKSI"].map((h) => (
+                <tr style={{ background: "#0d0d0d", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                  {["SAHAM", "SEKTOR", "HARGA", "SKOR", "SIKLUS", "ALIRAN", "AKSI"].map((h) => (
                     <th
                       key={h}
-                      className="text-left px-4 py-2"
+                      className="text-left px-4 py-3"
                       style={{
                         fontFamily: mono,
                         fontSize: 9,
-                        letterSpacing: "0.1em",
-                        color: "#6b7280",
+                        letterSpacing: "0.12em",
+                        color: "#6B7280",
                         textTransform: "uppercase" as const,
                         fontWeight: 400,
+                        background: "#0d0d0d",
                       }}
                     >
                       {h}
@@ -483,7 +466,7 @@ export default function ScreenerPage() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} style={{ background: "#161616", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                      {Array.from({ length: 8 }).map((_, j) => (
+                      {Array.from({ length: 7 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <div className="h-4 w-16 rounded bg-[#222] animate-pulse" />
                         </td>
@@ -492,12 +475,14 @@ export default function ScreenerPage() {
                   ))
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-16 text-center">
-                      <p className="text-4xl mb-3" style={{ color: "rgba(255,255,255,0.06)" }}>◎</p>
-                      <p className="text-sm mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
-                        Tidak ada saham yang cocok dengan filter ini
+                    <td colSpan={7} className="py-16 text-center">
+                      <p
+                        className="text-sm mb-3"
+                        style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)", letterSpacing: "0.15em" }}
+                      >
+                        [ TIDAK ADA HASIL ]
                       </p>
-                      <p className="text-[10px]" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>
+                      <p className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
                         Coba ubah atau reset kriteria filter
                       </p>
                     </td>
@@ -517,6 +502,7 @@ export default function ScreenerPage() {
                         }}
                         data-testid={`screener-row-${stock.symbol}`}
                       >
+                        {/* SAHAM */}
                         <td className="px-4 py-3 w-48">
                           <div className="flex items-center gap-3 py-1">
                             <StockLogo symbol={stock.symbol} />
@@ -524,40 +510,73 @@ export default function ScreenerPage() {
                               <p className="text-base font-bold text-white" style={{ fontFamily: sora }}>
                                 {stock.symbol}
                               </p>
-                              <p
-                                className="text-[11px] truncate"
-                                style={{ fontFamily: mono, color: "#6b7280", maxWidth: 160 }}
-                              >
+                              <p className="text-[11px] truncate" style={{ fontFamily: mono, color: "#6b7280", maxWidth: 160 }}>
                                 {stock.name}
                               </p>
                             </div>
                           </div>
                         </td>
+
+                        {/* SEKTOR */}
                         <td className="px-4 py-3 w-28">
                           <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
                             {stock.sector || "—"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 w-20 text-center">
-                          <span
-                            className="text-lg font-bold"
-                            style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}
-                          >
-                            {stock.readinessScore}
-                          </span>
+
+                        {/* HARGA */}
+                        <td className="px-4 py-3 w-28">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-sm font-medium text-white" style={{ fontFamily: mono }}>
+                              Rp {parseFloat(String(stock.price).replace(/[^0-9.-]/g, "") || "0").toLocaleString("id-ID")}
+                            </span>
+                            <span
+                              className={`text-xs font-medium ${
+                                parseFloat(stock.changePercent) > 0
+                                  ? "text-emerald-400"
+                                  : parseFloat(stock.changePercent) < 0
+                                    ? "text-red-400"
+                                    : "text-[#6b7280]"
+                              }`}
+                              style={{ fontFamily: mono }}
+                            >
+                              {parseFloat(stock.changePercent) > 0
+                                ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
+                                : parseFloat(stock.changePercent) < 0
+                                  ? `▼ ${parseFloat(stock.changePercent).toFixed(2)}%`
+                                  : `— 0.00%`}
+                            </span>
+                          </div>
                         </td>
-                        <td className="px-4 py-3 w-32">
-                          <RegimeBadge regime={stock.marketRegime} />
+
+                        {/* SKOR */}
+                        <td className="px-4 py-3 w-20">
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-lg font-bold" style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}>
+                              {stock.readinessScore}
+                            </span>
+                            <div style={{ height: 3, width: 48, background: "rgba(255,255,255,0.06)", borderRadius: 9999 }}>
+                              <div style={{
+                                height: "100%",
+                                width: `${stock.readinessScore}%`,
+                                background: scoreColor(stock.readinessScore),
+                                borderRadius: 9999,
+                              }} />
+                            </div>
+                          </div>
                         </td>
+
+                        {/* SIKLUS */}
                         <td className="px-4 py-3 w-40">
                           <CycleLabel position={v2.cyclePosition} />
                         </td>
-                        <td className="px-4 py-3 w-28 text-right">
+
+                        {/* ALIRAN */}
+                        <td className="px-4 py-3 w-28">
                           <FlowLabel bias={v2.flowBias} />
                         </td>
-                        <td className="px-4 py-3 w-32">
-                          <ConcentrationBadge type={v2.concentrationType} />
-                        </td>
+
+                        {/* AKSI */}
                         <td className="px-4 py-3 w-32 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button
@@ -589,7 +608,7 @@ export default function ScreenerPage() {
                                 }}
                                 data-testid={`screener-detail-${stock.symbol}`}
                               >
-                                DETAIL →
+                                ANALISIS →
                               </button>
                             </Link>
                           </div>
@@ -604,111 +623,9 @@ export default function ScreenerPage() {
         </div>
       </div>
 
-      <p
-        className="mt-8 text-center"
-        style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}
-      >
+      <p className="mt-8 text-center" style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}>
         Filter likuiditas, volume, dan kapitalisasi akan aktif setelah integrasi data IDX live · PT Berkat Digital Investasi
       </p>
     </div>
-  );
-}
-
-function StockLogo({ symbol }: { symbol: string }) {
-  const [failed, setFailed] = useState(false);
-  const src = `https://assets.stockbit.com/logos/companies/${symbol}.png`;
-  return (
-    <div
-      className="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden"
-      style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
-    >
-      {failed ? (
-        <span className="text-[10px] font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>
-          {symbol.slice(0, 2)}
-        </span>
-      ) : (
-        <img
-          src={src}
-          alt={symbol}
-          className="w-6 h-6 object-contain rounded-sm"
-          onError={() => setFailed(true)}
-        />
-      )}
-    </div>
-  );
-}
-
-function RegimeBadge({ regime }: { regime: string }) {
-  if (!regime || regime === "Tidak Diketahui") {
-    return <span style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}>—</span>;
-  }
-  const r = regime.toLowerCase();
-  let color = "#6b7280";
-  if (r.includes("akumulasi")) color = "#38BDF8";
-  else if (r.includes("transisi") || r.includes("fading")) color = "#fbbf24";
-  else if (r.includes("distribusi") || r.includes("spekulatif") || r.includes("volatile")) color = "#f87171";
-  return (
-    <span
-      className="inline-block px-2 py-0.5 rounded-sm"
-      style={{
-        fontFamily: mono,
-        fontSize: 10,
-        color,
-        background: "rgba(255,255,255,0.02)",
-        border: "1px solid rgba(255,255,255,0.06)",
-      }}
-    >
-      {regime}
-    </span>
-  );
-}
-
-function CycleLabel({ position }: { position: string | null }) {
-  if (!position) {
-    return <span style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}>—</span>;
-  }
-  const map: Record<string, { label: string; color: string }> = {
-    ENTRY_WINDOW: { label: "Entry Window", color: "#34d399" },
-    KONFIRMASI_MULAI: { label: "Konfirmasi Mulai", color: "#38bdf8" },
-    TERLALU_DINI: { label: "Terlalu Dini", color: "#94a3b8" },
-    WASPADAI_DISTRIBUSI: { label: "Waspadai Distribusi", color: "#fbbf24" },
-  };
-  const entry = map[position] || { label: position, color: "#6b7280" };
-  return (
-    <span className="text-[11px]" style={{ fontFamily: mono, color: entry.color }}>
-      {entry.label}
-    </span>
-  );
-}
-
-function FlowLabel({ bias }: { bias: string | null }) {
-  if (!bias) return <span style={{ fontFamily: mono, fontSize: 11, color: "#6b7280" }}>—</span>;
-  if (bias === "Akumulasi") return <span className="text-[11px]" style={{ fontFamily: mono, color: "#34d399" }}>↑ Akumulasi</span>;
-  if (bias === "Distribusi") return <span className="text-[11px]" style={{ fontFamily: mono, color: "#f87171" }}>↓ Distribusi</span>;
-  return <span className="text-[11px]" style={{ fontFamily: mono, color: "#6b7280" }}>→ Netral</span>;
-}
-
-function ConcentrationBadge({ type }: { type: string | null }) {
-  if (!type) {
-    return <span style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}>—</span>;
-  }
-  const map: Record<string, { label: string; borderColor: string; textColor: string }> = {
-    KENDALI_BANDAR: { label: "Kendali Bandar", borderColor: "rgba(16,185,129,0.4)", textColor: "#34d399" },
-    JEBAKAN_DISTRIBUSI: { label: "Jebakan Distribusi", borderColor: "rgba(239,68,68,0.4)", textColor: "#f87171" },
-    TERSEBAR: { label: "Tersebar", borderColor: "rgba(255,255,255,0.08)", textColor: "#6b7280" },
-  };
-  const entry = map[type] || { label: type, borderColor: "rgba(255,255,255,0.08)", textColor: "#6b7280" };
-  return (
-    <span
-      className="inline-block px-2 py-0.5 rounded-sm"
-      style={{
-        fontFamily: mono,
-        fontSize: 10,
-        color: entry.textColor,
-        border: `1px solid ${entry.borderColor}`,
-      }}
-    >
-      {entry.label}
-    </span>
   );
 }

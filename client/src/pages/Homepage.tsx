@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Activity, Radio, ShieldCheck } from "lucide-react";
+import { ScoreRing } from "@/components/ScoreRing";
+import { DecisionBadge } from "@/components/DecisionBadge";
 
 interface StockData {
   symbol: string;
@@ -9,240 +11,306 @@ interface StockData {
   marketRegime: string;
   homepageBucket: string;
   sector: string | null;
+  changePercent: string;
   isGorengan?: boolean;
 }
 
 const mono = "'IBM Plex Mono', monospace";
 const sora = "'Sora', sans-serif";
 
-function scoreColor(score: number) {
-  if (score >= 80) return "#34d399";
-  if (score >= 60) return "#fbbf24";
-  return "#f87171";
+function getIDXSessionStatus(): { label: string; live: boolean } {
+  const now = new Date();
+  const wibOffset = 7 * 60;
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const wibMinutes = (utcMinutes + wibOffset) % (24 * 60);
+  const totalMinutes = Math.floor(wibMinutes / 60) * 60 + (wibMinutes % 60);
+  const wibDate = new Date(now.getTime() + wibOffset * 60 * 1000);
+  const dayOfWeek = wibDate.getUTCDay();
+  if (dayOfWeek === 0 || dayOfWeek === 6) return { label: "PASAR TUTUP", live: false };
+  if (totalMinutes >= 9 * 60 && totalMinutes < 12 * 60) return { label: "SESI 1 BERLANGSUNG", live: true };
+  if (totalMinutes >= 13 * 60 + 30 && totalMinutes < 15 * 60 + 50) return { label: "SESI 2 BERLANGSUNG", live: true };
+  if (totalMinutes >= 8 * 60 + 45) return { label: "PRA-PEMBUKAAN", live: false };
+  return { label: "PASAR TUTUP", live: false };
 }
 
-function bucketAccent(bucket: string) {
-  if (bucket === "siap_dipantau") return "#34d399";
-  if (bucket === "watchlist_prioritas") return "#fbbf24";
-  return "#f87171";
+function bucketToDecision(bucket: string): string {
+  if (bucket === "siap_dipantau") return "SIAP_DIPANTAU";
+  if (bucket === "watchlist_prioritas") return "WATCHLIST_PRIORITAS";
+  return "HINDARI_DULU";
 }
 
 export default function Homepage() {
-  const { data: stocks } = useQuery<StockData[]>({
-    queryKey: ["/api/stocks"],
-  });
+  const { data: stocks } = useQuery<StockData[]>({ queryKey: ["/api/stocks"] });
+  const session = getIDXSessionStatus();
+  const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  const stockCount = stocks?.length ?? 0;
 
   return (
-    <div style={{ background: "#0f0f0f" }}>
-      {/* SECTION 1 — Full viewport hero */}
-      <section className="relative min-h-screen flex flex-col overflow-hidden" style={{ background: "#0f0f0f" }}>
-        {/* BACKGROUND LAYER */}
+    <div style={{ background: "#080808" }}>
+
+      {/* ─── ZONE A: Terminal Header ─── */}
+      <div
+        className="flex items-center justify-between px-6 py-2.5"
+        style={{ background: "#0a0a0a", borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+      >
+        <span style={{ fontFamily: mono, fontWeight: 700, fontSize: 16, color: "#38BDF8" }}>BART</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {session.live && (
+            <span
+              style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: "#34D399", display: "inline-block",
+                animation: "pulse 2s infinite",
+              }}
+            />
+          )}
+          <span style={{ fontFamily: mono, fontSize: 9, color: "#38BDF8", opacity: 0.7, letterSpacing: "0.1em" }}>
+            {session.live ? "● " : "○ "}{session.label}
+            {" · "}SESI: {today}
+            {" · "}{stockCount} SAHAM
+            {" · "}PIPELINE: AKTIF
+          </span>
+        </div>
+        <Link href="/radar">
+          <input
+            type="text"
+            placeholder="Cari saham..."
+            readOnly
+            className="cursor-pointer rounded-md px-3 py-1.5 text-xs outline-none"
+            style={{
+              fontFamily: mono, background: "#161616",
+              border: "1px solid rgba(255,255,255,0.06)", color: "#6B7280", width: 160,
+            }}
+          />
+        </Link>
+      </div>
+
+      {/* ─── ZONE B: Hero ─── */}
+      <section
+        className="relative min-h-screen flex flex-col overflow-hidden"
+        style={{ background: "#080808" }}
+      >
+        {/* Background: blurred radar preview */}
         <div className="absolute inset-0 z-0">
-          {/* Layer A — Blurred Radar preview */}
-          <div
-            className="absolute inset-0 pt-32 overflow-hidden pointer-events-none select-none"
-            style={{ opacity: 0.2, filter: "blur(2px)" }}
-          >
+          <div className="absolute inset-0 pt-32 overflow-hidden pointer-events-none select-none"
+            style={{ opacity: 0.15, filter: "blur(2px)" }}>
             {stocks && stocks.length > 0 && (
               <table className="w-full" style={{ minWidth: 800 }}>
                 <thead>
                   <tr style={{ background: "#111111" }}>
-                    {["SAHAM", "SEKTOR", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "AKSI"].map((h) => (
-                      <th
-                        key={h}
-                        className="text-left px-4 py-2"
-                        style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.1em", color: "#6b7280", fontWeight: 400 }}
-                      >
+                    {["SAHAM", "SEKTOR", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "AKSI"].map((h) => (
+                      <th key={h} className="text-left px-4 py-2"
+                        style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.1em", color: "#6b7280", fontWeight: 400 }}>
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {stocks.slice(0, 12).map((stock) => {
-                    const accent = bucketAccent(stock.homepageBucket);
-                    return (
-                      <tr
-                        key={stock.symbol}
-                        style={{ background: "#161616", borderBottom: "1px solid rgba(255,255,255,0.03)", borderLeft: `2px solid ${accent}` }}
-                      >
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-bold text-white" style={{ fontFamily: sora }}>{stock.symbol}</p>
-                          <p className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>{stock.name}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>{stock.sector || "—"}</span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="text-lg font-bold" style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}>{stock.readinessScore}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="px-2 py-0.5 rounded-sm text-[10px]" style={{ fontFamily: mono, color: "#6b7280", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}>{stock.marketRegime}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-[11px]" style={{ fontFamily: mono, color: "#94a3b8" }}>—</span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-[11px]" style={{ fontFamily: mono, color: "#6b7280" }}>→ Netral</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-[10px]" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>—</span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-[10px] px-3 py-1.5 rounded-sm" style={{ fontFamily: mono, background: "rgba(56,189,248,0.1)", color: "#38BDF8", border: "1px solid rgba(56,189,248,0.2)" }}>DETAIL →</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {stocks.slice(0, 14).map((stock) => (
+                    <tr key={stock.symbol}
+                      style={{ background: "#161616", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                      <td className="px-4 py-2">
+                        <p className="text-sm font-bold text-white" style={{ fontFamily: sora }}>{stock.symbol}</p>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span style={{ fontFamily: mono, fontSize: 10, color: "#6b7280" }}>{stock.sector || "—"}</span>
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <span className="text-lg font-bold"
+                          style={{ fontFamily: mono, color: stock.readinessScore >= 60 ? "#34d399" : stock.readinessScore >= 40 ? "#fbbf24" : "#f87171" }}>
+                          {stock.readinessScore}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span style={{ fontFamily: mono, fontSize: 10, color: "#6b7280" }}>{stock.marketRegime}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span style={{ fontFamily: mono, fontSize: 10, color: "#9ca3af" }}>—</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span style={{ fontFamily: mono, fontSize: 10, color: "#6b7280" }}>→ Netral</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span style={{ fontFamily: mono, fontSize: 10, color: "#38BDF8" }}>DETAIL →</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
           </div>
-
-          {/* Layer B — Gradient overlay */}
-          <div
-            className="absolute inset-0"
-            style={{ background: "linear-gradient(to bottom, #0f0f0f 0%, #0f0f0f40 30%, #0f0f0f10 60%, #0f0f0f 100%)" }}
-          />
-
-          {/* Layer C — Scanline texture */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{ background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.016) 2px, rgba(255,255,255,0.016) 3px)" }}
-          />
+          <div className="absolute inset-0"
+            style={{ background: "linear-gradient(to bottom, #080808 0%, #08080840 25%, #08080810 55%, #080808 100%)" }} />
+          <div className="absolute inset-0 pointer-events-none"
+            style={{ background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.012) 2px, rgba(255,255,255,0.012) 3px)" }} />
         </div>
 
-        {/* FOREGROUND CONTENT */}
+        {/* Foreground */}
         <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-8 text-center">
-          <p
-            className="text-[10px] tracking-[0.3em] uppercase mb-6 opacity-80"
-            style={{ fontFamily: mono, color: "#38BDF8" }}
-          >
-            BANDARMOLOGY ANALYSIS & RESEARCH TERMINAL
+          <p style={{ fontFamily: mono, fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "#38BDF8", opacity: 0.9, marginBottom: 20 }}>
+            BART INTELLIGENCE TERMINAL
           </p>
 
-          <h1 style={{ fontFamily: sora }} className="text-5xl font-bold text-white leading-tight mb-4">
-            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "0ms" }}>
-              Baca Pasar
-            </div>
-            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "100ms" }}>
-              Sebelum Harga
-            </div>
-            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "200ms", color: "#38BDF8" }}>
-              Bergerak.
+          <h1 style={{ fontFamily: sora, fontWeight: 700, color: "#FFFFFF", lineHeight: 1.12, marginBottom: 16 }}
+            className="text-5xl md:text-6xl">
+            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards" }}>Baca Pasar</div>
+            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "120ms" }}>
+              Seperti Institusi.
             </div>
           </h1>
 
-          <p
-            className="text-lg max-w-lg mx-auto mt-2 mb-8 leading-relaxed"
-            style={{
-              fontFamily: sora,
-              color: "#6b7280",
-              opacity: 0,
-              animation: "fadeInUp 0.4s ease forwards",
-              animationDelay: "350ms",
-            }}
-            data-testid="text-homepage-subtitle"
-          >
-            BART mendeteksi perilaku institusi dan bandar di seluruh IDX
-            sebelum pergerakan harga terjadi.
+          <p style={{
+            fontFamily: sora, fontSize: 16, color: "#6B7280", maxWidth: 480,
+            lineHeight: 1.65, marginBottom: 32,
+            opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "280ms",
+          }}>
+            Enam layer intelijen. Satu skor kesiapan trading.
+            <br />Khusus untuk pasar IDX.
           </p>
 
-          <div
-            style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "500ms" }}
-            className="flex flex-col items-center"
-          >
+          <div className="flex gap-4 items-center justify-center"
+            style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "420ms" }}>
             <Link href="/radar">
               <button
-                className="font-bold text-sm tracking-wider px-8 py-3.5 rounded-md transition-all duration-200 hover:scale-[1.02]"
+                className="font-bold rounded-lg transition-all duration-150 hover:bg-[#7DD3FC] hover:scale-[1.02]"
                 style={{
-                  fontFamily: mono,
-                  background: "#38BDF8",
-                  color: "#000",
-                  boxShadow: "0 10px 25px -5px rgba(56,189,248,0.2)",
+                  fontFamily: sora, fontSize: 14, fontWeight: 700,
+                  background: "#38BDF8", color: "#000",
+                  padding: "12px 28px",
+                  boxShadow: "0 8px 20px -4px rgba(56,189,248,0.25)",
                 }}
                 data-testid="button-open-radar"
               >
-                BUKA RADAR →
+                Buka Radar →
               </button>
             </Link>
             <Link href="/stock/BBCA">
-              <span
-                className="text-[11px] mt-3 block transition-colors cursor-pointer hover:text-[#ffffff60]"
-                style={{ fontFamily: mono, color: "rgba(255,255,255,0.19)" }}
+              <button
+                className="rounded-lg transition-all duration-150"
+                style={{
+                  fontFamily: sora, fontSize: 14,
+                  background: "transparent",
+                  color: "#38BDF8", padding: "12px 24px",
+                  border: "1px solid rgba(56,189,248,0.3)",
+                }}
                 data-testid="link-example-analysis"
               >
-                Lihat contoh analisis saham →
-              </span>
+                Lihat Contoh Saham
+              </button>
             </Link>
           </div>
 
-          <div
-            className="flex gap-12 justify-center mt-16 items-center"
-            style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "600ms" }}
-          >
+          {/* Stats strip */}
+          <div className="flex gap-12 justify-center mt-16 items-center"
+            style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "560ms" }}>
             <div className="text-center">
-              <p className="text-2xl font-bold text-white" style={{ fontFamily: mono }}>12+</p>
-              <p className="text-[10px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>Model Deteksi</p>
+              <p className="text-2xl font-bold text-white" style={{ fontFamily: mono }}>6</p>
+              <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#6b7280" }}>Layer Intelijen</p>
             </div>
             <div className="w-px h-8 self-center" style={{ background: "rgba(255,255,255,0.06)" }} />
             <div className="text-center">
-              <p className="text-2xl font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>v2.0</p>
-              <p className="text-[10px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>Engine Bandarmologi</p>
+              <p className="text-2xl font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>v3.0</p>
+              <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#6b7280" }}>Engine Bandarmologi</p>
             </div>
             <div className="w-px h-8 self-center" style={{ background: "rgba(255,255,255,0.06)" }} />
             <div className="text-center">
               <p className="text-2xl font-bold text-white" style={{ fontFamily: mono }}>IDX</p>
-              <p className="text-[10px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>Seluruh Pasar</p>
+              <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#6b7280" }}>Seluruh Pasar</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* SECTION 2 — Feature strip */}
-      <section className="py-12 px-8" style={{ background: "#0a0a0a", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
-        <h2
-          className="text-xl font-bold text-white text-center mb-8"
-          style={{ fontFamily: sora }}
-        >
+      {/* ─── ZONE C: Live Signal Strip ─── */}
+      {stocks && stocks.length > 0 && (
+        <section style={{ background: "#0a0a0a", borderTop: "1px solid rgba(255,255,255,0.03)", padding: "16px 0" }}>
+          <div style={{ overflowX: "auto", paddingBottom: 4 }} className="no-scrollbar">
+            <div style={{ display: "flex", gap: 10, paddingLeft: 24, paddingRight: 24, width: "max-content" }}>
+              {stocks.slice(0, 16).map((stock) => {
+                const cp = parseFloat(stock.changePercent || "0");
+                const decision = bucketToDecision(stock.homepageBucket);
+                const accentColor = decision === "SIAP_DIPANTAU" ? "#34D399" : decision === "WATCHLIST_PRIORITAS" ? "#FBBF24" : "#F87171";
+                return (
+                  <Link href={`/stock/${stock.symbol}`} key={stock.symbol}>
+                    <div
+                      className="cursor-pointer transition-all duration-150 hover:border-[rgba(255,255,255,0.1)]"
+                      style={{
+                        width: 148, padding: "12px 14px",
+                        background: "#111111", border: "1px solid #1F2937",
+                        borderLeft: `3px solid ${accentColor}`,
+                        borderRadius: 10,
+                      }}
+                    >
+                      <p style={{ fontFamily: sora, fontSize: 13, fontWeight: 700, color: "#FFFFFF", marginBottom: 4 }}>
+                        {stock.symbol}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{
+                          fontFamily: mono, fontSize: 16, fontWeight: 700,
+                          color: stock.readinessScore >= 60 ? "#34D399" : stock.readinessScore >= 40 ? "#FBBF24" : "#F87171",
+                        }}>
+                          {stock.readinessScore}
+                        </span>
+                        <span style={{
+                          fontFamily: mono, fontSize: 10,
+                          color: cp > 0 ? "#34D399" : cp < 0 ? "#F87171" : "#6B7280",
+                        }}>
+                          {cp > 0 ? `+${cp.toFixed(2)}%` : `${cp.toFixed(2)}%`}
+                        </span>
+                      </div>
+                      <DecisionBadge decision={decision} size="sm" showIcon={false} />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ─── ZONE D: How It Works ─── */}
+      <section className="py-16 px-8" style={{ background: "#0a0a0a", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
+        <p style={{ fontFamily: mono, fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: "#38BDF8", textAlign: "center", marginBottom: 12, opacity: 0.8 }}>
+          CARA KERJA
+        </p>
+        <h2 className="text-center mb-12" style={{ fontFamily: sora, fontSize: 22, fontWeight: 700, color: "#FFFFFF" }}>
           Dirancang untuk trader yang berpikir seperti institusi.
         </h2>
 
-        <div className="grid grid-cols-3 gap-6 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           {[
             {
               icon: Activity,
-              title: "Bandarmology Engine",
+              title: "Baca Aliran Broker",
               desc: "12 model deteksi perilaku institusi. Dari akumulasi stealth hingga stabilitas rezim pasar.",
             },
             {
               icon: Radio,
-              title: "Radar IDX",
-              desc: "Pemindaian seluruh pasar secara bersamaan. Temukan kampanye akumulasi sebelum harga bergerak.",
+              title: "Analisis 6 Layer",
+              desc: "Bandarmologi, makro, fundamental, manajemen, valuasi, dan rotasi sektor — diintegrasikan dalam satu skor.",
             },
             {
               icon: ShieldCheck,
-              title: "Bukan Sinyal Jual Beli",
-              desc: "BART membantu Anda berpikir seperti pro. Bukan robot trading — panduan analisis berbasis data.",
+              title: "Satu Skor Kesiapan",
+              desc: "Bukan sinyal beli/jual. Satu angka yang memberi konteks lengkap: kapan, kenapa, dan seberapa siap.",
             },
           ].map((f) => {
             const Icon = f.icon;
             return (
               <div
                 key={f.title}
-                className="p-6 rounded-md transition-all duration-200 hover:border-[rgba(56,189,248,0.2)]"
-                style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
+                className="p-6 rounded-xl transition-all duration-150"
+                style={{ background: "#111111", border: "1px solid #1F2937" }}
               >
-                <div
-                  className="w-8 h-8 rounded-sm flex items-center justify-center mb-4"
-                  style={{ background: "rgba(56,189,248,0.1)" }}
-                >
-                  <Icon style={{ width: 16, height: 16, color: "#38BDF8" }} />
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-5"
+                  style={{ background: "rgba(56,189,248,0.1)" }}>
+                  <Icon style={{ width: 18, height: 18, color: "#38BDF8" }} />
                 </div>
-                <h3 className="text-sm font-bold text-white mb-2" style={{ fontFamily: sora }}>
+                <h3 className="mb-2" style={{ fontFamily: sora, fontSize: 15, fontWeight: 600, color: "#FFFFFF" }}>
                   {f.title}
                 </h3>
-                <p className="text-[11px] leading-relaxed" style={{ fontFamily: mono, color: "#6b7280" }}>
+                <p style={{ fontFamily: mono, fontSize: 11, color: "#6B7280", lineHeight: 1.7 }}>
                   {f.desc}
                 </p>
               </div>
@@ -251,28 +319,25 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* SECTION 3 — Bottom CTA strip */}
-      <section
-        className="py-10 px-8"
-        style={{ background: "#0f0f0f", borderTop: "1px solid rgba(255,255,255,0.03)" }}
-      >
+      {/* ─── Bottom CTA ─── */}
+      <section className="py-10 px-8" style={{ background: "#080808", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           <div>
-            <p className="text-lg font-bold text-white" style={{ fontFamily: sora }}>
+            <p style={{ fontFamily: sora, fontSize: 17, fontWeight: 700, color: "#FFFFFF" }}>
               Siap memindai pasar?
             </p>
-            <p className="text-xs mt-1" style={{ fontFamily: mono, color: "#6b7280" }}>
+            <p style={{ fontFamily: mono, fontSize: 10, color: "#6B7280", marginTop: 4 }}>
               Data IDX live segera hadir via PT Berkat Digital Investasi
             </p>
           </div>
           <Link href="/radar">
             <button
-              className="font-bold text-sm tracking-wider px-8 py-3.5 rounded-md transition-all duration-200 hover:scale-[1.02]"
+              className="rounded-lg font-bold transition-all duration-150 hover:scale-[1.02]"
               style={{
-                fontFamily: mono,
-                background: "#38BDF8",
-                color: "#000",
-                boxShadow: "0 10px 25px -5px rgba(56,189,248,0.2)",
+                fontFamily: sora, fontSize: 14, fontWeight: 700,
+                background: "#38BDF8", color: "#000",
+                padding: "12px 28px",
+                boxShadow: "0 8px 20px -4px rgba(56,189,248,0.2)",
               }}
               data-testid="button-bottom-radar"
             >

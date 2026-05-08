@@ -158,22 +158,22 @@ export default function RadarPage() {
       {/* SECTION A — Header */}
       <div className="mb-5">
         <p
-          className="text-[10px] tracking-[0.2em] uppercase mb-1"
+          className="text-[10px] tracking-[0.25em] uppercase mb-1.5"
           style={{ fontFamily: mono, color: "#38BDF8" }}
         >
-          BANDARMOLOGY RADAR
+          RADAR INSTITUSIONAL
         </p>
         <h1
           className="text-2xl font-bold text-white"
           style={{ fontFamily: sora }}
         >
-          Pemindaian Institusional IDX
+          Pemindaian Pasar IDX
         </h1>
         <p
           className="text-sm mt-1"
           style={{ fontFamily: mono, color: "#6b7280" }}
         >
-          Mendeteksi aktivitas akumulasi dan distribusi di seluruh pasar
+          Seluruh saham dianalisis dengan 6 layer intelijen
         </p>
       </div>
 
@@ -189,14 +189,14 @@ export default function RadarPage() {
               <button
                 key={pill.key}
                 onClick={() => setFilter(pill.key)}
-                className="px-3 py-1.5 rounded-sm cursor-pointer transition-colors"
+                className="px-3 py-1.5 rounded-md cursor-pointer transition-all duration-150"
                 style={{
                   fontFamily: mono,
                   fontSize: 10,
-                  letterSpacing: "0.05em",
-                  background: active ? "rgba(56,189,248,0.15)" : "rgba(255,255,255,0.02)",
+                  letterSpacing: "0.06em",
+                  background: active ? "rgba(56,189,248,0.1)" : "rgba(255,255,255,0.02)",
                   color: active ? "#38BDF8" : "#6b7280",
-                  border: active ? "1px solid rgba(56,189,248,0.3)" : "1px solid rgba(255,255,255,0.03)",
+                  border: active ? "1px solid rgba(56,189,248,0.40)" : "1px solid #1F2937",
                 }}
                 data-testid={`filter-${pill.key}`}
               >
@@ -236,17 +236,18 @@ export default function RadarPage() {
         <table className="w-full min-w-[900px]">
           <thead>
             <tr style={{ background: "#111111", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-              {["SAHAM", "SEKTOR", "PERGERAKAN", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "KONSENTRASI", "AKSI"].map((h) => (
+              {["SAHAM", "SEKTOR", "HARGA", "SKOR", "SIKLUS", "ALIRAN", "AKSI"].map((h) => (
                 <th
                   key={h}
-                  className="text-left px-4 py-2"
+                  className="text-left px-4 py-3"
                   style={{
                     fontFamily: mono,
                     fontSize: 9,
-                    letterSpacing: "0.1em",
-                    color: "#6b7280",
+                    letterSpacing: "0.12em",
+                    color: "#6B7280",
                     textTransform: "uppercase",
                     fontWeight: 400,
+                    background: "#0d0d0d",
                   }}
                 >
                   {h}
@@ -258,7 +259,7 @@ export default function RadarPage() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} style={{ background: "#161616", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                  {Array.from({ length: 9 }).map((_, j) => (
+                  {Array.from({ length: 7 }).map((_, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 w-16 rounded bg-[#222] animate-pulse" />
                     </td>
@@ -267,7 +268,7 @@ export default function RadarPage() {
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-16 text-center">
+                <td colSpan={7} className="py-16 text-center">
                   <p className="text-4xl mb-3" style={{ color: "rgba(255,255,255,0.06)" }}>◎</p>
                   <p className="text-sm" style={{ fontFamily: mono, color: "#6b7280" }}>
                     Tidak ada saham terdeteksi pada filter ini
@@ -355,29 +356,31 @@ export default function RadarPage() {
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 w-20 text-center">
-                      <span
-                        className="text-lg font-bold"
-                        style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}
-                      >
-                        {stock.readinessScore}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-3 w-32">
-                      <RegimeBadge regime={stock.marketRegime} />
+                    <td className="px-4 py-3 w-20">
+                      <div className="flex flex-col gap-1.5">
+                        <span
+                          className="text-lg font-bold"
+                          style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}
+                        >
+                          {stock.readinessScore}
+                        </span>
+                        <div style={{ height: 3, width: 48, background: "rgba(255,255,255,0.06)", borderRadius: 9999 }}>
+                          <div style={{
+                            height: "100%",
+                            width: `${stock.readinessScore}%`,
+                            background: scoreColor(stock.readinessScore),
+                            borderRadius: 9999,
+                          }} />
+                        </div>
+                      </div>
                     </td>
 
                     <td className="px-4 py-3 w-40">
                       <CycleLabel position={v2.cyclePosition} />
                     </td>
 
-                    <td className="px-4 py-3 w-28 text-right">
+                    <td className="px-4 py-3 w-28">
                       <FlowLabel bias={v2.flowBias} />
-                    </td>
-
-                    <td className="px-4 py-3 w-32">
-                      <ConcentrationBadge type={v2.concentrationType} />
                     </td>
 
                     <td className="px-4 py-3 w-32 text-right">
@@ -411,7 +414,7 @@ export default function RadarPage() {
                             }}
                             data-testid={`radar-detail-${stock.symbol}`}
                           >
-                            DETAIL →
+                            ANALISIS →
                           </button>
                         </Link>
                       </div>
@@ -491,10 +494,10 @@ function CycleLabel({ position }: { position: string | null }) {
     return <span style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}>—</span>;
   }
   const map: Record<string, { label: string; color: string }> = {
-    ENTRY_WINDOW: { label: "Entry Window", color: "#34d399" },
-    KONFIRMASI_MULAI: { label: "Konfirmasi Mulai", color: "#38bdf8" },
-    TERLALU_DINI: { label: "Terlalu Dini", color: "#94a3b8" },
-    WASPADAI_DISTRIBUSI: { label: "Waspadai Distribusi", color: "#fbbf24" },
+    ENTRY_WINDOW: { label: "▶ Entry Window", color: "#34d399" },
+    KONFIRMASI_MULAI: { label: "◎ Konfirmasi", color: "#38bdf8" },
+    TERLALU_DINI: { label: "○ Terlalu Dini", color: "#94a3b8" },
+    WASPADAI_DISTRIBUSI: { label: "▼ Waspada Distribusi", color: "#fbbf24" },
   };
   const entry = map[position] || { label: position, color: "#6b7280" };
   return (
