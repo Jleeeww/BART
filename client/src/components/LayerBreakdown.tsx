@@ -12,7 +12,7 @@ interface LayerBreakdownProps {
   defaultCollapsed?: boolean;
 }
 
-const mono = "'IBM Plex Mono', monospace";
+const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 
 const LAYERS = [
   { key: "bandarmology", label: "Bandarmologi",   weight: 25 },
@@ -23,28 +23,37 @@ const LAYERS = [
   { key: "macro",        label: "Rotasi Sektor",     weight: 5  },
 ];
 
-function barColor(score: number | null) {
-  if (score === null) return "rgba(255,255,255,0.08)";
-  if (score >= 70) return "#34D399";
-  if (score >= 50) return "#FBBF24";
-  return "#F87171";
+function barColor(score: number | null): string {
+  if (score === null) return "rgba(255,255,255,0.06)";
+  if (score >= 70) return "#10B981";
+  if (score >= 50) return "#38BDF8";
+  if (score >= 40) return "#F59E0B";
+  return "#EF4444";
 }
 
-const STATUS_MAP: Record<string, [string, string, string]> = {
-  bandarmology: ["Akumulasi Aktif",  "Akumulasi Ringan", "Distribusi"],
-  news:         ["Sentimen Positif", "Netral",           "Override Makro"],
-  fundamental:  ["Fundamental Kuat", "Moderat",          "Lemah"],
-  management:   ["Manajemen Kuat",   "Memadai",          "Bendera Merah"],
-  valuation:    ["Valuasi Wajar",    "Moderat",          "Valuasi Mahal"],
-  macro:        ["Sektor Panas",     "Netral",           "Sektor Dingin"],
+function confColor(c: number): string {
+  if (c >= 70) return "#10B981";
+  if (c >= 50) return "#38BDF8";
+  if (c >= 40) return "#F59E0B";
+  return "#EF4444";
+}
+
+const STATUS_MAP: Record<string, [string, string, string, string]> = {
+  bandarmology: ["Akumulasi Aktif",  "Akumulasi Ringan", "Netral",          "Distribusi"],
+  news:         ["Sentimen Positif", "Netral",           "Perhatian",       "Override Makro"],
+  fundamental:  ["Fundamental Kuat", "Moderat",          "Rapuh",           "Lemah"],
+  management:   ["Manajemen Kuat",   "Memadai",          "Perlu Perhatian", "Bendera Merah"],
+  valuation:    ["Valuasi Wajar",    "Moderat",          "Agak Mahal",      "Valuasi Mahal"],
+  macro:        ["Sektor Panas",     "Netral",           "Melandai",        "Sektor Dingin"],
 };
 
 function layerStatus(key: string, score: number | null): string | null {
   if (score === null) return null;
-  const [high, mid, low] = STATUS_MAP[key] ?? ["", "", ""];
-  if (score >= 70) return high;
-  if (score >= 50) return mid;
-  return low;
+  const [s70, s50, s40, s0] = STATUS_MAP[key] ?? ["", "", "", ""];
+  if (score >= 70) return s70;
+  if (score >= 50) return s50;
+  if (score >= 40) return s40;
+  return s0;
 }
 
 export function LayerBreakdown({
@@ -62,12 +71,13 @@ export function LayerBreakdown({
     macro:        macroScore,
   };
 
-  const confColor = confidence >= 70 ? "#34D399" : confidence >= 50 ? "#FBBF24" : "#F87171";
+  const cc = confColor(confidence);
+  const activeCount = Object.values(scores).filter(v => v !== null).length;
 
   return (
     <div style={{
-      background: "#111111",
-      border: "1px solid #1F2937",
+      background: "#0d0d0d",
+      border: "1px solid rgba(255,255,255,0.06)",
       borderRadius: 12,
       overflow: "hidden",
     }}>
@@ -81,56 +91,75 @@ export function LayerBreakdown({
         onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
       >
-        <span style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "#6B7280" }}>
+        <span style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "#71717A" }}>
           ANALISIS 6 LAYER
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontFamily: mono, fontSize: 9, color: confColor }}>
-            Keyakinan: {confidence}%
+          <span style={{ fontFamily: mono, fontSize: 9, color: cc }}>
+            Keyakinan {confidence}% · {activeCount}/6 aktif
           </span>
           {collapsed
-            ? <ChevronDown size={14} color="#6B7280" />
-            : <ChevronUp size={14} color="#6B7280" />}
+            ? <ChevronDown size={14} color="#71717A" />
+            : <ChevronUp size={14} color="#71717A" />}
         </div>
       </button>
 
       {!collapsed && (
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", padding: "4px 20px 20px" }}>
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", padding: "8px 20px 20px" }}>
           {LAYERS.map((layer) => {
             const score = scores[layer.key];
             const color = barColor(score);
             const pct = score !== null ? score : 0;
             const status = layerStatus(layer.key, score);
+            const isNull = score === null;
             return (
-              <div key={layer.key} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
-                <div style={{ width: 108, flexShrink: 0 }}>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: "#9CA3AF" }}>{layer.label}</span>
+              <div key={layer.key} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
+                {/* Layer name */}
+                <div style={{ width: 112, flexShrink: 0 }}>
+                  <span style={{ fontFamily: mono, fontSize: 10, color: "#A1A1AA" }}>{layer.label}</span>
                 </div>
-                <div style={{ fontFamily: mono, fontSize: 9, color: "#6B7280", width: 26, flexShrink: 0 }}>
+                {/* Weight badge */}
+                <span style={{
+                  fontFamily: mono, fontSize: 8, color: "#3F3F46",
+                  background: "rgba(255,255,255,0.03)", borderRadius: 3,
+                  padding: "1px 5px", flexShrink: 0, width: 28, textAlign: "center",
+                }}>
                   {layer.weight}%
-                </div>
+                </span>
+                {/* Progress bar */}
                 <div style={{
-                  flex: 1, height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 9999, overflow: "hidden",
+                  flex: 1, height: 3, background: "rgba(255,255,255,0.05)",
+                  borderRadius: 9999, overflow: "hidden",
                 }}>
                   <div style={{
                     height: "100%", width: `${pct}%`,
                     background: color, borderRadius: 9999,
-                    transition: "width 0.5s ease",
+                    transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
+                    animation: isNull ? "pulse 2s infinite" : undefined,
                   }} />
                 </div>
+                {/* Score number */}
                 <div style={{
-                  width: 28, flexShrink: 0, textAlign: "right",
-                  fontFamily: mono, fontSize: 11, fontWeight: 700, color,
+                  width: 30, flexShrink: 0, textAlign: "right",
+                  fontFamily: mono, fontSize: 12, fontWeight: 600,
+                  color: isNull ? "#3F3F46" : color,
                 }}>
                   {score !== null ? score : "—"}
                 </div>
+                {/* Status badge */}
                 {status && (
                   <span style={{
-                    fontFamily: mono, fontSize: 8, color,
-                    background: `${color}18`, border: `1px solid ${color}30`,
+                    fontFamily: mono, fontSize: 8,
+                    color, background: `${color}14`,
+                    border: `1px solid ${color}28`,
                     borderRadius: 4, padding: "1px 6px", flexShrink: 0,
                   }}>
                     {status}
+                  </span>
+                )}
+                {isNull && !status && (
+                  <span style={{ fontFamily: mono, fontSize: 8, color: "#3F3F46", flexShrink: 0 }}>
+                    Memuat...
                   </span>
                 )}
               </div>

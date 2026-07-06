@@ -4,6 +4,7 @@ import { eq, desc, and } from 'drizzle-orm';
 
 export interface StockHistoryArrays {
   netFlowHistory: number[];
+  foreignFlowHistory: number[];  // daily netForeignFlow — used by M6/M8/M12/M14
   priceHistory: number[];
   m6ScoreHistory: number[];
   avg20dValue: number | null;
@@ -18,6 +19,7 @@ export async function buildStockHistory(
 ): Promise<StockHistoryArrays> {
   const empty: StockHistoryArrays = {
     netFlowHistory: [],
+    foreignFlowHistory: [],
     priceHistory: [],
     m6ScoreHistory: [],
     avg20dValue: null,
@@ -46,6 +48,7 @@ export async function buildStockHistory(
     const ordered = [...records].reverse();
 
     const netFlowHistory: number[] = [];
+    const foreignFlowHistory: number[] = [];
     const priceHistory: number[] = [];
     const m6ScoreHistory: number[] = [];
     const valueHistory: number[] = [];
@@ -54,6 +57,10 @@ export async function buildStockHistory(
       if (r.netFlow !== null && r.netFlow !== undefined &&
           isFinite(r.netFlow)) {
         netFlowHistory.push(r.netFlow);
+      }
+      if (r.netForeignFlow !== null && r.netForeignFlow !== undefined &&
+          isFinite(r.netForeignFlow)) {
+        foreignFlowHistory.push(r.netForeignFlow);
       }
       if (r.close !== null && r.close !== undefined &&
           r.close > 0 && isFinite(r.close)) {
@@ -80,6 +87,7 @@ export async function buildStockHistory(
 
     return {
       netFlowHistory,
+      foreignFlowHistory,
       priceHistory,
       m6ScoreHistory: m6ForM16,
       avg20dValue,

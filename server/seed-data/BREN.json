@@ -1,0 +1,14 @@
+{
+  "symbol": "BREN",
+  "date": "2026-05-19",
+  "description": "BREN gorengan pattern — single dominant broker controls >40% volume, retail-heavy, classic pump structure",
+  "netFlow": 12400000000,
+  "price": 3150,
+  "brokers": [
+    { "code": "YP",   "name": "PT eTrading Securities", "netBuy": "87.4B IDR",  "netSell": null,        "volumePercent": "41.2%", "avgBuy": "3,155", "avgSell": "3,140" },
+    { "code": "DH",   "name": "PT Sinarmas Sekuritas",  "netBuy": "32.1B IDR",  "netSell": null,        "volumePercent": "18.4%", "avgBuy": "3,148", "avgSell": "3,135" },
+    { "code": "MU",   "name": "PT Minna Padi Investama","netBuy": "21.8B IDR",  "netSell": null,        "volumePercent": "12.7%", "avgBuy": "3,152", "avgSell": "3,138" },
+    { "code": "BK",   "name": "PT Mandiri Sekuritas",   "netBuy": null,         "netSell": "68.4B IDR", "volumePercent": "8.1%",  "avgBuy": "3,180", "avgSell": "3,155" },
+    { "code": "CS",   "name": "PT Credit Suisse",       "netBuy": null,         "netSell": "60.5B IDR", "volumePercent": "7.2%",  "avgBuy": "3,175", "avgSell": "3,150" }
+  ]
+}

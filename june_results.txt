@@ -1,0 +1,75 @@
+
+════════════════════════════════════════════════════════════════════════════════
+JUNE 2026 BANDARMOLOGY VALIDATION — 9 IDX STOCKS
+════════════════════════════════════════════════════════════════════════════════
+Date window : Jun 2–18 2026 (12 sessions). Jun 16 = no data.
+Fix active  : M6/M8/M12/M14 read foreignFlowHistory (not netTotalFlow≈0).
+
+⚠  STALE STORED LABELS — validate by FLOW DATA here, not stored labels:
+   KLBF stored=stealth-accum  →  June actual=weak-dist-accelerating
+   BBRI stored=clean-accum    →  June actual=heavy-dist+reversal-stress
+   BREN stored=smart-exit     →  June actual=weak-dist/outlier-noise
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PATH A — computeStockReadiness  (categorical flow labels → 7-layer composite)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TICKER  BANDO  COMP CONF%  ACTION    BUCKET                FLAGS / NOTES
+────────────────────────────────────────────────────────────────────────────────
+TLKM        0  11.0   55%  AVOID     hindari_dulu          —
+BBRI        5  16.0   55%  AVOID     hindari_dulu          —
+MDKA       62  34.0   45%  WATCHLIST hindari_dulu          —
+KLBF        5  18.0   55%  AVOID     hindari_dulu          —
+HRUM       10  10.0   55%  AVOID     hindari_dulu          —
+BREN        0   6.0   55%  AVOID     hindari_dulu          —
+BUVA       25  17.0   55%  AVOID     hindari_dulu          —
+UNVR        5  20.0   55%  AVOID     hindari_dulu          —
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PATH B — computeBandarmologyV2  (foreignFlowHistory[] → M6/M8/M12/M14 direct)
+  M6  = last-day foreignFlow / avg20d (spot signal)
+  M8  = persistence × consistency last 5 days (stealth detector, gate: meanFlow>0)
+  M12 = recency-weighted rolling avg last 5 days [w=1,2,3,4,5]
+  M14 = trailing positive streak from today backward
+  M16 = null for all (no stored M6 history for these test stocks — expected)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TICKER     M6    M8   M12  M14(age/mat)          V2COMP  V2 LABEL
+──────────────────────────────────────────────────────────────────────────────────────────
+TLKM     39.6   0.0  46.6  NO_CAMPAIGN             22.5  HINDARI_DULU
+BBRI      0.0   0.0  36.6  NO_CAMPAIGN             15.6  HINDARI_DULU
+MDKA     50.7   3.6  56.2  42.5(age=3/ACTIVE)      52.7  NETRAL
+KLBF      9.8   0.0   4.8  NO_CAMPAIGN             13.9  HINDARI_DULU
+HRUM     47.5   0.0  46.0  NO_CAMPAIGN             23.9  HINDARI_DULU
+BREN     51.8   0.0  43.8  33.1(age=1/FORMING)     26.2  HINDARI_DULU
+BUVA     66.8   0.0  32.0  42.1(age=1/FORMING)     27.1  HINDARI_DULU
+UNVR     55.5   0.0  54.5  35.3(age=1/FORMING)     27.9  HINDARI_DULU
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VALIDATION SUMMARY — actual vs expected archetype
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TICKER A-ACTION  MATCH  EXPECTED ARCHETYPE
+────────────────────────────────────────────────────────────────────────────────
+TLKM   AVOID     ✓ PASS smart-money-exit / CAPITAL_FLIGHT
+BBRI   AVOID     ✓ PASS heavy sustained distribution + reversal-str [M14 age=0 ✓ — Jun17 reversal did NOT flip streak]
+MDKA   WATCHLIST ✓ PASS accumulation / domestic-led markup with mid
+KLBF   AVOID     ✓ PASS weak-distribution accelerating late, low-co
+HRUM   AVOID     ✓ PASS neutral / weak-distribution — low-confidenc
+BREN   AVOID     ✓ PASS weak-distribution / outlier-in-noise
+BUVA   AVOID     ✓ PASS weak/low-conviction — primary fix validatio [M6=66.8 (last day +) but M12=32.0 (rolling −) ✓ no false positive]
+UNVR   AVOID     ✓ PASS fading distribution / decay test [M12=54.5 — recency decay of early distribution ⚠ late recovery detected]
+
+Result: 8 / 8 expected archetypes matched
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL CHECKS (explicit per task spec)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  BBRI M14 age: 0 (must be 0 — Jun17 green print must NOT create streak)
+  BUVA readiness: 25 (must be low — three dampeners active)
+  UNVR M12: 54.5 (tests recency-weight decay of Jun2-5 front-load)
+  KLBF M12: 4.8 (stale stored label=accum; Jun flow=heavy dist)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+M11 NOTE: M11=50 for all stocks (domestic mirrors foreign → avgScore always 50).
+  This is CORRECT — M11 detects dual-direction flow impossible in real IDX data.
+  M11 was excluded from "DO NOT CHANGE" list. No action needed.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+

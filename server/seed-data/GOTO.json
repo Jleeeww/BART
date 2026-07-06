@@ -1,0 +1,14 @@
+{
+  "symbol": "GOTO",
+  "date": "2026-05-19",
+  "description": "GOTO distribution warning — smart money selling into retail buying; triggers SMART_MONEY_EXIT",
+  "netFlow": -62800000000,
+  "price": 68,
+  "brokers": [
+    { "code": "CS",   "name": "PT Credit Suisse",       "netBuy": null,         "netSell": "48.3B IDR", "volumePercent": "13.2%", "avgBuy": "69",  "avgSell": "68"  },
+    { "code": "CIMB", "name": "PT CIMB Securities",     "netBuy": null,         "netSell": "35.7B IDR", "volumePercent": "9.7%",  "avgBuy": "70",  "avgSell": "68"  },
+    { "code": "BK",   "name": "PT Mandiri Sekuritas",   "netBuy": null,         "netSell": "22.4B IDR", "volumePercent": "6.1%",  "avgBuy": "70",  "avgSell": "67"  },
+    { "code": "YP",   "name": "PT eTrading Securities", "netBuy": "28.6B IDR",  "netSell": null,        "volumePercent": "15.8%", "avgBuy": "68",  "avgSell": "67"  },
+    { "code": "DH",   "name": "PT Sinarmas Sekuritas",  "netBuy": "15.0B IDR",  "netSell": null,        "volumePercent": "11.3%", "avgBuy": "68",  "avgSell": "67"  }
+  ]
+}

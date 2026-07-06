@@ -150,16 +150,19 @@ async function processStock(
     const enrichedRaw = history && history.sessionCount > 0
       ? {
           ...raw,
-          netFlowHistory:  history.netFlowHistory.length > 0
-                             ? history.netFlowHistory
-                             : raw.netFlowHistory,
-          priceHistory:    history.priceHistory.length > 0
-                             ? history.priceHistory
-                             : raw.priceHistory,
-          avg20dValue:     history.avg20dValue ?? raw.avg20dValue,
-          _m6ScoreHistory: history.m6ScoreHistory.length > 0
-                             ? history.m6ScoreHistory
-                             : (raw as any)._m6ScoreHistory,
+          netFlowHistory:    history.netFlowHistory.length > 0
+                               ? history.netFlowHistory
+                               : raw.netFlowHistory,
+          foreignFlowHistory: history.foreignFlowHistory.length > 0
+                               ? history.foreignFlowHistory
+                               : (raw as any).foreignFlowHistory ?? null,
+          priceHistory:      history.priceHistory.length > 0
+                               ? history.priceHistory
+                               : raw.priceHistory,
+          avg20dValue:       history.avg20dValue ?? raw.avg20dValue,
+          _m6ScoreHistory:   history.m6ScoreHistory.length > 0
+                               ? history.m6ScoreHistory
+                               : (raw as any)._m6ScoreHistory,
         }
       : raw;
 
@@ -216,9 +219,9 @@ async function processStock(
     let homepageBucket = 'hindari_dulu';
     if (effectiveIsGorengan) {
       homepageBucket = 'hindari_dulu';
-    } else if (decision?.decision === 'SIAP_DIPANTAU' || decision?.decision === 'BUY') {
+    } else if (decision?.decision === 'SIAP_DIPANTAU') {
       homepageBucket = 'siap_dipantau';
-    } else if (decision?.decision === 'WATCHLIST_PRIORITAS' || decision?.decision === 'WATCHLIST') {
+    } else if (decision?.decision === 'WATCHLIST_PRIORITAS') {
       homepageBucket = 'watchlist_prioritas';
     } else {
       homepageBucket = 'hindari_dulu';

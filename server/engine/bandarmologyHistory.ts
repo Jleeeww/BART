@@ -32,6 +32,9 @@
  * ============================================================
  */
 
+import type { BandarmologyV2Result } from './bandarmologyCore';
+export type { BandarmologyV2Result } from './bandarmologyCore';
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -42,15 +45,6 @@ export interface BandarmologyHistoryRecord {
   m6Score:    number | null; // null if model was suppressed that session
   netFlow:    number | null; // net total flow (IDR)
   closePrice: number | null; // closing price
-}
-
-export interface BandarmologyV2Result {
-  M6_flowNormalized: { score: number | null };
-  composite: { score: number | null };
-  integrityReport: { isValid: boolean };
-  meta: { liquidityTier: number };
-  // Minimal interface — actual result has more fields
-  [key: string]: unknown;
 }
 
 // ============================================================
@@ -94,7 +88,7 @@ class InMemoryStorage implements HistoryStorage {
     const sym = symbol.toUpperCase();
     const records: BandarmologyHistoryRecord[] = [];
 
-    for (const [k, v] of this.store) {
+    for (const [k, v] of Array.from(this.store)) {
       if (k.startsWith(`${sym}::`)) records.push(v);
     }
 

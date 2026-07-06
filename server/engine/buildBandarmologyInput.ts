@@ -73,6 +73,7 @@ export interface RawStockRecord {
 
   // Pre-computed history arrays (optional enrichment)
   netFlowHistory?: (number | null | undefined)[] | null;
+  foreignFlowHistory?: (number | null | undefined)[] | null;  // daily netForeignFlow, oldest→newest
   priceHistory?: (number | null | undefined)[] | null;
 
   // v2.0: M6 score history — loaded from bandarmology_history storage
@@ -293,8 +294,9 @@ export function buildBandarmologyInput(
   const signals = mapFlowSignals(rawStock);
 
   // ── History arrays ────────────────────────────────────────────
-  const netFlowHistory = cleanNumberArray(rawStock.netFlowHistory);
-  const priceHistory   = cleanNumberArray(rawStock.priceHistory);
+  const netFlowHistory     = cleanNumberArray(rawStock.netFlowHistory);
+  const foreignFlowHistory = cleanNumberArray(rawStock.foreignFlowHistory);
+  const priceHistory       = cleanNumberArray(rawStock.priceHistory);
 
   // ── M6 score history (v2.0 — from storage, not derived here) ──
   // Priority: explicit m6History argument > rawStock._m6ScoreHistory > null
@@ -318,6 +320,7 @@ export function buildBandarmologyInput(
     volume,
     signals,
     netFlowHistory,
+    foreignFlowHistory,
     priceHistory,
     m6ScoreHistory,
     calendarFlags,

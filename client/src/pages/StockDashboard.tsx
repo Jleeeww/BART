@@ -3,9 +3,13 @@ import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
 import { StatusCard } from "@/components/StatusCard";
 import { LayerBreakdown } from "@/components/LayerBreakdown";
+import { ScoreRing as ScoreRingV3 } from "@/components/v3/ScoreRing";
+import { BODMemberCard } from "@/components/v3/BODMemberCard";
+import { NewsArticleCard } from "@/components/v3/NewsArticleCard";
 
-const mono = "'IBM Plex Mono', monospace";
-const sora = "'Sora', sans-serif";
+const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
+const sora = "'Inter', system-ui, sans-serif";
+const inter = "'Inter', system-ui, sans-serif";
 import { Users, Sparkles, Shield, Target, Activity, AlertOctagon, Lightbulb, Gauge, ChevronDown, ChevronUp, EyeOff, Eye, HelpCircle, BarChart3, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -135,6 +139,7 @@ function ConvictionTimeline({ phase, explanation }: { phase: string; explanation
 export default function StockDashboard() {
   const { symbol = "BBCA" } = useParams<{ symbol: string }>();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const { data: stock, isLoading, error } = useStock(symbol);
   const [aiData, setAIData] = useState<any>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -143,6 +148,39 @@ export default function StockDashboard() {
   const [distWarning, setDistWarning] = useState<any>(null);
   const [newsData, setNewsData] = useState<any>(null);
   const [managementData, setManagementData] = useState<any>(null);
+  const [insiderData, setInsiderData] = useState<any>(null);
+
+  const TAB_IDS = ["overview", "flow", "financials", "news", "risk", "insider", "valuation"] as const;
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key;
+      if (k === "?") { setShowShortcuts(s => !s); return; }
+      if (k === "Escape") { setShowShortcuts(false); return; }
+      if (k === "r") { setActiveTab("overview"); return; }
+      if (k === "f") { setActiveTab("flow"); return; }
+      if (k === "n") { setActiveTab("news"); return; }
+      if (k === "d") { setActiveTab("risk"); return; }
+      if (k === "j") {
+        setActiveTab(cur => {
+          const i = TAB_IDS.indexOf(cur as any);
+          return TAB_IDS[Math.min(i + 1, TAB_IDS.length - 1)];
+        });
+        return;
+      }
+      if (k === "k") {
+        setActiveTab(cur => {
+          const i = TAB_IDS.indexOf(cur as any);
+          return TAB_IDS[Math.max(i - 1, 0)];
+        });
+        return;
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     if (!symbol) return;
@@ -270,6 +308,14 @@ export default function StockDashboard() {
       .catch(() => {});
   }, [stock]);
 
+  useEffect(() => {
+    if (!stock) return;
+    fetch(`/api/insider/${stock.symbol}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && (data.signal || data.score !== undefined)) setInsiderData(data); })
+      .catch(() => {});
+  }, [stock]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -321,7 +367,9 @@ export default function StockDashboard() {
   const readinessScore = aiData?.smartMoneyReadinessScore?.score ?? 0;
   const mainReasons: string[] = aiData?.decisionEngine?.reasons ?? [];
   const mainRisk: string = aiData?.decisionEngine?.primaryRisk ?? '';
-  const traderProfile: string = aiData?.decisionEngine?.investorFit ?? '';
+  const traderProfile: string = (aiData?.decisionEngine?.investorFit ?? '')
+    .replace(/Investor defensif/gi, "Trader konservatif")
+    .replace(/Investor menengah/gi, "Trader aktif");
   const statusLabel: string = aiData?.smartMoneyReadinessScore?.statusLabel ?? '';
   const aiConfidence: number = aiData?.actionGuidance?.confidence === 'Tinggi' ? 85 : aiData?.actionGuidance?.confidence === 'Sedang' ? 60 : 35;
   const bandarmologyScore: number | null = aiData?.brokerControlScore?.score ?? null;
@@ -340,91 +388,101 @@ export default function StockDashboard() {
   const managementRedFlag = managementData?.hasCriticalRedFlag === 'true';
 
   return (
-    <div className="min-h-screen" style={{ background: "#080808", paddingBottom: 80 }}>
+    <div className="min-h-screen" style={{ background: "#060606", paddingBottom: 80 }}>
 
-      {/* SECTION A — Stock Identity Bar */}
+      {/* SECTION A — Sticky Ticker Bar */}
       <div
         style={{
-          background: "#111111", borderBottom: "1px solid #1F2937",
-          padding: "16px 24px", display: "flex", alignItems: "center",
-          gap: 16, flexWrap: "wrap",
+          position: "sticky", top: 0, zIndex: 40,
+          background: "#0a0a0a", borderBottom: "1px solid rgba(255,255,255,0.06)",
+          height: 56, padding: "0 24px",
+          display: "flex", alignItems: "center", gap: 16,
         }}
       >
-        {/* Logo + Symbol + Name + Sector */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div
-            className="flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden"
-            style={{ width: 40, height: 40, background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
-          >
-            <img
-              src={`https://assets.stockbit.com/logos/companies/${stock.symbol}.png`}
-              alt={stock.symbol}
-              className="w-8 h-8 object-contain"
-              onError={(e) => {
-                const el = e.currentTarget;
-                el.style.display = "none";
-                const parent = el.parentElement;
-                if (parent) {
-                  const span = document.createElement("span");
-                  span.textContent = stock.symbol.slice(0, 2);
-                  span.style.cssText = `font-family:${mono};font-size:11px;font-weight:700;color:#38BDF8`;
-                  parent.appendChild(span);
-                }
-              }}
-            />
-          </div>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontFamily: sora, fontSize: 22, fontWeight: 700, color: "#FFFFFF" }}>
-                {stock.symbol}
-              </span>
-              {stock.sector && (
-                <span style={{
-                  fontFamily: mono, fontSize: 9, letterSpacing: "0.12em",
-                  textTransform: "uppercase" as const, color: "#38BDF8",
-                  background: "rgba(56,189,248,0.1)", border: "1px solid rgba(56,189,248,0.2)",
-                  borderRadius: 4, padding: "2px 8px",
-                }}>
-                  {stock.sector}
-                </span>
-              )}
-            </div>
-            <p style={{ fontFamily: "'Inter', system-ui", fontSize: 13, color: "#6B7280", marginTop: 2 }}>
-              {stock.name}
+        {/* Logo */}
+        <div
+          className="flex-shrink-0 rounded-md flex items-center justify-center overflow-hidden"
+          style={{ width: 32, height: 32, background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.06)" }}
+        >
+          <img
+            src={`https://assets.stockbit.com/logos/companies/${stock.symbol}.png`}
+            alt={stock.symbol}
+            className="w-6 h-6 object-contain"
+            onError={(e) => {
+              const el = e.currentTarget;
+              el.style.display = "none";
+              const parent = el.parentElement;
+              if (parent) {
+                const span = document.createElement("span");
+                span.textContent = stock.symbol.slice(0, 2);
+                span.style.cssText = `font-family:${mono};font-size:10px;font-weight:700;color:#38BDF8`;
+                parent.appendChild(span);
+              }
+            }}
+          />
+        </div>
+
+        {/* Symbol · Name · Sector */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span style={{ fontFamily: mono, fontSize: 15, fontWeight: 700, color: "#F4F4F5" }}>
+            {stock.symbol}
+          </span>
+          <span style={{ color: "rgba(255,255,255,0.12)" }}>·</span>
+          <span style={{ fontFamily: inter, fontSize: 13, color: "#71717A" }}>
+            {stock.name}
+          </span>
+          {stock.sector && (
+            <span style={{
+              fontFamily: mono, fontSize: 8, letterSpacing: "0.12em",
+              textTransform: "uppercase" as const, color: "#4FC3F7",
+              background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.15)",
+              borderRadius: 4, padding: "2px 7px",
+            }}>
+              {stock.sector}
+            </span>
+          )}
+        </div>
+
+        {/* Price + change + session — right-aligned */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 20 }}>
+          <div style={{ textAlign: "right" }}>
+            <p style={{ fontFamily: mono, fontSize: 16, fontWeight: 700, color: "#F4F4F5", lineHeight: 1 }}>
+              Rp {parseFloat(String(stock.price).replace(/[^0-9.-]/g, "") || "0").toLocaleString("id-ID")}
+            </p>
+            <p style={{
+              fontFamily: mono, fontSize: 11, marginTop: 3,
+              color: parseFloat(stock.changePercent) > 0 ? "#4ADE80" : parseFloat(stock.changePercent) < 0 ? "#F87171" : "#71717A",
+            }}>
+              {parseFloat(stock.changePercent) > 0
+                ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
+                : parseFloat(stock.changePercent) < 0
+                  ? `▼ ${parseFloat(stock.changePercent).toFixed(2)}%`
+                  : `— 0.00%`}
             </p>
           </div>
-        </div>
 
-        {/* Price */}
-        <div style={{ marginLeft: "auto", textAlign: "right" }}>
-          <p style={{ fontFamily: mono, fontSize: 22, fontWeight: 700, color: "#FFFFFF", lineHeight: 1 }}>
-            Rp {parseFloat(String(stock.price).replace(/[^0-9.-]/g, "") || "0").toLocaleString("id-ID")}
-          </p>
-          <p style={{
-            fontFamily: mono, fontSize: 13, marginTop: 4,
-            color: parseFloat(stock.changePercent) > 0 ? "#34D399" : parseFloat(stock.changePercent) < 0 ? "#F87171" : "#6B7280",
-          }}>
-            {parseFloat(stock.changePercent) > 0
-              ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
-              : parseFloat(stock.changePercent) < 0
-                ? `▼ ${parseFloat(stock.changePercent).toFixed(2)}%`
-                : `— 0.00%`}
-          </p>
-        </div>
+          {/* Divider */}
+          <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.06)" }} />
 
-        {/* Session status */}
-        <div style={{ textAlign: "right" }} data-testid="badge-session-status">
-          <div className={`flex items-center gap-2 text-xs justify-end ${
-            sessionStatus.color === "green" ? "text-emerald-400" : sessionStatus.color === "yellow" ? "text-amber-400" : "text-rose-400"
-          }`}>
-            <div className={`w-1.5 h-1.5 rounded-full ${
-              sessionStatus.color === "green" ? "bg-emerald-500 animate-pulse" : sessionStatus.color === "yellow" ? "bg-amber-500" : "bg-rose-500"
-            }`} />
-            <span style={{ fontFamily: mono }}>{sessionStatus.label}</span>
+          {/* Session badge */}
+          <div style={{ textAlign: "right" }} data-testid="badge-session-status">
+            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: sessionStatus.color === "green" ? "#4ADE80" : sessionStatus.color === "yellow" ? "#FBBF24" : "#F87171",
+                boxShadow: sessionStatus.color === "green" ? "0 0 6px rgba(16,185,129,0.6)" : "none",
+              }} />
+              <span style={{
+                fontFamily: mono, fontSize: 10,
+                color: sessionStatus.color === "green" ? "#4ADE80" : sessionStatus.color === "yellow" ? "#FBBF24" : "#F87171",
+              }}>
+                {sessionStatus.label}
+              </span>
+            </div>
+            <p style={{ fontFamily: mono, fontSize: 8, color: "#3F3F46", marginTop: 2, letterSpacing: "0.06em" }}>
+              SESI IDX
+            </p>
           </div>
-          <p style={{ fontFamily: mono, fontSize: 9, color: "#6B7280", marginTop: 4 }}>
-            SESI IDX
-          </p>
         </div>
       </div>
 
@@ -436,67 +494,74 @@ export default function StockDashboard() {
           className="space-y-5"
         >
 
-          {/* SECTION B — Intelligence Summary Card */}
+          {/* CHART — Hero, top of analysis area */}
+          <motion.div variants={itemVariants}>
+            <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)" }}>
+              <PriceChart />
+            </div>
+          </motion.div>
+
+          {/* SCORE BLOCK — primary decision artifact, below chart */}
           <motion.div variants={itemVariants}>
             {aiLoading ? (
-              <div style={{ height: 220, background: "#111111", borderRadius: 12, border: "1px solid #1F2937" }}
+              <div style={{ height: 160, background: "#0a0a0a", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}
                 className="animate-pulse" />
             ) : (
               <StatusCard
                 score={readinessScore}
                 decision={decision}
-                mainReasons={mainReasons}
-                mainRisk={mainRisk}
-                traderProfile={traderProfile}
                 statusLabel={statusLabel}
+                symbol={symbol}
+                confidence={aiConfidence}
+                layerCount={[bandarmologyScore, newsScore, fundamentalScore, managementScore, valuationScore].filter(s => s !== null).length}
                 newsOverride={newsOverride}
                 managementRedFlag={managementRedFlag}
+                onAnalysisClick={() => {
+                  document.getElementById("section-intelligence")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
               />
             )}
           </motion.div>
 
-          {/* SECTION C — Layer Breakdown */}
-          <motion.div variants={itemVariants}>
-            <LayerBreakdown
-              bandarmologyScore={bandarmologyScore}
-              newsScore={newsScore !== null ? Math.round(newsScore) : null}
-              fundamentalScore={fundamentalScore}
-              managementScore={managementScore}
-              valuationScore={valuationScore}
-              macroScore={null}
-              confidence={aiConfidence}
-              defaultCollapsed={true}
-            />
-          </motion.div>
 
-          {/* SECTION D — PriceChart + Tabs */}
+          {/* TABS — Analysis sections below score */}
           <motion.div variants={itemVariants} className="space-y-4">
-            <PriceChart />
 
             <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <div style={{ borderBottom: "1px solid #1F2937", marginBottom: 0 }}>
+              <div style={{ marginBottom: 16, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                 <TabsList
-                  className="w-full justify-start h-auto bg-transparent overflow-x-auto no-scrollbar rounded-none p-0"
-                  style={{ borderBottom: "none" }}
+                  className="w-full justify-start h-auto overflow-x-auto no-scrollbar p-0"
+                  style={{ background: "transparent", gap: 0, borderRadius: 0 }}
                 >
                   {[
-                    { id: "overview",   label: "Ringkasan",  icon: PieChart },
-                    { id: "flow",       label: "Flow Broker", icon: Activity },
-                    { id: "financials", label: "Keuangan",   icon: DollarSign },
-                    { id: "news",       label: "Berita",     icon: Newspaper },
-                    { id: "risk",       label: "Distribusi", icon: AlertTriangle },
-                    { id: "insider",    label: "Manajemen",  icon: UserCheck },
-                    { id: "valuation",  label: "Valuasi",    icon: TrendingUp },
+                    { id: "overview",   label: "Ringkasan" },
+                    { id: "flow",       label: "Flow Broker", demoData: (stock as any)?.scrapeSource === 'MANUAL_SEED' },
+                    { id: "financials", label: "Keuangan" },
+                    { id: "news",       label: "Berita" },
+                    { id: "risk",       label: "Distribusi" },
+                    { id: "insider",    label: "Manajemen" },
+                    { id: "valuation",  label: "Valuasi" },
                   ].map((tab) => (
                     <TabsTrigger
                       key={tab.id}
                       value={tab.id}
-                      className="flex items-center gap-1.5 px-4 py-3 rounded-none border-b-2 border-transparent transition-all data-[state=active]:border-[#38BDF8] data-[state=active]:text-[#38BDF8] data-[state=inactive]:text-[#6B7280]"
-                      style={{ fontFamily: mono, fontSize: 11 }}
+                      className="px-4 py-2.5 transition-all rounded-none border-b-2"
+                      style={{
+                        fontFamily: mono, fontSize: 11, letterSpacing: "0.04em",
+                        borderBottom: activeTab === tab.id ? "2px solid #4FC3F7" : "2px solid transparent",
+                        color: activeTab === tab.id ? "#4FC3F7" : "#71717A",
+                        background: "transparent",
+                      }}
                       data-state={activeTab === tab.id ? "active" : "inactive"}
                     >
-                      <tab.icon className="w-3.5 h-3.5" />
                       {tab.label}
+                      {(tab as any).demoData && (
+                        <span style={{
+                          marginLeft: 5, fontSize: 8, fontWeight: 700, padding: "1px 4px",
+                          background: "#78350f", color: "#fbbf24", borderRadius: 2,
+                          letterSpacing: "0.06em", verticalAlign: "middle",
+                        }}>DEMO</span>
+                      )}
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -504,168 +569,130 @@ export default function StockDashboard() {
                 
                 <div className="mt-4">
                   <TabsContent value="overview" className="mt-0 focus-visible:outline-none space-y-5">
-                    {/* ACTION GUIDANCE MODE - HERO POSITION */}
-                    {!aiLoading && aiData?.actionGuidance && (
-                      <Card className={`p-6 border-2 shadow-lg ${
-                        aiData.actionGuidance.statusColor === "green" 
-                          ? "border-emerald-400 dark:border-emerald-600 bg-gradient-to-br from-emerald-500/15 to-emerald-500/5" 
-                          : aiData.actionGuidance.statusColor === "yellow"
-                            ? "border-amber-400 dark:border-amber-600 bg-gradient-to-br from-amber-500/15 to-amber-500/5"
-                            : aiData.actionGuidance.statusColor === "orange"
-                              ? "border-orange-400 dark:border-orange-600 bg-gradient-to-br from-orange-500/15 to-orange-500/5"
-                              : aiData.actionGuidance.statusColor === "red"
-                                ? "border-red-400 dark:border-red-600 bg-gradient-to-br from-red-500/15 to-red-500/5"
-                                : "border-slate-400 dark:border-slate-600 bg-gradient-to-br from-slate-500/15 to-slate-500/5"
-                      }`} data-testid="card-action-guidance">
-                        <div className="flex flex-col gap-4">
-                          {/* Title */}
-                          <div className="flex items-center gap-2">
-                            <Target className="w-5 h-5 text-primary" />
-                            <h2 className="text-base font-bold font-display text-foreground">
-                              Tindakan Paling Masuk Akal Saat Ini
-                            </h2>
-                          </div>
-                          
-                          {/* Combined Status Badge (Primary) */}
-                          <div className="flex flex-wrap items-center gap-3">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wide ${
-                                aiData.actionGuidance.statusColor === "green" 
-                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300" 
-                                  : aiData.actionGuidance.statusColor === "yellow"
-                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300"
-                                    : aiData.actionGuidance.statusColor === "orange"
-                                      ? "bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300"
-                                      : aiData.actionGuidance.statusColor === "red"
-                                        ? "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300"
-                                        : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                              }`} data-testid="badge-combined-status">
-                                <span className={`w-2.5 h-2.5 rounded-full ${
-                                  aiData.actionGuidance.statusColor === "green" ? "bg-emerald-500" 
-                                    : aiData.actionGuidance.statusColor === "yellow" ? "bg-amber-500"
-                                      : aiData.actionGuidance.statusColor === "orange" ? "bg-orange-500"
-                                        : aiData.actionGuidance.statusColor === "red" ? "bg-red-500"
-                                          : "bg-slate-400"
-                                }`}></span>
-                                {aiData.actionGuidance.statusLabel}
-                              </span>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Info className="w-4 h-4 text-muted-foreground hover:text-foreground cursor-help" data-testid="tooltip-action-guidance" />
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-xs text-center">
-                                  <p>Tindakan ini menunjukkan langkah paling masuk akal saat ini berdasarkan kondisi pasar.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                            
-                            {/* Watchlist Priority Tag */}
-                            {aiData.actionGuidance.isWatchlistPriority && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300" data-testid="badge-watchlist-priority">
-                                <Eye className="w-3.5 h-3.5" />
-                                Pantau Prioritas
-                              </span>
-                            )}
-                            
-                            {/* Gorengan Warning Tag */}
-                            {aiData.actionGuidance.isGorengan && (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold bg-red-600 text-white animate-pulse" data-testid="badge-gorengan-warning">
-                                <AlertTriangle className="w-4 h-4" />
-                                Spekulatif Terdeteksi
-                              </span>
-                            )}
-                          </div>
-                          
-                          {/* Primary Action & Confidence */}
-                          <div className="flex flex-wrap items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                                Aksi:
-                              </span>
-                              <span className="text-sm font-medium text-foreground" data-testid="text-primary-action">
-                                {aiData.actionGuidance.primaryActionLabel}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                                Keyakinan:
-                              </span>
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                                aiData.actionGuidance.confidence === "Tinggi" 
-                                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                                  : aiData.actionGuidance.confidence === "Sedang"
-                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                                    : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
-                              }`} data-testid="badge-confidence">
-                                {aiData.actionGuidance.confidence}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          {/* Short AI Summary */}
-                          <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-action-summary">
-                            {aiData.actionGuidance.shortSummary}
+                    {/* ── Intelligence Grid ── */}
+                    {!aiLoading && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                        {/* Card 1: RINGKASAN */}
+                        <div style={{
+                          background: "#080808", border: "1px solid rgba(255,255,255,0.04)",
+                          borderRadius: 10, padding: "18px 20px",
+                        }}>
+                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 14 }}>
+                            RINGKASAN
                           </p>
-                          
-                          {/* Expandable Section - Lihat Alasan & Risiko */}
-                          <Collapsible className="pt-3 border-t border-border/30">
-                            <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors group" data-testid="button-expand-reasons">
-                              <span className="flex items-center gap-1.5">
-                                <Lightbulb className="w-4 h-4" />
-                                Lihat Alasan & Risiko
-                              </span>
-                              <ChevronDown className="w-4 h-4 transition-transform group-data-[state=open]:rotate-180" />
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="pt-3 space-y-4" data-testid="section-reasons-risks">
-                              {/* Kenapa Tindakan Ini? */}
-                              <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                                  Kenapa Tindakan Ini?
-                                </p>
-                                <ul className="space-y-1.5">
-                                  {aiData.actionGuidance.expandedExplanation.whyAction.map((reason: string, idx: number) => (
-                                    <li key={idx} className="flex items-start gap-2 text-sm text-foreground" data-testid={`reason-action-${idx}`}>
-                                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                                      {reason}
-                                    </li>
-                                  ))}
-                                </ul>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {(mainReasons.length > 0 ? mainReasons.slice(0, 3) : ["Memuat analisis..."]).map((r, i) => (
+                              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                                <span style={{ fontFamily: mono, fontSize: 11, color: "#4ADE80", flexShrink: 0, lineHeight: "18px" }}>+</span>
+                                <span style={{ fontFamily: inter, fontSize: 12, color: "#A1A1AA", lineHeight: 1.55 }}>{r}</span>
                               </div>
-                              
-                              {/* Risiko Utama */}
-                              <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                  <AlertOctagon className="w-3 h-3 text-amber-500" />
-                                  Risiko Utama
-                                </p>
-                                <p className="text-sm text-foreground" data-testid="text-main-risk">
-                                  {aiData.actionGuidance.expandedExplanation.mainRisk}
-                                </p>
-                              </div>
-                              
-                              {/* Kapan Ini Bisa Gagal? */}
-                              <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                                  <Shield className="w-3 h-3 text-red-500" />
-                                  Kapan Ini Bisa Gagal?
-                                </p>
-                                <p className="text-sm text-foreground" data-testid="text-failure-trigger">
-                                  {aiData.actionGuidance.expandedExplanation.failureTrigger}
-                                </p>
-                              </div>
-                              
-                              {/* Disclaimer */}
-                              <div className="pt-2 border-t border-border/30">
-                                <p className="text-[10px] text-muted-foreground/70 italic leading-relaxed">
-                                  Panduan ini bersifat probabilistik, bukan sinyal transaksi. 
-                                  Selalu lakukan analisis mandiri sebelum mengambil keputusan investasi.
-                                </p>
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
+                            ))}
+                          </div>
                         </div>
-                      </Card>
+                        {/* Card 2: ALIRAN INSTITUSI */}
+                        <div style={{
+                          background: "#080808", border: "1px solid rgba(255,255,255,0.04)",
+                          borderRadius: 10, padding: "18px 20px",
+                        }}>
+                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 14 }}>
+                            ALIRAN INSTITUSI
+                          </p>
+                          {bandarmologyScore !== null ? (
+                            <>
+                              <p style={{
+                                fontFamily: mono, fontSize: 26, fontWeight: 700,
+                                color: bandarmologyScore >= 70 ? "#4ADE80" : bandarmologyScore >= 50 ? "#4FC3F7" : bandarmologyScore >= 40 ? "#FBBF24" : "#F87171",
+                                lineHeight: 1, marginBottom: 6,
+                              }}>
+                                {bandarmologyScore >= 70 ? "+" : bandarmologyScore < 40 ? "−" : "~"}{bandarmologyScore}
+                              </p>
+                              <p style={{ fontFamily: mono, fontSize: 10, color: "#71717A", marginBottom: 14 }}>
+                                Skor bandarmologi agregat
+                              </p>
+                              <div style={{ height: 1, background: "rgba(255,255,255,0.04)", marginBottom: 12 }} />
+                              <p style={{ fontFamily: mono, fontSize: 10, color: "#71717A" }}>
+                                Skor M6: {bandarmologyScore} · Tren: {
+                                  aiData?.brokerStabilityScore?.score >= 65 ? "naik" :
+                                  aiData?.brokerStabilityScore?.score >= 40 ? "stabil" : "turun"
+                                }
+                              </p>
+                            </>
+                          ) : (
+                            <p style={{ fontFamily: mono, fontSize: 11, color: "#3F3F46" }}>Memuat...</p>
+                          )}
+                        </div>
+                        {/* Card 3: KONTEKS MAKRO */}
+                        <div style={{
+                          background: "#080808", border: "1px solid rgba(255,255,255,0.04)",
+                          borderRadius: 10, padding: "18px 20px",
+                        }}>
+                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 14 }}>
+                            KONTEKS MAKRO
+                          </p>
+                          {newsOverride ? (
+                            <p style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: "#F87171", marginBottom: 6 }}>
+                              ⚠ Override aktif
+                            </p>
+                          ) : (
+                            <p style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: "#F4F4F5", marginBottom: 6 }}>
+                              Normal
+                            </p>
+                          )}
+                          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "10px 0" }} />
+                          <p style={{ fontFamily: mono, fontSize: 10, color: "#71717A" }}>
+                            {newsData?.impacts?.length > 0
+                              ? `${newsData.impacts.length} berita relevan · `
+                              : "Tidak ada berita · "}
+                            {newsData?.impacts?.some((n: any) => n.direction === "POSITIF")
+                              ? "sentimen positif"
+                              : newsData?.impacts?.some((n: any) => n.direction === "NEGATIF")
+                                ? "sentimen negatif"
+                                : "sentimen netral"}
+                          </p>
+                        </div>
+                      </div>
                     )}
+
+                    {/* ── Risk + Profil Trader ── */}
+                    {!aiLoading && (mainRisk || traderProfile) && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "14px 16px" }}>
+                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#3F3F46", marginBottom: 8 }}>
+                            RISIKO UTAMA
+                          </p>
+                          <p style={{ fontFamily: inter, fontSize: 13, color: "#71717A", lineHeight: 1.55 }}>
+                            {mainRisk || "—"}
+                          </p>
+                        </div>
+                        <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "14px 16px" }}>
+                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#3F3F46", marginBottom: 8 }}>
+                            PROFIL TRADER
+                          </p>
+                          <p style={{ fontFamily: inter, fontSize: 13, color: "#71717A", lineHeight: 1.55 }}>
+                            {traderProfile
+                              ? traderProfile.replace(/Investor defensif/gi, "Trader konservatif").replace(/Investor menengah/gi, "Trader aktif")
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Analisis 6 Layer ── */}
+                    <LayerBreakdown
+                      bandarmologyScore={bandarmologyScore}
+                      newsScore={newsScore !== null ? Math.round(newsScore) : null}
+                      fundamentalScore={fundamentalScore}
+                      managementScore={managementScore}
+                      valuationScore={valuationScore}
+                      macroScore={null}
+                      confidence={aiConfidence}
+                      defaultCollapsed={true}
+                    />
+
+                    {/* AI Summary — only on Ringkasan tab */}
+                    <AIStockSummary summary={stock.summary} confidence={stock.aiConfidence as "High" | "Medium" | "Low"} />
+
+                    {/* ── Distribution warning (unique signal, shown only here) ── */}
 
                     {distWarning && distWarning.alertLevel !== 'AMAN' && (
                       <div
@@ -753,362 +780,6 @@ export default function StockDashboard() {
                       </div>
                     )}
 
-                    {valuationData?.synthesis && (
-                      <Card className={`p-5 border shadow-sm ${
-                        valuationData.synthesis.alertLevel === 'POSITIVE' ? 'border-emerald-500/30 bg-gradient-to-br from-emerald-500/8 to-emerald-500/3'
-                        : valuationData.synthesis.alertLevel === 'DANGER' ? 'border-red-500/30 bg-gradient-to-br from-red-500/8 to-red-500/3'
-                        : valuationData.synthesis.alertLevel === 'CAUTION' ? 'border-amber-500/30 bg-gradient-to-br from-amber-500/8 to-amber-500/3'
-                        : 'border-border/50 bg-card/50'
-                      }`} data-testid="card-synthesis">
-                        <div className="flex items-center gap-2 mb-3">
-                          <GitMerge className={`w-4 h-4 ${
-                            valuationData.synthesis.alertLevel === 'POSITIVE' ? 'text-emerald-400'
-                            : valuationData.synthesis.alertLevel === 'DANGER' ? 'text-red-400'
-                            : valuationData.synthesis.alertLevel === 'CAUTION' ? 'text-amber-400'
-                            : 'text-primary'
-                          }`} />
-                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Sintesis: Valuasi × Bandarmology</p>
-                        </div>
-                        <p className="text-sm font-semibold text-foreground mb-2" data-testid="text-synthesis-headline">
-                          {valuationData.synthesis.headline}
-                        </p>
-                        <p className="text-xs text-muted-foreground leading-relaxed mb-3" data-testid="text-synthesis-explanation">
-                          {valuationData.synthesis.explanation}
-                        </p>
-                        <div className="flex items-start gap-2 pt-3 border-t border-border/30">
-                          <ArrowRight className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
-                          <p className="text-xs text-foreground" data-testid="text-synthesis-implication">
-                            {valuationData.synthesis.implication}
-                          </p>
-                        </div>
-                      </Card>
-                    )}
-                    
-                    {/* HERO DECISION BLOCK */}
-                    {!aiLoading && aiData?.decisionEngine && (
-                      <Card className={`p-6 border-2 shadow-md ${
-                        aiData.decisionEngine.status === "Layak Dikoleksi Bertahap" 
-                          ? "border-emerald-300 dark:border-emerald-700 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5" 
-                          : aiData.decisionEngine.status === "Perlu Waspada"
-                            ? "border-amber-300 dark:border-amber-700 bg-gradient-to-br from-amber-500/10 to-amber-500/5"
-                            : "border-red-300 dark:border-red-700 bg-gradient-to-br from-red-500/10 to-red-500/5"
-                      }`} data-testid="card-hero-decision">
-                        <div className="flex flex-col gap-4">
-                          {/* Status Title */}
-                          <div className="flex items-center justify-between flex-wrap gap-3">
-                            <h2 className={`text-xl font-bold font-display ${
-                              aiData.decisionEngine.status === "Layak Dikoleksi Bertahap" 
-                                ? "text-emerald-700 dark:text-emerald-400" 
-                                : aiData.decisionEngine.status === "Perlu Waspada"
-                                  ? "text-amber-700 dark:text-amber-400"
-                                  : "text-red-700 dark:text-red-400"
-                            }`} data-testid="text-decision-status">
-                              Status Saham: {aiData.decisionEngine.status === "Layak Dikoleksi Bertahap" ? "Siap Entry" : aiData.decisionEngine.status}
-                            </h2>
-                            {/* Sub-badge */}
-                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wide ${
-                              aiData.decisionEngine.subBadge === "Akumulasi Sehat" 
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" 
-                                : aiData.decisionEngine.subBadge === "Akumulasi Rapuh"
-                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                                  : aiData.decisionEngine.subBadge === "Distribusi Awal"
-                                    ? "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"
-                                    : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                            }`} data-testid="badge-decision-subbadge">
-                              {aiData.decisionEngine.subBadge}
-                            </span>
-                          </div>
-                          
-                          {/* ALASAN UTAMA - Max 3 bullets */}
-                          <div className="pt-4 border-t border-border/30">
-                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Alasan Utama</p>
-                            <ul className="space-y-2" data-testid="list-main-reasons">
-                              {aiData.decisionEngine.reasons.slice(0, 3).map((reason: string, idx: number) => (
-                                <li key={idx} className="flex items-start gap-2 text-sm text-foreground" data-testid={`reason-${idx}`}>
-                                  <div className={`w-1.5 h-1.5 rounded-full mt-2 shrink-0 ${
-                                    aiData.decisionEngine.status === "Layak Dikoleksi Bertahap" 
-                                      ? "bg-emerald-500" 
-                                      : aiData.decisionEngine.status === "Perlu Waspada"
-                                        ? "bg-amber-500"
-                                        : "bg-red-500"
-                                  }`} />
-                                  {reason}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                          
-                          {/* RISIKO UTAMA - Only 1 */}
-                          <div className="pt-4 border-t border-border/30">
-                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                              <AlertTriangle className="w-3 h-3 text-amber-500" />
-                              Risiko Utama
-                            </p>
-                            <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-primary-risk">
-                              {aiData.decisionEngine.primaryRisk}
-                            </p>
-                          </div>
-                          
-                          {/* COCOK UNTUK SIAPA */}
-                          <div className="pt-4 border-t border-border/30">
-                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                              <Users className="w-3 h-3 text-primary" />
-                              Profil Trader
-                            </p>
-                            <p className="text-sm text-foreground font-medium" data-testid="text-investor-fit">
-                              {aiData.decisionEngine.investorFit}
-                            </p>
-                          </div>
-                        </div>
-                      </Card>
-                    )}
-                    
-                    {/* Loading state for decision engine */}
-                    {aiLoading && (
-                      <Card className="p-6 border-border/50 shadow-sm animate-pulse">
-                        <div className="h-8 bg-muted rounded w-3/4 mb-4" />
-                        <div className="space-y-2">
-                          <div className="h-4 bg-muted rounded w-full" />
-                          <div className="h-4 bg-muted rounded w-5/6" />
-                          <div className="h-4 bg-muted rounded w-4/6" />
-                        </div>
-                      </Card>
-                    )}
-
-                    {/* SMART MONEY READINESS SCORE */}
-                    {!aiLoading && aiData?.smartMoneyReadinessScore && (
-                      <Card className="p-6 border-border/50 shadow-sm" data-testid="card-smart-money-readiness">
-                        <div className="flex flex-col gap-4">
-                          {/* Score Display */}
-                          <div className="flex items-center justify-between flex-wrap gap-3">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                                aiData.smartMoneyReadinessScore.score >= 75 
-                                  ? "bg-emerald-100 dark:bg-emerald-900/40" 
-                                  : aiData.smartMoneyReadinessScore.score >= 55
-                                    ? "bg-blue-100 dark:bg-blue-900/40"
-                                    : aiData.smartMoneyReadinessScore.score >= 35
-                                      ? "bg-amber-100 dark:bg-amber-900/40"
-                                      : "bg-red-100 dark:bg-red-900/40"
-                              }`}>
-                                <BarChart3 className={`w-7 h-7 ${
-                                  aiData.smartMoneyReadinessScore.score >= 75 
-                                    ? "text-emerald-600 dark:text-emerald-400" 
-                                    : aiData.smartMoneyReadinessScore.score >= 55
-                                      ? "text-blue-600 dark:text-blue-400"
-                                      : aiData.smartMoneyReadinessScore.score >= 35
-                                        ? "text-amber-600 dark:text-amber-400"
-                                        : "text-red-600 dark:text-red-400"
-                                }`} />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Kesiapan Trading</p>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help" data-testid="tooltip-readiness-score" />
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="max-w-xs text-center">
-                                      <p>Readiness mengukur kesiapan struktur saham, bukan waktu beli.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                                <p className="text-[10px] text-muted-foreground/70 mb-1">Penilaian kesiapan struktural (bukan sinyal beli)</p>
-                                <div className="flex items-baseline gap-2">
-                                  <span className={`text-3xl font-bold font-display ${
-                                    aiData.smartMoneyReadinessScore.score >= 75 
-                                      ? "text-emerald-700 dark:text-emerald-400" 
-                                      : aiData.smartMoneyReadinessScore.score >= 55
-                                        ? "text-blue-700 dark:text-blue-400"
-                                        : aiData.smartMoneyReadinessScore.score >= 35
-                                          ? "text-amber-700 dark:text-amber-400"
-                                          : "text-red-700 dark:text-red-400"
-                                  }`} data-testid="text-readiness-score">
-                                    {aiData.smartMoneyReadinessScore.score}
-                                  </span>
-                                  <span className="text-lg text-muted-foreground font-medium">/ 100</span>
-                                </div>
-                                {aiData.smartMoneyReadinessScore.valuationModifier != null && aiData.smartMoneyReadinessScore.valuationModifier !== 0 && (
-                                  <div className="flex items-center gap-1 mt-1" data-testid="text-valuation-modifier">
-                                    <span className={`text-[10px] font-mono ${
-                                      aiData.smartMoneyReadinessScore.valuationModifier > 0 ? 'text-emerald-400' : 'text-red-400'
-                                    }`}>
-                                      {aiData.smartMoneyReadinessScore.valuationModifier > 0 ? '▲' : '▼'}
-                                      {Math.abs(aiData.smartMoneyReadinessScore.valuationModifier)} poin dari valuasi
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* Status Label */}
-                            <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${
-                              aiData.smartMoneyReadinessScore.score >= 75 
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300" 
-                                : aiData.smartMoneyReadinessScore.score >= 55
-                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
-                                  : aiData.smartMoneyReadinessScore.score >= 35
-                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                                    : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                            }`} data-testid="badge-readiness-status">
-                              {aiData.smartMoneyReadinessScore.statusLabel}
-                            </span>
-                          </div>
-                          
-                          {/* Short Explanation */}
-                          <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-readiness-explanation">
-                            {aiData.smartMoneyReadinessScore.shortExplanation}
-                          </p>
-                          
-                          {/* Inconsistency Warning */}
-                          {aiData.smartMoneyReadinessScore.hasInconsistency && (
-                            <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20" data-testid="warning-inconsistency">
-                              <AlertOctagon className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                                {aiData.smartMoneyReadinessScore.inconsistencyNote}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* Expandable Detail Section */}
-                          <Collapsible className="pt-2 border-t border-border/30">
-                            <CollapsibleTrigger className="flex items-center justify-between w-full py-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors group" data-testid="button-expand-grading">
-                              <span className="flex items-center gap-1.5">
-                                <HelpCircle className="w-4 h-4" />
-                                Bagaimana skor ini dihitung?
-                              </span>
-                              <ChevronDown className="w-4 h-4 transition-transform group-data-[state=open]:rotate-180" />
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="pt-3 space-y-4" data-testid="section-grading-detail">
-                              {/* What is Readiness Score */}
-                              <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
-                                <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-widest mb-1">Apa itu Skor Kesiapan?</p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                  Skor Kesiapan mengukur kesiapan struktural saham berdasarkan perilaku institusional. 
-                                  Skor tinggi menunjukkan fondasi yang kuat, namun bukan berarti saham harus dibeli sekarang.
-                                </p>
-                              </div>
-                              
-                              {/* Component Breakdown Table */}
-                              <div>
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Analisis 6 Layer</p>
-                                <div className="overflow-x-auto">
-                                  <table className="w-full text-sm">
-                                    <thead>
-                                      <tr className="border-b border-border/50">
-                                        <th className="text-left py-2 text-xs font-semibold text-muted-foreground">Komponen</th>
-                                        <th className="text-center py-2 text-xs font-semibold text-muted-foreground">Bobot</th>
-                                        <th className="text-right py-2 text-xs font-semibold text-muted-foreground">Kondisi</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {aiData.smartMoneyReadinessScore.components.map((comp: { name: string; weight: string; condition: string }, idx: number) => (
-                                        <tr key={idx} className="border-b border-border/30 last:border-b-0" data-testid={`row-component-${idx}`}>
-                                          <td className="py-2 text-foreground font-medium">{comp.name}</td>
-                                          <td className="py-2 text-center text-muted-foreground">{comp.weight}</td>
-                                          <td className="py-2 text-right">
-                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                                              comp.condition.includes("Aktif") || comp.condition.includes("Kuat") || comp.condition.includes("Konsisten") || comp.condition.includes("Selaras") || comp.condition.includes("Rendah")
-                                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                                                : comp.condition.includes("Rapuh") || comp.condition.includes("Parsial") || comp.condition.includes("Netral") || comp.condition.includes("Sedang") || comp.condition.includes("Tersembunyi")
-                                                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-                                                  : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
-                                            }`}>
-                                              {comp.condition}
-                                            </span>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-                              
-                              {/* Why high score doesn't mean buy */}
-                              <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                                <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest mb-1">Kenapa skor tinggi belum tentu beli?</p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                  Skor tinggi mencerminkan struktur yang siap, namun momentum eksekusi (jendela masuk) ditentukan oleh Action Guidance di atas.
-                                  Skor dapat tinggi saat distribusi berlangsung karena mencerminkan struktur masa lalu.
-                                </p>
-                              </div>
-                              
-                              {/* When score becomes active */}
-                              <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                                <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-widest mb-1">Kapan skor menjadi aktif?</p>
-                                <p className="text-xs text-muted-foreground leading-relaxed">
-                                  Skor menjadi aktif ketika Action Guidance menunjukkan "Layak Akumulasi" atau "Spekulatif Terkontrol".
-                                  Pada status "Watchlist Prioritas", skor sudah tinggi namun belum ada jendela eksekusi optimal.
-                                </p>
-                              </div>
-                              
-                              {/* AI Grading Explanation */}
-                              <div className="p-3 rounded-lg bg-muted/50 border border-border/30">
-                                <p className="text-xs text-muted-foreground leading-relaxed" data-testid="text-grading-explanation">
-                                  {aiData.smartMoneyReadinessScore.gradingExplanation}
-                                </p>
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        </div>
-                      </Card>
-                    )}
-
-                    {decisionV2?.cyclePosition && (
-                      <div className="mt-3 flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">Posisi Siklus:</span>
-                        <span className={`font-medium ${
-                          decisionV2.cyclePosition === 'ENTRY_WINDOW'         ? 'text-emerald-400' :
-                          decisionV2.cyclePosition === 'KONFIRMASI_MULAI'     ? 'text-sky-400' :
-                          decisionV2.cyclePosition === 'WASPADAI_DISTRIBUSI'  ? 'text-amber-400' :
-                          'text-slate-400'
-                        }`}>
-                          {decisionV2.cyclePosition === 'TERLALU_DINI'        && 'Terlalu Dini — kampanye baru terbentuk'}
-                          {decisionV2.cyclePosition === 'KONFIRMASI_MULAI'    && 'Konfirmasi Mulai — 3–7 hari akumulasi'}
-                          {decisionV2.cyclePosition === 'ENTRY_WINDOW'        && 'Entry Window Terbuka — 7–15 hari'}
-                          {decisionV2.cyclePosition === 'WASPADAI_DISTRIBUSI' && 'Kampanye Memanjang — waspadai distribusi'}
-                        </span>
-                      </div>
-                    )}
-
-                    {decisionV2?.label === 'WATCHLIST_PRIORITAS' && (
-                      <div className="mt-3 p-3 rounded-md bg-secondary/40 border border-border/40">
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Kriteria Konfirmasi ({decisionV2.confirmation.criteriaMetCount}/4 terpenuhi):
-                        </p>
-                        <div className="grid grid-cols-2 gap-1 text-xs">
-                          {([
-                            ['Kampanye Aktif (≥3 hari)',     decisionV2.confirmation.details.campaignActive],
-                            ['Aliran Dana Kuat (M6 ≥65)',    decisionV2.confirmation.details.flowStrong],
-                            ['Harga Merespon (M15 ≥65)',     decisionV2.confirmation.details.priceResponding],
-                            ['Akumulasi Bergulir (M12 ≥65)', decisionV2.confirmation.details.rollingStrong],
-                          ] as [string, boolean][]).map(([label, met]) => (
-                            <div key={label} className="flex items-center gap-1">
-                              <span className={met ? 'text-emerald-400' : 'text-slate-500'}>{met ? '✓' : '○'}</span>
-                              <span className={met ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Company Profile - Simplified */}
-                    <Card className="p-6 border-border/50 shadow-sm">
-                      <h3 className="text-lg font-bold font-display mb-4">Profil Perusahaan</h3>
-                      <p className="text-muted-foreground leading-relaxed mb-4">
-                        {stock.description}
-                      </p>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Sektor</p>
-                          <p className="text-base font-semibold text-foreground">{stock.sector}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Subsektor</p>
-                          <p className="text-base font-semibold text-foreground">{stock.subsector}</p>
-                        </div>
-                      </div>
-                    </Card>
                   </TabsContent>
                   
                   {/* Financials Tab */}
@@ -1737,98 +1408,33 @@ export default function StockDashboard() {
                     )}
 
                     {/* SECTION 1: Analyzed News Impacts */}
+                    {/* Analyzed impacts — filtered by symbol/sector only */}
                     {newsData?.impacts?.length > 0 ? (
-                      <div className="space-y-3">
-                        <h3 className="text-sm font-bold text-foreground px-1 uppercase tracking-widest" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
-                          Dampak Berita Teranalisis
-                        </h3>
-                        {newsData.impacts.map((impact: any, idx: number) => {
-                          const directionStyle =
-                            impact.direction === 'POSITIF'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                              : impact.direction === 'NEGATIF'
-                              ? 'bg-red-500/10 text-red-400 border border-red-500/30'
-                              : 'bg-[#ffffff06] text-[#6b7280] border border-[#ffffff10]';
-                          const horizonLabel =
-                            impact.timeHorizon === 'IMMEDIATE' ? '0-2 sesi'
-                            : impact.timeHorizon === 'SHORT' ? '3-10 sesi'
-                            : '11-30 sesi';
-                          return (
-                            <Card key={`${impact.articleId}-${idx}`} className="p-4 border-border/40 bg-[#0d0d0d]">
-                              <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${directionStyle}`}>
-                                  {impact.direction}
-                                </span>
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${directionStyle}`}>
-                                  {impact.strength}
-                                </span>
-                                <span className="inline-flex items-center px-2 py-0.5 rounded bg-[#ffffff06] border border-[#ffffff10] text-[10px] text-[#6b7280]">
-                                  {horizonLabel}
-                                </span>
-                                {impact.requiresImmediateAttention && (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-red-500/10 border border-red-500/20 text-[10px] text-red-400 font-bold">
-                                    SEGERA
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-[#d1d5db] leading-relaxed mb-2">{impact.mechanism}</p>
-                              <p className="text-[10px] text-[#6b7280] leading-relaxed italic">{impact.traderImplication}</p>
-                              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#ffffff08]">
-                                <span className="text-[9px] text-[#4b5563] font-mono">{impact.eventType}</span>
-                                <span className="text-[9px] text-[#4b5563]">·</span>
-                                <span className="text-[9px] text-[#4b5563] font-mono">
-                                  {new Date(impact.analyzedAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              </div>
-                            </Card>
-                          );
-                        })}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {newsData.impacts.map((impact: any, idx: number) => (
+                          <NewsArticleCard
+                            key={`${impact.articleId}-${idx}`}
+                            title={impact.mechanism ?? "Dampak berita"}
+                            summary={impact.traderImplication}
+                            source={impact.eventType ?? ""}
+                            publishedAt={impact.analyzedAt}
+                            direction={impact.direction}
+                          />
+                        ))}
                       </div>
                     ) : (
-                      <div className="py-6 text-center">
-                        <p className="text-sm text-[#6b7280]" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
-                          Berita sedang dimuat — pipeline aktif setiap 15 menit
+                      <div style={{
+                        background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.05)",
+                        borderRadius: 8, padding: "32px 24px", textAlign: "center",
+                      }}>
+                        <p style={{ fontFamily: mono, fontSize: 11, color: "#3F3F46", marginBottom: 6 }}>
+                          Tidak ada berita relevan untuk {symbol} dalam 30 hari terakhir.
+                        </p>
+                        <p style={{ fontFamily: mono, fontSize: 10, color: "#27272A" }}>
+                          Pipeline berita aktif setiap 15 menit.
                         </p>
                       </div>
                     )}
-
-                    {/* SECTION 2: Recent Raw Articles */}
-                    {newsData?.cachedArticles?.length > 0 && (
-                      <div className="space-y-3">
-                        <h3 className="text-sm font-bold text-foreground px-1 uppercase tracking-widest" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
-                          Berita Terkini
-                        </h3>
-                        {newsData.cachedArticles.map((article: any) => (
-                          <Card key={article.id} className="p-4 border-border/40 bg-[#0d0d0d]">
-                            <a
-                              href={article.url || '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm font-semibold text-[#d1d5db] hover:text-[#38BDF8] leading-tight block mb-1 transition-colors"
-                            >
-                              {article.title}
-                            </a>
-                            <p className="text-xs text-[#6b7280] leading-relaxed mb-2 line-clamp-2">{article.summary}</p>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-[#4b5563] font-mono">{article.source}</span>
-                              <span className="text-[9px] text-[#4b5563]">·</span>
-                              <span className="text-[10px] text-[#4b5563] font-mono">
-                                {new Date(article.publishedAt).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Disclaimer */}
-                    <div className="p-4 rounded-lg bg-muted/30 border border-border/30" data-testid="news-disclaimer">
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        <span className="font-semibold text-foreground">Catatan Penting:</span> Berita tidak menghasilkan sinyal beli atau jual.
-                        Analisis bersifat indikatif dan bukan rekomendasi investasi.
-                        Gunakan sebagai konteks tambahan dalam analisis menyeluruh.
-                      </p>
-                    </div>
                   </TabsContent>
 
                   {/* Risk Tab */}
@@ -2048,333 +1654,321 @@ export default function StockDashboard() {
                   </TabsContent>
 
                   {/* Insider Tab */}
-                  <TabsContent value="insider" className="mt-0 focus-visible:outline-none space-y-6">
-
-                    {/* MANAGEMENT INTELLIGENCE — shown when research data is available */}
-                    {managementData && (
-                      <div className="space-y-3">
+                  <TabsContent value="insider" className="mt-0 focus-visible:outline-none space-y-5">
+                    {managementData ? (
+                      <>
                         {/* Critical red flag banner */}
                         {managementData.hasCriticalRedFlag && (
-                          <div className="bg-red-500/10 border border-red-500/30 rounded-md px-4 py-3">
-                            <p className="text-red-400 text-[10px] font-bold uppercase tracking-widest mb-1" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
-                              ⛔ RED FLAG KRITIS TERIDENTIFIKASI
+                          <div style={{
+                            background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.25)",
+                            borderRadius: 8, padding: "12px 16px",
+                          }}>
+                            <p style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "#F87171", marginBottom: 4, textTransform: "uppercase" }}>
+                              ⛔ Bendera Merah Kritis Teridentifikasi
                             </p>
-                            <p className="text-red-300 text-xs leading-relaxed">
+                            <p style={{ fontFamily: inter, fontSize: 12, color: "#FCA5A5", lineHeight: 1.55 }}>
                               {managementData.criticalRedFlagMember}: {managementData.criticalRedFlagReason}
-                            </p>
-                            <p className="text-red-400/70 text-[10px] mt-1 font-mono">
-                              Skor manajemen dipaksa 0 — override HINDARI aktif
                             </p>
                           </div>
                         )}
 
-                        {/* Management composite score card */}
-                        <Card className="p-5 border-border/40 bg-[#0d0d0d]">
-                          <div className="flex items-center justify-between mb-4">
-                            <div>
-                              <p className="text-[10px] text-[#6b7280] font-mono uppercase tracking-widest mb-1">
-                                Skor Manajemen
-                              </p>
-                              <h3 className="text-sm font-bold text-foreground">Integritas &amp; Rekam Jejak BOD</h3>
-                            </div>
-                            <div className="text-right">
-                              <p className={`text-3xl font-bold font-mono ${
-                                managementData.compositeScore > 70 ? 'text-emerald-400'
-                                : managementData.compositeScore >= 40 ? 'text-amber-400'
-                                : 'text-red-400'
-                              }`}>
-                                {managementData.compositeScore}
-                              </p>
-                              <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${
-                                managementData.qualityLabel === 'KUAT'   ? 'bg-emerald-500/10 text-emerald-400'
-                                : managementData.qualityLabel === 'LEMAH' ? 'bg-red-500/10 text-red-400'
-                                : 'bg-amber-500/10 text-amber-400'
-                              }`}>
+                        {/* Section 1: Composite score ring */}
+                        <div style={{
+                          background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)",
+                          borderRadius: 10, padding: "20px 24px",
+                          display: "flex", alignItems: "center", gap: 28,
+                        }}>
+                          <ScoreRingV3 score={managementData.compositeScore} size={120} showLabel />
+                          <div style={{ flex: 1 }}>
+                            <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 8 }}>
+                              INTEGRITAS & REKAM JEJAK BOD
+                            </p>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                              <span style={{
+                                fontFamily: mono, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
+                                color: managementData.qualityLabel === "KUAT" ? "#4ADE80" : managementData.qualityLabel === "LEMAH" ? "#F87171" : "#FBBF24",
+                                background: managementData.qualityLabel === "KUAT" ? "rgba(74,222,128,0.10)" : managementData.qualityLabel === "LEMAH" ? "rgba(248,113,113,0.10)" : "rgba(251,191,36,0.10)",
+                                border: managementData.qualityLabel === "KUAT" ? "1px solid rgba(74,222,128,0.25)" : managementData.qualityLabel === "LEMAH" ? "1px solid rgba(248,113,113,0.25)" : "1px solid rgba(251,191,36,0.25)",
+                                borderRadius: 9999, padding: "3px 10px",
+                              }}>
                                 {managementData.qualityLabel}
                               </span>
+                              <span style={{ fontFamily: mono, fontSize: 9, color: "#3F3F46" }}>
+                                Reliabilitas: {managementData.reliability}
+                              </span>
                             </div>
+                            <p style={{ fontFamily: inter, fontSize: 12, color: "#71717A" }}>
+                              {managementData.scoredMemberCount} anggota dinilai
+                              {managementData.excludedMemberCount > 0 && ` · ${managementData.excludedMemberCount} dikecualikan`}
+                            </p>
                           </div>
-                          <div className="flex gap-3 text-[10px] text-[#6b7280] font-mono">
-                            <span>{managementData.scoredMemberCount} anggota dinilai</span>
-                            {managementData.excludedMemberCount > 0 && (
-                              <span>· {managementData.excludedMemberCount} dikecualikan (data tidak cukup)</span>
-                            )}
-                            <span className="ml-auto">Reliabilitas: {managementData.reliability}</span>
-                          </div>
-                        </Card>
+                        </div>
 
-                        {/* BOD member cards */}
-                        {managementData.memberScores?.filter((m: any) => !m.excluded).map((member: any, idx: number) => (
-                          <Card key={`${member.name}-${idx}`} className="p-4 border-border/40 bg-[#0d0d0d]">
-                            <div className="flex items-start justify-between gap-3 mb-2">
-                              <div>
-                                <p className="text-sm font-bold text-foreground">{member.name}</p>
-                                <p className="text-[10px] text-[#6b7280] font-mono">{member.title}</p>
+                        {/* Section 2: 5-component breakdown */}
+                        <div style={{
+                          background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.05)",
+                          borderRadius: 10, padding: "16px 20px",
+                        }}>
+                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 14 }}>
+                            BOBOT KOMPONEN
+                          </p>
+                          {[
+                            { label: "Rekam Jejak",      weight: 30, score: managementData.memberScores?.length ? Math.round(managementData.memberScores.reduce((s: number, m: any) => s + (m.compositeScore ?? 0), 0) / managementData.memberScores.length) : null },
+                            { label: "Tata Kelola",      weight: 25, score: null },
+                            { label: "Alinemen Insider", weight: 20, score: null },
+                            { label: "Stabilitas",       weight: 15, score: null },
+                            { label: "Reputasi",         weight: 10, score: null },
+                          ].map((comp) => {
+                            const color = comp.score !== null ? (comp.score >= 70 ? "#4ADE80" : comp.score >= 50 ? "#4FC3F7" : comp.score >= 40 ? "#FBBF24" : "#F87171") : "rgba(255,255,255,0.06)";
+                            return (
+                              <div key={comp.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                                <div style={{ width: 120, flexShrink: 0 }}>
+                                  <span style={{ fontFamily: mono, fontSize: 10, color: "#A1A1AA" }}>{comp.label}</span>
+                                </div>
+                                <span style={{ fontFamily: mono, fontSize: 8, color: "#27272A", background: "rgba(255,255,255,0.02)", borderRadius: 3, padding: "1px 5px", flexShrink: 0, width: 28, textAlign: "center" }}>
+                                  {comp.weight}%
+                                </span>
+                                <div style={{ flex: 1, height: 2, background: "rgba(255,255,255,0.05)", borderRadius: 9999 }}>
+                                  <div style={{ height: "100%", width: comp.score !== null ? `${comp.score}%` : "0%", background: color, borderRadius: 9999, transition: "width 0.7s" }} />
+                                </div>
+                                <div style={{ width: 28, textAlign: "right", fontFamily: mono, fontSize: 11, fontWeight: 600, color: comp.score !== null ? color : "#27272A" }}>
+                                  {comp.score !== null ? comp.score : "—"}
+                                </div>
                               </div>
-                              <div className="text-right flex-shrink-0">
-                                <p className={`text-xl font-bold font-mono ${
-                                  member.compositeScore > 70 ? 'text-emerald-400'
-                                  : member.compositeScore >= 40 ? 'text-amber-400'
-                                  : 'text-red-400'
-                                }`}>{member.compositeScore}</p>
-                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Section 3: BOD member cards */}
+                        {managementData.memberScores?.length > 0 && (
+                          <div>
+                            <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.14em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 10 }}>
+                              PROFIL ANGGOTA BOD
+                            </p>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                              {managementData.memberScores.map((member: any, idx: number) => (
+                                <BODMemberCard
+                                  key={`${member.name}-${idx}`}
+                                  name={member.name}
+                                  title={member.title}
+                                  compositeScore={member.compositeScore}
+                                  keyInsight={member.keyInsight}
+                                  hasCriticalRedFlag={member.hasCriticalRedFlag}
+                                  reliability={member.reliability}
+                                  excluded={member.excluded}
+                                />
+                              ))}
                             </div>
-                            {member.hasCriticalRedFlag && (
-                              <div className="mb-2 px-2 py-1 rounded bg-red-500/10 border border-red-500/20">
-                                <p className="text-[10px] text-red-400 font-bold font-mono">⛔ RED FLAG KRITIS</p>
-                              </div>
-                            )}
-                            {member.keyInsight && (
-                              <p className="text-xs text-[#9ca3af] leading-relaxed">{member.keyInsight}</p>
-                            )}
-                          </Card>
-                        ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      /* Empty state — no research yet */
+                      <div style={{
+                        background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.05)",
+                        borderRadius: 10, padding: "40px 24px", textAlign: "center",
+                      }}>
+                        <p style={{ fontFamily: mono, fontSize: 11, color: "#3F3F46", marginBottom: 8 }}>
+                          Riset manajemen belum tersedia untuk {symbol}.
+                        </p>
+                        <p style={{ fontFamily: inter, fontSize: 12, color: "#27272A", marginBottom: 20, lineHeight: 1.6 }}>
+                          Riset BOD membutuhkan koneksi API. Klik untuk memicu riset baru.
+                        </p>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await fetch(`/api/management/${symbol}/research`, { method: "POST" });
+                              const res = await fetch(`/api/management/${symbol}`);
+                              const data = await res.json();
+                              if (data && typeof data.compositeScore === "number") {
+                                window.location.reload();
+                              }
+                            } catch {}
+                          }}
+                          style={{
+                            fontFamily: mono, fontSize: 10, letterSpacing: "0.1em",
+                            color: "#4FC3F7", background: "rgba(79,195,247,0.07)",
+                            border: "1px solid rgba(79,195,247,0.2)",
+                            borderRadius: 6, padding: "8px 16px", cursor: "pointer",
+                          }}
+                        >
+                          PICU RISET MANAJEMEN →
+                        </button>
                       </div>
                     )}
 
-                    {/* ── existing insider transaction content below ── */}
-                    {(() => {
-                      try {
-                        const insider = stock.insiderData ? JSON.parse(stock.insiderData) : null;
-                        if (!insider) {
-                          return (
-                            <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
-                              <UserCheck className="w-12 h-12 text-muted-foreground mb-4" />
-                              <h3 className="text-lg font-bold mb-2">Tidak Ada Data Insider</h3>
-                              <p className="text-muted-foreground">Data transaksi insider belum tersedia untuk saham ini.</p>
-                            </Card>
-                          );
-                        }
-                        return (
-                          <div className="space-y-6">
-                            {/* HERO STATUS: INSIDER VS BANDAR ALIGNMENT */}
-                            {aiData?.insiderBandarAlignment && (
-                              <Card className={`p-6 border-2 shadow-md ${
-                                aiData.insiderBandarAlignment.status === "Selaras" 
-                                  ? "border-emerald-300 dark:border-emerald-700 bg-gradient-to-br from-emerald-500/10 to-emerald-500/5" 
-                                  : aiData.insiderBandarAlignment.status === "Bertentangan"
-                                    ? "border-red-300 dark:border-red-700 bg-gradient-to-br from-red-500/10 to-red-500/5"
-                                    : "border-slate-300 dark:border-slate-700 bg-gradient-to-br from-slate-500/10 to-slate-500/5"
-                              }`} data-testid="card-insider-bandar-alignment">
-                                <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
-                                  <div>
-                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Insider vs Bandar</p>
-                                    <h2 className={`text-xl font-bold font-display ${
-                                      aiData.insiderBandarAlignment.status === "Selaras" 
-                                        ? "text-emerald-700 dark:text-emerald-400" 
-                                        : aiData.insiderBandarAlignment.status === "Bertentangan"
-                                          ? "text-red-700 dark:text-red-400"
-                                          : "text-foreground"
-                                    }`} data-testid="text-alignment-status">
-                                      {aiData.insiderBandarAlignment.status}
-                                    </h2>
-                                  </div>
-                                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                                    aiData.insiderBandarAlignment.status === "Selaras" 
-                                      ? "bg-emerald-100 dark:bg-emerald-900/40" 
-                                      : aiData.insiderBandarAlignment.status === "Bertentangan"
-                                        ? "bg-red-100 dark:bg-red-900/40"
-                                        : "bg-slate-100 dark:bg-slate-800/40"
-                                  }`}>
-                                    <UserCheck className={`w-6 h-6 ${
-                                      aiData.insiderBandarAlignment.status === "Selaras" 
-                                        ? "text-emerald-600 dark:text-emerald-400" 
-                                        : aiData.insiderBandarAlignment.status === "Bertentangan"
-                                          ? "text-red-600 dark:text-red-400"
-                                          : "text-slate-600 dark:text-slate-400"
-                                    }`} />
-                                  </div>
-                                </div>
-                                <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-alignment-interpretation">
-                                  {aiData.insiderBandarAlignment.interpretation}
+                    {/* Section 5: OJK Insider Activity (Layer 7) */}
+                    <div style={{
+                      background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 10, padding: "18px 20px",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                        <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase" }}>
+                          AKTIVITAS INSIDER (90 HARI)
+                        </p>
+                        {insiderData?.clusterBuySignal && (
+                          <span style={{
+                            fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
+                            color: "#4ADE80", background: "rgba(74,222,128,0.10)",
+                            border: "1px solid rgba(74,222,128,0.25)",
+                            borderRadius: 9999, padding: "3px 10px",
+                          }}>
+                            Cluster Buy Aktif
+                          </span>
+                        )}
+                      </div>
+
+                      {!insiderData ? (
+                        <div style={{ textAlign: "center", paddingTop: 8, paddingBottom: 8 }}>
+                          <p style={{ fontFamily: mono, fontSize: 11, color: "#3F3F46" }}>
+                            Data insider belum cukup untuk dianalisis
+                          </p>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const token = prompt("MANAGEMENT_TOKEN:");
+                                if (!token) return;
+                                const r = await fetch(`/api/insider/${symbol}/research`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                                  body: JSON.stringify({ companyName: stock.name }),
+                                });
+                                const d = await r.json();
+                                if (d.signal) setInsiderData(d);
+                              } catch {}
+                            }}
+                            style={{
+                              fontFamily: mono, fontSize: 10, letterSpacing: "0.1em",
+                              color: "#4FC3F7", background: "rgba(79,195,247,0.07)",
+                              border: "1px solid rgba(79,195,247,0.2)",
+                              borderRadius: 6, padding: "8px 16px", cursor: "pointer", marginTop: 10,
+                            }}
+                          >
+                            PICU RISET INSIDER →
+                          </button>
+                        </div>
+                      ) : insiderData.signal === "INSUFFICIENT_DATA" ? (
+                        <p style={{ fontFamily: inter, fontSize: 12, color: "#71717A", marginBottom: 8 }}>
+                          Data insider belum cukup untuk dianalisis
+                        </p>
+                      ) : (
+                        <>
+                          {/* Stat row */}
+                          <div style={{ display: "flex", gap: 20, marginBottom: 14, flexWrap: "wrap" as const }}>
+                            {[
+                              { label: "Pembelian", value: `${insiderData.insiderBuyCount ?? 0} transaksi`, color: "#4ADE80" },
+                              { label: "Penjualan", value: `${insiderData.insiderSellCount ?? 0} transaksi`, color: "#F87171" },
+                              { label: "Nilai Net", value: (() => {
+                                const v = insiderData.netInsiderValue ?? 0;
+                                const abs = Math.abs(v);
+                                const fmt = abs >= 1e9 ? `Rp ${(abs/1e9).toFixed(1)}M`
+                                           : abs >= 1e6 ? `Rp ${(abs/1e6).toFixed(0)}Jt`
+                                           : `Rp ${abs.toLocaleString("id-ID")}`;
+                                return (v >= 0 ? "+" : "−") + fmt;
+                              })(), color: (insiderData.netInsiderValue ?? 0) >= 0 ? "#4ADE80" : "#F87171" },
+                            ].map((s) => (
+                              <div key={s.label}>
+                                <p style={{ fontFamily: mono, fontSize: 8, letterSpacing: "0.12em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 3 }}>
+                                  {s.label}
                                 </p>
-                                
-                                {/* Context with Market Regime */}
-                                {aiData?.marketMode && (
-                                  <div className="mt-4 p-3 rounded-lg bg-background/50 border border-border/30">
-                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Konteks Rezim Pasar</p>
-                                    <p className="text-xs text-muted-foreground" data-testid="text-regime-context">
-                                      Analisis ini dilakukan dalam konteks rezim pasar <span className="font-semibold text-foreground">{aiData.marketMode}</span>. 
-                                      {aiData.marketMode.includes("Akumulasi") && " Keselarasan positif dalam fase akumulasi memperkuat tesis konstruktif."}
-                                      {aiData.marketMode.includes("Distribusi") && " Perhatikan potensi divergensi jika insider mulai menjual saat distribusi berlangsung."}
-                                    </p>
-                                  </div>
-                                )}
-                              </Card>
-                            )}
-                            
-                            {/* Insider Overview */}
-                            <Card className="p-6 border-border/50 shadow-sm">
-                              <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-base font-bold font-display text-foreground">Skor Keselarasan Insider</h3>
-                                <div className="text-right">
-                                  <p className={`text-2xl font-bold ${
-                                    insider.alignmentScore >= 70 ? 'text-emerald-600 dark:text-emerald-400' :
-                                    insider.alignmentScore >= 40 ? 'text-amber-600 dark:text-amber-400' :
-                                    'text-red-600 dark:text-red-400'
-                                  }`}>{insider.alignmentScore}/100</p>
-                                </div>
+                                <p style={{ fontFamily: mono, fontSize: 13, fontWeight: 700, color: s.color }}>{s.value}</p>
                               </div>
-                              {(insider.overview || insider.interpretation) && (
-                                <p className="text-muted-foreground leading-relaxed mb-4">
-                                  {insider.overview || insider.interpretation}
-                                </p>
-                              )}
-                              <div className="grid grid-cols-3 gap-4 mt-4">
-                                <div className="text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Pembelian</p>
-                                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                                    {typeof insider.totalBuyValue === 'number' 
-                                      ? `${(insider.totalBuyValue / 1000000000).toFixed(1)}B IDR`
-                                      : insider.totalBuy || '-'}
-                                  </p>
-                                </div>
-                                <div className="text-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Total Penjualan</p>
-                                  <p className="text-lg font-bold text-red-600 dark:text-red-400">
-                                    {typeof insider.totalSellValue === 'number'
-                                      ? `${(insider.totalSellValue / 1000000000).toFixed(1)}B IDR`
-                                      : insider.totalSell || '-'}
-                                  </p>
-                                </div>
-                                <div className="text-center p-3 rounded-lg bg-primary/10 border border-primary/20">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">Arus Bersih</p>
-                                  <p className={`text-lg font-bold ${
-                                    (typeof insider.netFlow === 'number' ? insider.netFlow < 0 : String(insider.netFlow).startsWith('-'))
-                                      ? 'text-red-600 dark:text-red-400' 
-                                      : 'text-emerald-600 dark:text-emerald-400'
-                                  }`}>
-                                    {typeof insider.netFlow === 'number'
-                                      ? `${insider.netFlow >= 0 ? '+' : ''}${(insider.netFlow / 1000000000).toFixed(1)}B IDR`
-                                      : insider.netFlow}
-                                  </p>
-                                </div>
-                              </div>
-                            </Card>
-
-                            {/* AI Insider Analysis */}
-                            <Card className="p-6 border-border/50 shadow-sm">
-                              <div className="flex items-center gap-2 mb-4">
-                                <Activity className="w-5 h-5 text-indigo-500" />
-                                <h4 className="text-base font-bold font-display text-foreground">Interpretasi AI</h4>
-                              </div>
-                              <div className="space-y-4">
-                                <div className="p-4 bg-primary/5 border border-primary/10 rounded-lg">
-                                  <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Interpretasi AI</p>
-                                  <p className="text-sm text-muted-foreground leading-relaxed">{insider.aiInterpretation || insider.interpretation}</p>
-                                </div>
-                                <div className="p-4 bg-secondary/50 rounded-lg border border-border/30">
-                                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Kekuatan Sinyal</p>
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                      <div 
-                                        className={`h-full transition-all ${
-                                          insider.signalStrength === 'Kuat' || insider.signalStrength === 'Strong' ? 'bg-emerald-500 w-full' :
-                                          insider.signalStrength === 'Sedang' || insider.signalStrength === 'Moderat' || insider.signalStrength === 'Moderate' ? 'bg-amber-500 w-2/3' :
-                                          'bg-muted-foreground w-1/3'
-                                        }`}
-                                      />
-                                    </div>
-                                    <span className={`text-sm font-bold ${
-                                      insider.signalStrength === 'Kuat' || insider.signalStrength === 'Strong' ? 'text-emerald-600 dark:text-emerald-400' :
-                                      insider.signalStrength === 'Sedang' || insider.signalStrength === 'Moderat' || insider.signalStrength === 'Moderate' ? 'text-amber-600 dark:text-amber-400' :
-                                      'text-muted-foreground'
-                                    }`}>{insider.signalStrength}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </Card>
-
-                            {/* Recent Insider Transactions */}
-                            <Card className="p-6 border-border/50 shadow-sm">
-                              <h4 className="text-base font-bold font-display mb-4 text-foreground">Riwayat Transaksi</h4>
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="border-b border-border/50">
-                                      <th className="text-left py-3 px-3 font-semibold text-foreground">Nama</th>
-                                      <th className="text-left py-3 px-3 font-semibold text-foreground">Jabatan</th>
-                                      <th className="text-left py-3 px-3 font-semibold text-foreground">Tipe</th>
-                                      <th className="text-right py-3 px-3 font-semibold text-foreground">Jumlah Saham</th>
-                                      <th className="text-right py-3 px-3 font-semibold text-foreground">Harga</th>
-                                      <th className="text-right py-3 px-3 font-semibold text-foreground">Tanggal</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {insider.transactions?.map((tx: any, idx: number) => {
-                                      const isBuy = tx.type === 'BUY' || tx.type === 'Beli';
-                                      const typeLabel = isBuy ? 'Beli' : 'Jual';
-                                      return (
-                                        <tr key={idx} className="border-b border-border/30 hover:bg-muted/30">
-                                          <td className="py-3 px-3 font-medium text-foreground">{tx.name}</td>
-                                          <td className="py-3 px-3 text-muted-foreground">{tx.position}</td>
-                                          <td className="py-3 px-3">
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                              isBuy ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                                              'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                            }`}>
-                                              {typeLabel}
-                                            </span>
-                                          </td>
-                                          <td className="text-right py-3 px-3 font-mono text-foreground">
-                                            {typeof tx.shares === 'number' ? tx.shares.toLocaleString('id-ID') : tx.shares}
-                                          </td>
-                                          <td className="text-right py-3 px-3 font-mono text-foreground">
-                                            {typeof tx.price === 'number' ? `IDR ${tx.price.toLocaleString('id-ID')}` : tx.price}
-                                          </td>
-                                          <td className="text-right py-3 px-3 text-muted-foreground">{tx.date}</td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </Card>
-
-                            {/* Insider Sentiment Indicator */}
-                            {(() => {
-                              // Calculate percentages if not provided
-                              const buyVal = insider.totalBuyValue || 0;
-                              const sellVal = insider.totalSellValue || 0;
-                              const total = buyVal + sellVal;
-                              const buyPct = insider.buyPercent ?? (total > 0 ? Math.round((buyVal / total) * 100) : 50);
-                              const sellPct = insider.sellPercent ?? (total > 0 ? Math.round((sellVal / total) * 100) : 50);
-                              return (
-                                <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-indigo-500/5 to-purple-500/5 dark:from-indigo-500/10 dark:to-purple-500/10">
-                                  <h4 className="text-base font-bold font-display mb-4 text-foreground">Sentimen Insider (12 Bulan)</h4>
-                                  <div className="flex items-center gap-4">
-                                    <div className="flex-1 h-4 rounded-full overflow-hidden border border-border/30 flex">
-                                      <div className="bg-emerald-500 dark:bg-emerald-400" style={{ width: `${buyPct}%` }} />
-                                      <div className="bg-red-500 dark:bg-red-400" style={{ width: `${sellPct}%` }} />
-                                    </div>
-                                    <div className="flex items-center gap-4 text-xs">
-                                      <span className="flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                        Beli {buyPct}%
-                                      </span>
-                                      <span className="flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-full bg-red-500" />
-                                        Jual {sellPct}%
-                                      </span>
-                                    </div>
-                                  </div>
-                                  {(insider.sentimentNote || insider.sentiment) && (
-                                    <p className="text-xs text-muted-foreground mt-3 italic">{insider.sentimentNote || `Sentimen: ${insider.sentiment}`}</p>
-                                  )}
-                                </Card>
-                              );
-                            })()}
+                            ))}
+                            <div>
+                              <p style={{ fontFamily: mono, fontSize: 8, letterSpacing: "0.12em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 3 }}>
+                                Sinyal
+                              </p>
+                              <p style={{
+                                fontFamily: mono, fontSize: 11, fontWeight: 700,
+                                color: insiderData.signal === "STRONG_BUY" || insiderData.signal === "BUY" ? "#4ADE80"
+                                     : insiderData.signal === "STRONG_SELL" || insiderData.signal === "SELL" ? "#F87171"
+                                     : "#FBBF24",
+                              }}>
+                                {insiderData.signal?.replace("_", " ")}
+                              </p>
+                            </div>
                           </div>
-                        );
-                      } catch (e) {
-                        return (
-                          <Card className="p-12 border-border/50 border-dashed shadow-none flex flex-col items-center justify-center text-center">
-                            <h3 className="text-lg font-bold mb-2 text-foreground">Gagal Memuat Data Insider</h3>
-                            <p className="text-muted-foreground">Tidak dapat memproses data transaksi insider.</p>
-                          </Card>
-                        );
-                      }
-                    })()}
+
+                          {/* Note */}
+                          {insiderData.note && (
+                            <p style={{ fontFamily: inter, fontSize: 11, color: "#71717A", marginBottom: 14, lineHeight: 1.55 }}>
+                              {insiderData.note}
+                            </p>
+                          )}
+
+                          {/* Cluster buy alert */}
+                          {insiderData.clusterBuySignal && (
+                            <div style={{
+                              background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.2)",
+                              borderRadius: 6, padding: "8px 12px", marginBottom: 14,
+                            }}>
+                              <p style={{ fontFamily: mono, fontSize: 10, color: "#4ADE80", fontWeight: 600 }}>
+                                Cluster Buy: 3+ insider beli dalam 14 hari
+                                {insiderData.priceContextSignal && " — saat harga lemah"}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Top transactions */}
+                          {(insiderData.topTransactions ?? insiderData.allTransactions ?? []).length > 0 && (
+                            <div>
+                              <p style={{ fontFamily: mono, fontSize: 8, letterSpacing: "0.12em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 8 }}>
+                                TRANSAKSI TERBARU
+                              </p>
+                              <div style={{ display: "flex", flexDirection: "column" as const, gap: 4 }}>
+                                {(insiderData.topTransactions ?? insiderData.allTransactions ?? []).slice(0, 5).map((tx: any, i: number) => (
+                                  <div key={i} style={{
+                                    display: "flex", alignItems: "center", gap: 10,
+                                    padding: "6px 10px",
+                                    background: "rgba(255,255,255,0.02)", borderRadius: 5,
+                                    flexWrap: "wrap" as const,
+                                  }}>
+                                    <span style={{ fontFamily: mono, fontSize: 9, color: "#3F3F46", flexShrink: 0 }}>
+                                      {tx.transactionDate}
+                                    </span>
+                                    <span style={{ fontFamily: inter, fontSize: 11, color: "#A1A1AA", flex: 1, minWidth: 80 }}>
+                                      {tx.personName}
+                                    </span>
+                                    <span style={{ fontFamily: mono, fontSize: 9, color: "#52525B" }}>
+                                      {tx.role?.slice(0, 20)}
+                                    </span>
+                                    <span style={{
+                                      fontFamily: mono, fontSize: 9, fontWeight: 700,
+                                      color: tx.transactionType === "BUY" ? "#4ADE80" : "#F87171",
+                                    }}>
+                                      {tx.transactionType === "BUY" ? "BELI" : "JUAL"}
+                                    </span>
+                                    <span style={{ fontFamily: mono, fontSize: 10, color: "#71717A" }}>
+                                      {Number(tx.shares).toLocaleString("id-ID")} lbr
+                                    </span>
+                                    <span style={{ fontFamily: mono, fontSize: 10, color: "#A1A1AA", fontWeight: 600 }}>
+                                      {(() => {
+                                        const v = Number(tx.totalValue);
+                                        if (v >= 1e9) return `Rp ${(v/1e9).toFixed(1)}M`;
+                                        if (v >= 1e6) return `Rp ${(v/1e6).toFixed(0)}Jt`;
+                                        return `Rp ${v.toLocaleString("id-ID")}`;
+                                      })()}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Filing delay warning */}
+                          {insiderData.filingDelayFlag && (
+                            <div style={{
+                              background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)",
+                              borderRadius: 6, padding: "8px 12px", marginTop: 12,
+                            }}>
+                              <p style={{ fontFamily: mono, fontSize: 9, color: "#FBBF24" }}>
+                                Pelaporan terlambat terdeteksi — sinyal tata kelola negatif
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </TabsContent>
 
                   {/* Valuasi Tab */}
@@ -2505,12 +2099,77 @@ export default function StockDashboard() {
               </Tabs>
             </motion.div>
 
-          {/* AI Summary — full width below tabs */}
-          <motion.div variants={itemVariants}>
-            <AIStockSummary summary={stock.summary} confidence={stock.aiConfidence as "High" | "Medium" | "Low"} />
-          </motion.div>
         </motion.div>
       </main>
+
+      {/* Keyboard shortcuts hint */}
+      <div
+        style={{
+          position: "fixed", bottom: 20, right: 20, zIndex: 40,
+          display: "flex", alignItems: "center", gap: 6,
+          background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)",
+          borderRadius: 8, padding: "6px 10px", cursor: "pointer",
+          opacity: showShortcuts ? 0 : 1, transition: "opacity 0.2s",
+        }}
+        onClick={() => setShowShortcuts(true)}
+        title="Keyboard shortcuts (?)"
+      >
+        <span style={{ fontFamily: mono, fontSize: 10, color: "#3F3F46", letterSpacing: "0.06em" }}>?</span>
+        <span style={{ fontFamily: mono, fontSize: 8, color: "#3F3F46", letterSpacing: "0.08em" }}>SHORTCUTS</span>
+      </div>
+
+      {/* Keyboard shortcuts overlay */}
+      {showShortcuts && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 50,
+            background: "rgba(0,0,0,0.7)", display: "flex",
+            alignItems: "center", justifyContent: "center",
+          }}
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div
+            style={{
+              background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 12, padding: "28px 32px", minWidth: 320,
+              boxShadow: "0 25px 50px rgba(0,0,0,0.6)",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase" }}>
+                KEYBOARD SHORTCUTS
+              </p>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                style={{ fontFamily: mono, fontSize: 10, color: "#3F3F46", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                ESC
+              </button>
+            </div>
+            {[
+              { key: "r", label: "Ringkasan (Overview)" },
+              { key: "f", label: "Flow Broker" },
+              { key: "n", label: "Berita" },
+              { key: "d", label: "Distribusi" },
+              { key: "j", label: "Tab berikutnya →" },
+              { key: "k", label: "Tab sebelumnya ←" },
+              { key: "?", label: "Toggle shortcut panel" },
+            ].map(({ key, label }) => (
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 10 }}>
+                <span style={{
+                  fontFamily: mono, fontSize: 10, fontWeight: 700, color: "#F4F4F5",
+                  background: "#141414", border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 4, padding: "3px 8px", minWidth: 24, textAlign: "center",
+                }}>
+                  {key}
+                </span>
+                <span style={{ fontFamily: inter, fontSize: 12, color: "#71717A" }}>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

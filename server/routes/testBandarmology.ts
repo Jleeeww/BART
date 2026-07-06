@@ -59,13 +59,15 @@ const SAMPLE_BROKER_DATA = JSON.stringify([
   { code: "MK",   netBuy: "8.0B IDR",   netSell: "18.5B IDR", volumePercent: "6.2%",  avgBuyPrice: "5,230 IDR", avgSellPrice: "5,238 IDR" },
 ]);
 
+// Realistic IDX flow: foreign and domestic are mirrors (they sum to ≈0).
+// Foreign net +80B means domestic net -80B — domestic sold what foreign bought.
 const SAMPLE_FOREIGN_ACTIVITY = JSON.stringify({
-  foreignBuy:    "52000000000",   // 52B IDR
-  foreignSell:   "18000000000",   // 18B IDR
-  domesticBuy:   "85000000000",   // 85B IDR
-  domesticSell:  "39000000000",   // 39B IDR
-  netForeignFlow: "34000000000",  // +34B IDR net foreign buy
-  netDomesticFlow: "46000000000", // +46B IDR net domestic buy
+  foreignBuy:     "98000000000",   // 98B IDR
+  foreignSell:    "18000000000",   // 18B IDR
+  domesticBuy:    "85000000000",   // 85B IDR
+  domesticSell:  "165000000000",   // 165B IDR
+  netForeignFlow:  "80000000000",  // +80B IDR net foreign buy
+  netDomesticFlow: "-80000000000", // -80B IDR net domestic (mirror)
 });
 
 const SAMPLE_RAW: RawStockRecord = {
@@ -90,9 +92,16 @@ const SAMPLE_RAW: RawStockRecord = {
   todayValue:   "810000000000",   // 810B IDR
   avg20dValue:  "600000000000",   // 600B IDR
 
-  // Net flow history: 10-session building campaign (oldest → newest)
-  // Critical: [0]=oldest, [-1]=today
+  // netFlowHistory kept for legacy compatibility (≈0 in real data, not used by M6/M8/M12/M14)
   netFlowHistory: [
+    0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
+  ],
+
+  // foreignFlowHistory: daily netForeignFlow — 10-session building campaign (oldest → newest)
+  // Used by M6 (spot), M8 (persistence), M12 (rolling), M14 (streak).
+  // Realistic: domestic mirrors these negative each session.
+  foreignFlowHistory: [
     55e9, 60e9, 62e9, 65e9, 70e9,   // sessions 1-5 (older)
     72e9, 75e9, 78e9, 80e9, 80e9,   // sessions 6-10 (recent, incl. today)
   ],

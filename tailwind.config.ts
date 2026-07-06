@@ -6,12 +6,52 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        "2xl": "16px", // kept for shadcn/Radix compat
+        xl: "12px",
+        lg: "10px",    // was 8px
+        md: "8px",     // was 6px
+        base: "6px",   // new base
+        sm: "3px",     // was 4px
       },
       colors: {
-        // Flat / base colors (regular buttons)
+        // ── New surface tokens ──────────────────────────────────────────
+        "surface-0": "#000000",
+        "surface-1": "#0a0a0a",
+        "surface-2": "#0f0f0f",
+        "surface-3": "#141414",
+        "surface-4": "#1a1a1a",
+
+        // ── New semantic/signal tokens ──────────────────────────────────
+        signal: "#4FC3F7",
+        "signal-dim": "#4FC3F726",
+        positive: "#4ADE80",
+        warning: "#FBBF24",
+        danger: "#F87171",
+
+        // ── Text scale ──────────────────────────────────────────────────
+        "text-1": "#F4F4F5",
+        "text-2": "#A1A1AA",
+        "text-3": "#71717A",
+        "text-4": "#3F3F46",
+
+        // ── Backward-compat aliases (remove after full page migration) ──
+        "bg-base": "#000000",
+        "bg-elevated": "#0a0a0a",
+        "bg-elevated-2": "#0f0f0f",
+        "bg-hover": "#141414",
+        "bg-active": "#1a1a1a",
+        "text-primary": "#F4F4F5",
+        "text-secondary": "#A1A1AA",
+        "text-tertiary": "#71717A",
+        "text-disabled": "#3F3F46",
+        "border-subtle": "rgba(255,255,255,0.04)",
+        "border-default": "rgba(255,255,255,0.08)",
+        "border-strong": "rgba(255,255,255,0.14)",
+        brand: "#4FC3F7",   // updated to match signal
+        emerald: "#4ADE80",
+        amber: "#FBBF24",
+
+        // ── HSL-variable system (Radix / shadcn) ───────────────────────
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
         border: "hsl(var(--border) / <alpha-value>)",
@@ -52,13 +92,6 @@ export default {
           border: "var(--destructive-border)",
         },
         ring: "hsl(var(--ring) / <alpha-value>)",
-        chart: {
-          "1": "hsl(var(--chart-1) / <alpha-value>)",
-          "2": "hsl(var(--chart-2) / <alpha-value>)",
-          "3": "hsl(var(--chart-3) / <alpha-value>)",
-          "4": "hsl(var(--chart-4) / <alpha-value>)",
-          "5": "hsl(var(--chart-5) / <alpha-value>)",
-        },
         sidebar: {
           ring: "hsl(var(--sidebar-ring) / <alpha-value>)",
           DEFAULT: "hsl(var(--sidebar) / <alpha-value>)",
@@ -73,7 +106,7 @@ export default {
         "sidebar-accent": {
           DEFAULT: "hsl(var(--sidebar-accent) / <alpha-value>)",
           foreground: "hsl(var(--sidebar-accent-foreground) / <alpha-value>)",
-          border: "var(--sidebar-accent-border)"
+          border: "var(--sidebar-accent-border)",
         },
         status: {
           online: "rgb(34 197 94)",
@@ -82,10 +115,22 @@ export default {
           offline: "rgb(156 163 175)",
         },
       },
+      spacing: {
+        "1": "4px",
+        "2": "8px",
+        "3": "12px",
+        "4": "16px",
+        "6": "24px",
+        "8": "32px",
+        "12": "48px",
+        "16": "64px",
+        "24": "96px",
+      },
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+        display: ["var(--font-display)"],
       },
       keyframes: {
         "accordion-down": {
@@ -96,10 +141,25 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        scroll: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        "fade-in-up": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        pulse: {
+          "0%, 100%": { opacity: "0.4" },
+          "50%": { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        scroll: "scroll 40s linear infinite",
+        "fade-in-up": "fade-in-up 0.2s ease forwards",
+        pulse: "pulse 2s ease-in-out infinite",
       },
     },
   },

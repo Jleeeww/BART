@@ -25,6 +25,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { RawNewsArticle } from './newsFetcher';
 import { getMatchingCausalEvents, buildMacroContext } from './macroCausalKnowledge';
+import { isCapReached, recordCost } from './costTracker';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -75,9 +76,20 @@ export interface NewsImpactAnalysis {
 
 // ── Config ───────────────────────────────────────────────────
 
-const ANALYSIS_TIMEOUT_MS = 30000;
-const MAX_ARTICLES_PER_BATCH = 10;
-const DEDUP_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const ANALYSIS_TIMEOUT_MS    = 30000;
+const MAX_ARTICLES_PER_BATCH = 8;               // reduced from 10 for cost control
+const DEDUP_CACHE_TTL        = 24 * 60 * 60 * 1000; // 24 hours
+
+// ── Analysis window: Mon-Fri 06:00-17:00 WIB ─────────────────
+
+export function isAnalysisHours(): boolean {
+  const now = new Date();
+  const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  const day = wib.getUTCDay(); // 0=Sun, 6=Sat
+  if (day === 0 || day === 6) return false;
+  const hour = wib.getUTCHours();
+  return hour >= 6 && hour < 17;
+}
 
 // ── In-memory dedup cache ────────────────────────────────────
 
@@ -240,6 +252,15 @@ export async function analyzeNewsImpact(
     };
 
     _analyzed.set(article.id, { analysis: result, timestamp: Date.now() });
+
+    // Record cost using usage metadata when available
+    const inputTokens  = (response as any).usage?.input_tokens  ?? 600;
+    const outputTokens = (response as any).usage?.output_tokens ?? 900;
+    const webSearchUses = response.content.filter(
+      (b: any) => b.type === 'tool_use' && b.name === 'web_search'
+    ).length;
+    recordCost('news', inputTokens, outputTokens, webSearchUses);
+
     return result;
 
   } catch (err: any) {
@@ -250,35 +271,64 @@ export async function analyzeNewsImpact(
 
 // ── Batch processor ──────────────────────────────────────────
 
+// Severity keywords — higher score = processed first
+const SEVERITY_KEYWORDS = [
+  'fitch', "moody's", "moody", 's&p', 'sovereign', 'sovereign downgrade',
+  'msci', 'ftse rebalancing', 'bi rate', 'suku bunga acuan',
+  'ojk sanksi', 'ojk suspend', 'sanksi bursa', 'downgrade', 'upgrade rating',
+  'rupiah krisis', 'rupiah anjlok', 'capital flight',
+  'default', 'gagal bayar', 'pailit', 'delisting', 'suspend',
+  'krisis', 'bail out', 'resesi', 'sanctions',
+];
+
 export async function processArticleQueue(
   articles: RawNewsArticle[],
   client: Anthropic
 ): Promise<NewsImpactAnalysis[]> {
   if (!articles.length) return [];
 
-  // Filter already-analyzed articles
+  // Daily cost cap check
+  if (isCapReached('news')) {
+    console.log('[newsPipeline] Daily cost cap reached ($2.00), pausing news analysis until tomorrow');
+    return [];
+  }
+
+  // Filter already-analyzed articles (SKIP_DUPLICATES)
   const unanalyzed = articles.filter((a) => {
     const cached = _analyzed.get(a.id);
     return !cached || Date.now() - cached.timestamp >= DEDUP_CACHE_TTL;
   });
 
-  // Prioritise CRITICAL-looking headlines (sovereign, bank, BI, OJK, downgrade)
-  const criticalKeywords = ['downgrade', 'default', 'gagal bayar', 'pailit', 'delisting', 'sanksi', 'krisis', 'bi rate', 'ojk', 'suspend'];
+  if (unanalyzed.length === 0) {
+    console.log('[newsAnalyzer] All articles already in dedup cache, skipping');
+    return [];
+  }
+
+  // Sort by severity — CRITICAL headlines first, then most recent
   const sorted = [...unanalyzed].sort((a, b) => {
-    const aScore = criticalKeywords.some((k) => (a.title + a.summary).toLowerCase().includes(k)) ? 1 : 0;
-    const bScore = criticalKeywords.some((k) => (b.title + b.summary).toLowerCase().includes(k)) ? 1 : 0;
-    return bScore - aScore;
+    const aHaystack = (a.title + ' ' + a.summary).toLowerCase();
+    const bHaystack = (b.title + ' ' + b.summary).toLowerCase();
+    const aScore = SEVERITY_KEYWORDS.filter((k) => aHaystack.includes(k)).length;
+    const bScore = SEVERITY_KEYWORDS.filter((k) => bHaystack.includes(k)).length;
+    if (bScore !== aScore) return bScore - aScore;
+    // Tiebreak: most recent first
+    return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
   });
 
   const batch = sorted.slice(0, MAX_ARTICLES_PER_BATCH);
   const results: NewsImpactAnalysis[] = [];
 
   for (const article of batch) {
+    // Re-check cap before each article (cost accumulates mid-batch)
+    if (isCapReached('news')) {
+      console.log(`[newsPipeline] Daily cost cap reached mid-batch after ${results.length} articles`);
+      break;
+    }
     const analysis = await analyzeNewsImpact(article, client);
     if (analysis) results.push(analysis);
   }
 
-  console.log(`[newsAnalyzer] Batch complete: ${results.length}/${batch.length} analyzed`);
+  console.log(`[newsAnalyzer] Batch complete: ${results.length}/${batch.length} analyzed (${unanalyzed.length} unanalyzed, ${articles.length - unanalyzed.length} deduped)`);
   return results;
 }
 

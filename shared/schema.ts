@@ -1,4 +1,4 @@
-import { pgTable, text, serial, numeric, timestamp, real, integer, jsonb, uniqueIndex, index, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, numeric, timestamp, real, integer, jsonb, date, uniqueIndex, index, customType } from "drizzle-orm/pg-core";
 
 // pgvector column — requires `CREATE EXTENSION IF NOT EXISTS vector` on the DB
 // IVFFlat index must be added via raw SQL (not expressible in Drizzle DSL):
@@ -81,6 +81,10 @@ export const stocks = pgTable("stocks", {
   riskData: text("risk_data").notNull(), // JSON stringified risk framework data
   insiderData: text("insider_data"), // JSON stringified insider transaction data (optional)
   aiConfidence: text("ai_confidence").default("High").notNull(), // High, Medium, Low
+  // avg20d_value: IDR avg 20-session trading value for liquidity tier guard.
+  // TEMPORARY SEED — populated with tier-based estimates until session_history has 20+ sessions.
+  avg20dValue: real("avg20d_value"),
+  scrapeSource: text("scrape_source"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
@@ -325,3 +329,43 @@ export const ragDocuments = pgTable('rag_documents', {
 export const insertRagDocumentSchema = createInsertSchema(ragDocuments).omit({ id: true, createdAt: true });
 export type InsertRagDocument = z.infer<typeof insertRagDocumentSchema>;
 export type RagDocument = typeof ragDocuments.$inferSelect;
+
+// ─── Previously unschematized tables (used via raw SQL — now registered with Drizzle) ────
+
+export const macroFlowHistory = pgTable('macro_flow_history', {
+  date:        date('date').primaryKey(),
+  ihsgForeign: numeric('ihsg_foreign'),
+  indogbUst:   numeric('indogb_ust'),
+  indoCds:     numeric('indo_cds'),
+  eidoVolume:  numeric('eido_volume'),
+  eidoChange:  numeric('eido_change'),
+  dataQuality: text('data_quality'),
+  fetchedAt:   timestamp('fetched_at').defaultNow(),
+});
+
+export type MacroFlowHistory = typeof macroFlowHistory.$inferSelect;
+
+export const macroRegimeHistory = pgTable('macro_regime_history', {
+  date:         date('date').primaryKey(),
+  regime:       text('regime').notNull(),
+  multiplier:   numeric('multiplier'),
+  confidence:   integer('confidence'),
+  triggers:     jsonb('triggers'),
+  durationDays: integer('duration_days'),
+  computedAt:   timestamp('computed_at').defaultNow(),
+});
+
+export type MacroRegimeHistory = typeof macroRegimeHistory.$inferSelect;
+
+export const scrapeLog = pgTable('scrape_log', {
+  id:              serial('id').primaryKey(),
+  runAt:           timestamp('run_at').defaultNow(),
+  symbols:         text('symbols').array(),
+  attempted:       integer('attempted'),
+  succeeded:       integer('succeeded'),
+  failed:          integer('failed'),
+  durationMs:      integer('duration_ms'),
+  sourceBreakdown: jsonb('source_breakdown'),
+});
+
+export type ScrapeLog = typeof scrapeLog.$inferSelect;

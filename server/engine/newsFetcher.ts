@@ -297,9 +297,14 @@ export async function runNewsCycle(): Promise<void> {
       return;
     }
 
-    const { default: Anthropic }      = await import('@anthropic-ai/sdk');
-    const { processArticleQueue }     = await import('./newsAnalyzer');
+    const { isAnalysisHours, processArticleQueue } = await import('./newsAnalyzer');
 
+    if (!isAnalysisHours()) {
+      console.log('[newsPipeline] Outside analysis window (Mon-Fri 06:00-17:00 WIB), skipping Claude analysis');
+      return;
+    }
+
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const results = await processArticleQueue(relevant, client);
 

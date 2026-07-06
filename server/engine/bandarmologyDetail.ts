@@ -1,44 +1,121 @@
 // ═══════════════════════════════════════════════════════════
-// BANDARMOLOGY INTELLIGENCE CORE v1.1
-// Permanent Intelligence Engine — Single Source of Truth
-// ═══════════════════════════════════════════════════════════
+// BANDARMOLOGY DETAIL FIELDS
+// Produces all display fields for /api/ai endpoint.
 //
-// This file consolidates ALL bandarmology intelligence logic
-// into a single deterministic engine.
+// Zero dependency on bandarmologyCoreV1.ts.
+// Identical logic — extracted so v1.1 can be deleted.
 //
-// RULES:
-// - No randomness (Math.random() forbidden)
-// - Same input → same output (deterministic)
-// - All explanations in Bahasa Indonesia
-// - No buy/sell recommendations or price targets
-// - Neutral analytical tone throughout
-//
-// ENGINE VERSION: 1.1.0
-//
-// v1.1.0 ADDITIONS:
-// - Model 6: Flow Normalization (negative range fix B-1)
-// - Model 7: Broker Rotation
-// - Model 8: Stealth Accumulation (slope fix B-2)
-// - Model 9: Fake Breakout Risk
-// - Model 10: Regime Probabilities
-// - Fix B-3: Pipeline order correction
+// Input:  BandarmologyDetailInput (same shape as v1.1 BandarmologyInput)
+// Output: BandarmologyDetail (all LIST A fields consumed by ai.ts)
 // ═══════════════════════════════════════════════════════════
 
 import { parseBrokerIDR } from "./parseBrokerIDR";
-import { parseForeignData } from "./foreignParser";
 import { calculateBrokerStabilityScore } from "./brokerStability";
 import { calculateFlowQualityScore } from "./flowQuality";
 import { getInsiderDirection } from "./insider";
-import { detectTapeControl } from "./tapeControl";
 import { detectAccumulationPhase } from "./phaseDetection";
-import {
-  computeGorenganFromStock as _computeGorenganFromStock,
-  GorenganResult as _GorenganResult
-} from './gorenganDetector';
 
-// ═══════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS (v1.1)
-// ═══════════════════════════════════════════════════════════
+// ─── Input type ───────────────────────────────────────────────────────────────
+
+export interface BandarmologyDetailInput {
+  flowBias: string;
+  flowIntensity: string;
+  flowReliability: string;
+  netForeignBuyIdr: number;
+  netDomesticBuyIdr: number;
+  buyAvg: number;
+  sellAvg: number;
+  lastPrice: number;
+  brokerData: any[];
+  foreignActivityData: string;
+  changePercent: number;
+  growth: number;
+  insiderData: any;
+  stockCharacter?: string | null;
+  eventType?: string;
+}
+
+// ─── Output types ─────────────────────────────────────────────────────────────
+
+export interface BrokerInsight {
+  brokerCode: string;
+  inferredRole: string;
+  confidenceLevel: string;
+  roleShiftFlag: boolean;
+  explanation: string;
+}
+
+export interface BandarmologyDetail {
+  flowQualityScore: number;
+  flowQualityInterpretation: string;
+
+  earlyDistributionFlag: boolean;
+  earlyDistributionExplanation: string;
+
+  brokerControlScore: { score: number; level: string; interpretation: string };
+  brokerStabilityScore: { score: number; level: string; interpretation: string };
+
+  tapeControlFlag: boolean;
+  tapeControlExplanation: string;
+
+  brokerInsights: BrokerInsight[];
+
+  marketMode: string;
+  marketModeExplanation: string;
+
+  convictionPhase: string;
+  convictionExplanation: string;
+
+  smartMoneyIntent: {
+    primaryIntent: string;
+    secondaryIntent?: string;
+    confidence: "Rendah" | "Sedang" | "Tinggi";
+    explanation: string;
+  };
+
+  currentPhaseLabel: string;
+  bandarHeatmap: Array<{ broker: string; net: number }>;
+  phaseTimeline: Array<{ phase: string; confidence: string }>;
+  bandarPhaseInterpretation: string;
+
+  trapDetection: {
+    type: string;
+    detected: boolean;
+    confidence: string;
+    title: string;
+    explanation: string;
+  };
+
+  decisionEngine: {
+    status: string;
+    subBadge: string;
+    reasons: string[];
+    primaryRisk: string;
+    investorFit: string;
+  };
+
+  controlQualityScore: { score: number; level: string; interpretation: string };
+
+  insiderBandarAlignment: { status: string; interpretation: string };
+
+  simplifiedRisk: {
+    level: string;
+    explanation: string;
+    failureTriggers: string[];
+  };
+
+  smartMoneyReadinessScore: {
+    score: number;
+    statusLabel: string;
+    shortExplanation: string;
+    gradingExplanation: string;
+    hasInconsistency: boolean;
+    inconsistencyNote: string;
+    components: Array<{ name: string; weight: string; condition: string }>;
+  };
+}
+
+// ─── Utilities ────────────────────────────────────────────────────────────────
 
 function clamp100(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
@@ -59,329 +136,11 @@ function parseBrokers(brokerData: any[]): Array<{ code: string; net: number }> {
   }));
 }
 
-// ═══════════════════════════════════════════════════════════
-// TYPE DEFINITIONS
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Broker Control Score ────────────────────────────────────────────
 
-export interface ScoreWithExplanation {
-  score: number;
-  level: string;
-  components: Array<{ name: string; value: number }>;
-  explanation: string;
-  isReliable: boolean;
-  reliabilityNote: string | null;
-}
-
-export interface BandarmologyInput {
-  // Flow signals
-  flowBias: string;
-  flowIntensity: string;
-  flowReliability: string;
-  netForeignBuyIdr: number;
-  netDomesticBuyIdr: number;
-  buyAvg: number;
-  sellAvg: number;
-  lastPrice: number;
-
-  // Broker data (parsed array)
-  brokerData: any[];
-
-  // Foreign activity (parsed)
-  foreignActivityData: string;
-
-  // Price context
-  changePercent: number;
-  growth: number;
-
-  // Insider data
-  insiderData: any;
-
-  // Stock character
-  stockCharacter?: string | null;
-
-  // Event context
-  eventType?: string;
-
-  // v1.1 — Extended fields (optional, graceful degradation if missing)
-  flow?: {
-    netForeignFlow: number;
-    netDomesticFlow: number;
-  };
-  volume?: {
-    todayVolume: number;
-    avg20dVolume: number;
-    avg20dValue: number;
-  };
-  price?: {
-    close: number;
-    prevClose: number;
-    high: number;
-    low: number;
-  };
-  priceHistory?: number[];
-  brokers?: any[];
-}
-
-export interface GorenganResult {
-  isGorengan: boolean;
-  triggeredLayers: number[];
-  layerDetails: string[];
-  riskOverride: string | null;
-}
-
-export interface BrokerInsight {
-  brokerCode: string;
-  inferredRole: string;
-  confidenceLevel: string;
-  roleShiftFlag: boolean;
-  explanation: string;
-}
-
-export interface BandarmologyResult {
-  engineVersion: string;
-
-  // ─── FLOW QUALITY ───
-  flowQualityScore: number;
-  flowQualityInterpretation: string;
-
-  // ─── EARLY DISTRIBUTION ───
-  earlyDistributionFlag: boolean;
-  earlyDistributionExplanation: string;
-
-  // ─── BROKER CONTROL ───
-  brokerControlScore: {
-    score: number;
-    level: string;
-    interpretation: string;
-  };
-
-  // ─── BROKER STABILITY ───
-  brokerStabilityScore: {
-    score: number;
-    level: string;
-    interpretation: string;
-  };
-
-  // ─── TAPE CONTROL ───
-  tapeControlFlag: boolean;
-  tapeControlExplanation: string;
-
-  // ─── BROKER INSIGHTS ───
-  brokerInsights: BrokerInsight[];
-
-  // ─── MARKET MODE (A/D Engine) ───
-  marketMode: string;
-  marketModeExplanation: string;
-
-  // ─── CONVICTION PHASE ───
-  convictionPhase: string;
-  convictionExplanation: string;
-
-  // ─── SMART MONEY INTENT ───
-  smartMoneyIntent: {
-    primaryIntent: string;
-    secondaryIntent?: string;
-    confidence: "Rendah" | "Sedang" | "Tinggi";
-    explanation: string;
-  };
-
-  // ─── PHASE DETECTION ───
-  currentPhaseLabel: string;
-  bandarHeatmap: Array<{ broker: string; net: number }>;
-  phaseTimeline: Array<{ phase: string; confidence: string }>;
-  bandarPhaseInterpretation: string;
-
-  // ─── TRAP DETECTION ───
-  trapDetection: {
-    type: string;
-    detected: boolean;
-    confidence: string;
-    title: string;
-    explanation: string;
-  };
-
-  // ─── DECISION ENGINE (Part A) ───
-  decisionEngine: {
-    status: string;
-    subBadge: string;
-    reasons: string[];
-    primaryRisk: string;
-    investorFit: string;
-  };
-
-  // ─── CONTROL QUALITY (Part B) ───
-  controlQualityScore: {
-    score: number;
-    level: string;
-    interpretation: string;
-  };
-
-  // ─── INSIDER-BANDAR ALIGNMENT ───
-  insiderBandarAlignment: {
-    status: string;
-    interpretation: string;
-  };
-
-  // ─── SIMPLIFIED RISK (Part C) ───
-  simplifiedRisk: {
-    level: string;
-    explanation: string;
-    failureTriggers: string[];
-  };
-
-  // ─── SMART MONEY READINESS SCORE ───
-  smartMoneyReadinessScore: {
-    score: number;
-    statusLabel: string;
-    shortExplanation: string;
-    gradingExplanation: string;
-    hasInconsistency: boolean;
-    inconsistencyNote: string;
-    components: Array<{ name: string; weight: string; condition: string }>;
-  };
-
-  // ─── GORENGAN DETECTION ───
-  gorenganResult: GorenganResult;
-
-  // ─── v1.1 NEW MODELS ───
-  flowNormalized: ScoreWithExplanation;
-  brokerRotation: ScoreWithExplanation;
-  stealthAccumulation: ScoreWithExplanation;
-  fakeBreakoutRisk: ScoreWithExplanation;
-  regimeProbabilities: {
-    strongAccumulation: number;
-    distribution: number;
-    sideways: number;
-  };
-}
-
-// ═══════════════════════════════════════════════════════════
-// GORENGAN DETECTOR (4-Layer Safety Engine)
-// ═══════════════════════════════════════════════════════════
-
-interface GorenganDetectionInput {
-  priceChangePercent5d: number;
-  hasIntradaySpikes: boolean;
-  volumeRatio: number;
-  top3BrokerNetBuyPercent: number;
-  hasBrokerFragmentation: boolean;
-  retailProxyDominates: boolean;
-  smallLotDominates: boolean;
-  foreignFlowAbsent: boolean;
-  hasAccumulationLadder: boolean;
-  marketRegime: string;
-  hasTapeControl: boolean;
-  hasAbsorptionFailure: boolean;
-  hasPostSpikeDistribution: boolean;
-}
-
-function detectGorengan(input: GorenganDetectionInput): GorenganResult {
-  const triggeredLayers: number[] = [];
-  const layerDetails: string[] = [];
-
-  // LAYER 1 — PRICE & VOLUME ANOMALY
-  const layer1Triggered =
-    input.priceChangePercent5d > 25 ||
-    input.hasIntradaySpikes ||
-    input.volumeRatio > 3;
-
-  if (layer1Triggered) {
-    triggeredLayers.push(1);
-    const details: string[] = [];
-    if (input.priceChangePercent5d > 25) details.push(`Kenaikan harga ${input.priceChangePercent5d.toFixed(1)}% dalam 5 hari`);
-    if (input.hasIntradaySpikes) details.push("Lonjakan intraday ≥10% terdeteksi");
-    if (input.volumeRatio > 3) details.push(`Volume ${input.volumeRatio.toFixed(1)}× rata-rata 20 hari`);
-    layerDetails.push(`Layer 1 (Anomali Harga & Volume): ${details.join(", ")}`);
-  }
-
-  // LAYER 2 — BROKER FLOW FRAGMENTATION
-  const layer2Triggered =
-    input.top3BrokerNetBuyPercent < 35 ||
-    input.hasBrokerFragmentation ||
-    input.retailProxyDominates;
-
-  if (layer2Triggered) {
-    triggeredLayers.push(2);
-    const details: string[] = [];
-    if (input.top3BrokerNetBuyPercent < 35) details.push(`Top 3 broker hanya ${input.top3BrokerNetBuyPercent.toFixed(0)}% net buy`);
-    if (input.hasBrokerFragmentation) details.push("Fragmentasi broker tinggi");
-    if (input.retailProxyDominates) details.push("Broker proxy ritel mendominasi");
-    layerDetails.push(`Layer 2 (Fragmentasi Broker): ${details.join(", ")}`);
-  }
-
-  // LAYER 3 — RETAIL DOMINANCE
-  const layer3Triggered =
-    input.smallLotDominates ||
-    input.foreignFlowAbsent ||
-    !input.hasAccumulationLadder;
-
-  if (layer3Triggered) {
-    triggeredLayers.push(3);
-    const details: string[] = [];
-    if (input.smallLotDominates) details.push("Transaksi lot kecil mendominasi");
-    if (input.foreignFlowAbsent) details.push("Aliran asing absen");
-    if (!input.hasAccumulationLadder) details.push("Tidak ada pola akumulasi bertahap");
-    layerDetails.push(`Layer 3 (Dominasi Ritel): ${details.join(", ")}`);
-  }
-
-  // LAYER 4 — STRUCTURAL FAILURE
-  const isAccumulationRegime = input.marketRegime.includes("Akumulasi") ||
-    input.marketRegime === "Stealth Accumulation" ||
-    input.marketRegime === "Active Accumulation";
-
-  const layer4Triggered =
-    !isAccumulationRegime ||
-    !input.hasTapeControl ||
-    input.hasAbsorptionFailure ||
-    input.hasPostSpikeDistribution;
-
-  if (layer4Triggered) {
-    triggeredLayers.push(4);
-    const details: string[] = [];
-    if (!isAccumulationRegime) details.push("Rezim pasar bukan akumulasi");
-    if (!input.hasTapeControl) details.push("Tidak ada kendali tape");
-    if (input.hasAbsorptionFailure) details.push("Absorpsi gagal (harga naik tapi tekanan jual kuat)");
-    if (input.hasPostSpikeDistribution) details.push("Distribusi pasca-lonjakan terdeteksi");
-    layerDetails.push(`Layer 4 (Kegagalan Struktural): ${details.join(", ")}`);
-  }
-
-  // FINAL DECISION: GORENGAN if ≥2 layers triggered
-  const isGorengan = triggeredLayers.length >= 2;
-
-  return {
-    isGorengan,
-    triggeredLayers,
-    layerDetails,
-    riskOverride: isGorengan ? "GOR" : null
-  };
-}
-
-// ═══════════════════════════════════════════════════════════
-// GORENGAN DETECTION FROM STOCK DATA
-// Wrapper that transforms stock fields into detection input
-// ═══════════════════════════════════════════════════════════
-
-export function computeGorenganFromStock(stock: {
-  changePercent: string;
-  flowBias: string;
-  flowIntensity: string;
-  flowReliability: string;
-  brokerData: string;
-  foreignActivityData: string;
-  stockCharacter?: string | null;
-  todayValue?: number | null;
-  avg20dValue?: number | null;
-  symbol?: string | null;
-}): GorenganResult {
-  return _computeGorenganFromStock(stock);
-}
-
-// ═══════════════════════════════════════════════════════════
-// BROKER CONTROL SCORE
-// Measures concentration of net accumulation among top brokers
-// ═══════════════════════════════════════════════════════════
-
-function computeBrokerControlScore(brokers: any[]): { score: number; level: string; interpretation: string } {
+function computeBrokerControlScore(
+  brokers: any[]
+): { score: number; level: string; interpretation: string } {
   const positive = brokers
     .map(b => {
       const buyVal = b.netBuy ? parseFloat(b.netBuy.replace(/[^\d.]/g, "")) : 0;
@@ -399,10 +158,8 @@ function computeBrokerControlScore(brokers: any[]): { score: number; level: stri
   }
 
   positive.sort((a, b) => b.net - a.net);
-
   const top3 = positive.slice(0, 3).reduce((sum, b) => sum + b.net, 0);
   const total = positive.reduce((sum, b) => sum + b.net, 0);
-
   const brokerScore = Math.round((top3 / total) * 100);
 
   let level = "Konsentrasi Rendah";
@@ -422,10 +179,7 @@ function computeBrokerControlScore(brokers: any[]): { score: number; level: stri
   return { score: brokerScore, level, interpretation };
 }
 
-// ═══════════════════════════════════════════════════════════
-// BROKER CLASSIFICATION ENGINE
-// Classifies each broker into behavioral roles
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Broker Classification ───────────────────────────────────────────
 
 function classifyBrokers(brokerData: any[], tapeControlFlag: boolean): BrokerInsight[] {
   return brokerData.map((b: any) => {
@@ -450,7 +204,6 @@ function classifyBrokers(brokerData: any[], tapeControlFlag: boolean): BrokerIns
       role = "Market Maker";
     }
 
-    // Operator detection: high volume with tape control signals
     if (tapeControlFlag && volPct >= 10 && (role === "Akumulator" || role === "Distributor")) {
       role = "Operator";
       confidence = "Tinggi";
@@ -474,10 +227,7 @@ function classifyBrokers(brokerData: any[], tapeControlFlag: boolean): BrokerIns
   });
 }
 
-// ═══════════════════════════════════════════════════════════
-// MARKET MODE ENGINE (A/D Mode)
-// Determines accumulation/distribution regime
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Market Mode ─────────────────────────────────────────────────────
 
 function computeMarketMode(
   score: number,
@@ -504,10 +254,7 @@ function computeMarketMode(
   return { mode, explanation: explanations[mode] || "" };
 }
 
-// ═══════════════════════════════════════════════════════════
-// CONVICTION TIMELINE ENGINE
-// Lifecycle phases: Positioning → Confirmation → Crowding → Distribution → Reset
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Conviction Phase ─────────────────────────────────────────────────
 
 function computeConvictionPhase(
   score: number,
@@ -536,10 +283,7 @@ function computeConvictionPhase(
   return { phase, explanation: explanations[phase] || "" };
 }
 
-// ═══════════════════════════════════════════════════════════
-// SMART MONEY INTENT ENGINE
-// Analyzes combined signals to infer institutional objectives
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Smart Money Intent ───────────────────────────────────────────────
 
 function computeSmartMoneyIntent(
   brokerInsights: BrokerInsight[],
@@ -602,10 +346,7 @@ function computeSmartMoneyIntent(
   return { primaryIntent, secondaryIntent, confidence: intentConfidence, explanation: intentExplanation };
 }
 
-// ═══════════════════════════════════════════════════════════
-// TRAP DETECTION ENGINE
-// Bull Trap / Bear Trap detection from phase + flow signals
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Trap Detection ───────────────────────────────────────────────────
 
 function computeTrapDetection(
   currentPhaseLabel: string,
@@ -648,10 +389,7 @@ function computeTrapDetection(
   };
 }
 
-// ═══════════════════════════════════════════════════════════
-// DECISION ENGINE (Part A)
-// Determines stock status, sub-badge, reasons, and investor fit
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Decision Engine ──────────────────────────────────────────────────
 
 function computeDecisionEngine(
   score: number,
@@ -728,10 +466,7 @@ function computeDecisionEngine(
   };
 }
 
-// ═══════════════════════════════════════════════════════════
-// CONTROL QUALITY SCORE (Part B)
-// Merges flow quality, reliability, and broker stability
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Control Quality Score ───────────────────────────────────────────
 
 function computeControlQualityScore(
   flowQualityVal: number,
@@ -760,9 +495,7 @@ function computeControlQualityScore(
   return { score: combined, level, interpretation };
 }
 
-// ═══════════════════════════════════════════════════════════
-// INSIDER-BANDAR ALIGNMENT
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Insider-Bandar Alignment ────────────────────────────────────────
 
 function computeInsiderAlignment(
   flowBias: string,
@@ -777,7 +510,7 @@ function computeInsiderAlignment(
       insiderParsed = typeof insiderData === "string"
         ? JSON.parse(insiderData)
         : insiderData;
-    } catch {}
+    } catch { /* graceful degradation */ }
   }
   const insiderDir = getInsiderDirection(insiderParsed);
 
@@ -808,9 +541,7 @@ function computeInsiderAlignment(
   };
 }
 
-// ═══════════════════════════════════════════════════════════
-// SIMPLIFIED RISK (Part C)
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Simplified Risk ──────────────────────────────────────────────────
 
 function computeSimplifiedRisk(
   score: number,
@@ -865,10 +596,7 @@ function computeSimplifiedRisk(
   };
 }
 
-// ═══════════════════════════════════════════════════════════
-// SMART MONEY READINESS SCORE (Core Intelligence)
-// Answers: "Seberapa siap saham ini untuk masuk fase kenaikan?"
-// ═══════════════════════════════════════════════════════════
+// ─── Helper: Smart Money Readiness Score ─────────────────────────────────────
 
 function computeSmartMoneyReadinessScore(
   marketMode: string,
@@ -888,114 +616,68 @@ function computeSmartMoneyReadinessScore(
   inconsistencyNote: string;
   components: Array<{ name: string; weight: string; condition: string }>;
 } {
-  // 1) MARKET REGIME (30%)
   let regimeScore = 0;
   let regimeCondition = "";
   switch (marketMode) {
-    case "Akumulasi Tersembunyi":
-      regimeScore = 24;
-      regimeCondition = "Akumulasi Tersembunyi";
-      break;
-    case "Akumulasi Aktif":
-      regimeScore = 28;
-      regimeCondition = "Akumulasi Aktif";
-      break;
-    case "Distribusi Saat Menguat":
-      regimeScore = 12;
-      regimeCondition = "Distribusi Awal";
-      break;
-    case "Distribusi Pasif":
-      regimeScore = 7;
-      regimeCondition = "Distribusi Pasif";
-      break;
-    case "Vakum Pasca-Distribusi":
-      regimeScore = 3;
-      regimeCondition = "Pasca-Distribusi";
-      break;
-    default:
-      regimeScore = 15;
-      regimeCondition = "Transisi";
+    case "Akumulasi Tersembunyi": regimeScore = 24; regimeCondition = "Akumulasi Tersembunyi"; break;
+    case "Akumulasi Aktif":       regimeScore = 28; regimeCondition = "Akumulasi Aktif"; break;
+    case "Distribusi Saat Menguat": regimeScore = 12; regimeCondition = "Distribusi Awal"; break;
+    case "Distribusi Pasif":      regimeScore = 7;  regimeCondition = "Distribusi Pasif"; break;
+    case "Vakum Pasca-Distribusi": regimeScore = 3; regimeCondition = "Pasca-Distribusi"; break;
+    default:                      regimeScore = 15; regimeCondition = "Transisi"; break;
   }
 
-  // 2) KUALITAS KENDALI BANDAR (25%)
   let controlScore = 0;
   let controlCondition = "";
   const combinedControl = controlQualityScore.score;
   if (combinedControl >= 70 && brokerStabilityLevel === "Tinggi") {
-    controlScore = 23;
-    controlCondition = "Kuat & Stabil";
+    controlScore = 23; controlCondition = "Kuat & Stabil";
   } else if (combinedControl >= 50 && brokerStabilityLevel !== "Rendah") {
-    controlScore = 16;
-    controlCondition = "Ada, Tapi Rapuh";
+    controlScore = 16; controlCondition = "Ada, Tapi Rapuh";
   } else if (combinedControl >= 30) {
-    controlScore = 8;
-    controlCondition = "Terfragmentasi";
+    controlScore = 8; controlCondition = "Terfragmentasi";
   } else {
-    controlScore = 2;
-    controlCondition = "Distribusi Dominan";
+    controlScore = 2; controlCondition = "Distribusi Dominan";
   }
 
-  // 3) ABSORPTION vs PRESSURE (20%)
   let absorptionScore = 0;
   let absorptionCondition = "";
   if (flowBias === "Akumulasi" && flowReliability === "Tinggi") {
-    absorptionScore = 18;
-    absorptionCondition = "Konsisten";
+    absorptionScore = 18; absorptionCondition = "Konsisten";
   } else if (flowBias === "Akumulasi") {
-    absorptionScore = 12;
-    absorptionCondition = "Parsial";
+    absorptionScore = 12; absorptionCondition = "Parsial";
   } else {
-    absorptionScore = 4;
-    absorptionCondition = "Tekanan Jual";
+    absorptionScore = 4; absorptionCondition = "Tekanan Jual";
   }
 
-  // 4) DISTRIBUTION RISK (15%) - PENALTY
   let riskScore = 0;
   let riskCondition = "";
   if (simplifiedRisk.level === "Rendah") {
-    riskScore = 13;
-    riskCondition = "Rendah";
+    riskScore = 13; riskCondition = "Rendah";
   } else if (simplifiedRisk.level === "Sedang") {
-    riskScore = 8;
-    riskCondition = "Sedang";
+    riskScore = 8; riskCondition = "Sedang";
   } else {
-    riskScore = 3;
-    riskCondition = "Tinggi";
+    riskScore = 3; riskCondition = "Tinggi";
   }
 
-  // 5) INSIDER ALIGNMENT (10%)
   let insiderScore = 0;
   let insiderCondition = "";
   if (insiderAlignment.status === "Selaras") {
-    insiderScore = 9;
-    insiderCondition = "Selaras";
+    insiderScore = 9; insiderCondition = "Selaras";
   } else if (insiderAlignment.status === "Netral") {
-    insiderScore = 5;
-    insiderCondition = "Netral";
+    insiderScore = 5; insiderCondition = "Netral";
   } else {
-    insiderScore = 2;
-    insiderCondition = "Bertentangan";
+    insiderScore = 2; insiderCondition = "Bertentangan";
   }
 
   const totalScore = regimeScore + controlScore + absorptionScore + riskScore + insiderScore;
 
-  // Check for inconsistencies
   let hasInconsistency = false;
-  if (marketMode.includes("Akumulasi") && simplifiedRisk.level === "Tinggi") {
-    hasInconsistency = true;
-  }
-  if (marketMode.includes("Akumulasi") && insiderAlignment.status === "Bertentangan") {
-    hasInconsistency = true;
-  }
-  if (controlQualityScore.level === "Tinggi" && earlyDistributionFlag) {
-    hasInconsistency = true;
-  }
+  if (marketMode.includes("Akumulasi") && simplifiedRisk.level === "Tinggi") hasInconsistency = true;
+  if (marketMode.includes("Akumulasi") && insiderAlignment.status === "Bertentangan") hasInconsistency = true;
+  if (controlQualityScore.level === "Tinggi" && earlyDistributionFlag) hasInconsistency = true;
 
-  let inconsistencyNote = "";
-  if (hasInconsistency) {
-    inconsistencyNote = "Beberapa sinyal belum sepenuhnya selaras.";
-  }
-
+  const inconsistencyNote = hasInconsistency ? "Beberapa sinyal belum sepenuhnya selaras." : "";
   const adjustedScore = hasInconsistency ? Math.max(0, totalScore - 7) : totalScore;
 
   let statusLabel = "";
@@ -1015,9 +697,7 @@ function computeSmartMoneyReadinessScore(
     shortExplanation = "Kondisi struktural saat ini tidak mengindikasikan kesiapan untuk fase kenaikan. Fokus pada pemantauan perubahan rezim pasar.";
   }
 
-  if (hasInconsistency) {
-    shortExplanation += " " + inconsistencyNote;
-  }
+  if (hasInconsistency) shortExplanation += " " + inconsistencyNote;
 
   const gradingExplanation = "Skor ini merupakan indikator kesiapan struktural, bukan sinyal beli atau prediksi pergerakan harga. Perhitungan mencakup kombinasi fase pasar, kualitas kendali bandar, kemampuan pasar menyerap tekanan jual, tingkat risiko distribusi, serta keselarasan perilaku insider. Gunakan sebagai salah satu pertimbangan dalam analisis menyeluruh, bukan sebagai satu-satunya dasar keputusan investasi.";
 
@@ -1029,276 +709,20 @@ function computeSmartMoneyReadinessScore(
     hasInconsistency,
     inconsistencyNote,
     components: [
-      { name: "Rezim Pasar", weight: "30%", condition: regimeCondition },
-      { name: "Kendali Bandar", weight: "25%", condition: controlCondition },
-      { name: "Absorpsi", weight: "20%", condition: absorptionCondition },
-      { name: "Risiko Distribusi", weight: "15%", condition: riskCondition },
-      { name: "Insider", weight: "10%", condition: insiderCondition }
+      { name: "Rezim Pasar",         weight: "30%", condition: regimeCondition },
+      { name: "Kendali Bandar",       weight: "25%", condition: controlCondition },
+      { name: "Absorpsi",             weight: "20%", condition: absorptionCondition },
+      { name: "Risiko Distribusi",    weight: "15%", condition: riskCondition },
+      { name: "Insider",              weight: "10%", condition: insiderCondition }
     ]
   };
 }
 
 // ═══════════════════════════════════════════════════════════
-// MODEL 6: FLOW NORMALIZATION (v1.1)
-// CRITICAL FIX B-1: Includes negative range for distribution
+// MAIN FUNCTION
 // ═══════════════════════════════════════════════════════════
 
-function computeFlowNormalized(input: BandarmologyInput): ScoreWithExplanation {
-  const flow = input.flow || { netForeignFlow: input.netForeignBuyIdr, netDomesticFlow: input.netDomesticBuyIdr };
-  const totalNetFlow = flow.netForeignFlow + flow.netDomesticFlow;
-
-  if (!input.volume || input.volume.avg20dValue <= 0) {
-    return {
-      score: 0,
-      level: "Sangat Lemah",
-      components: [],
-      explanation: "Data nilai transaksi historis tidak tersedia",
-      isReliable: false,
-      reliabilityNote: "avg20dValue tidak tersedia"
-    };
-  }
-
-  const ratio = totalNetFlow / input.volume.avg20dValue;
-
-  const score = clamp100(((ratio + 0.5) / 2.0) * 100);
-
-  return {
-    score,
-    level: buildLevelLabel(score),
-    components: [],
-    explanation: `Aliran bersih relatif terhadap rata-rata nilai transaksi menghasilkan rasio ${ratio.toFixed(2)}`,
-    isReliable: true,
-    reliabilityNote: null
-  };
-}
-
-// ═══════════════════════════════════════════════════════════
-// MODEL 7: BROKER ROTATION (v1.1)
-// Stable until historical broker DB exists
-// ═══════════════════════════════════════════════════════════
-
-function computeBrokerRotation(input: BandarmologyInput): ScoreWithExplanation {
-  const brokers = input.brokers || input.brokerData;
-
-  if (!brokers || brokers.length < 5) {
-    return {
-      score: 50,
-      level: "Sedang",
-      components: [],
-      explanation: "Data broker historis tidak cukup",
-      isReliable: false,
-      reliabilityNote: "Broker history <2 sessions"
-    };
-  }
-
-  parseBrokers(brokers)
-    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
-    .slice(0, 5)
-    .map(b => b.code);
-
-  return {
-    score: 50,
-    level: "Sedang",
-    components: [],
-    explanation: "Model rotasi broker membutuhkan data multi-hari",
-    isReliable: false,
-    reliabilityNote: "Broker history belum tersedia"
-  };
-}
-
-// ═══════════════════════════════════════════════════════════
-// MODEL 8: STEALTH ACCUMULATION (v1.1)
-// CRITICAL FIX B-2: Slight negative slopes allowed
-// ═══════════════════════════════════════════════════════════
-
-function computeStealthAccumulation(
-  input: BandarmologyInput,
-  flowNormalizedScore: number
-): ScoreWithExplanation {
-  if (!input.priceHistory || input.priceHistory.length < 5) {
-    return {
-      score: 50,
-      level: "Sedang",
-      components: [],
-      explanation: "Data harga historis tidak cukup",
-      isReliable: false,
-      reliabilityNote: "priceHistory <5"
-    };
-  }
-
-  const prices = input.priceHistory;
-  const n = prices.length;
-
-  let sumX = 0;
-  let sumY = 0;
-  let sumXY = 0;
-  let sumX2 = 0;
-
-  for (let i = 0; i < n; i++) {
-    sumX += i;
-    sumY += prices[i];
-    sumXY += i * prices[i];
-    sumX2 += i * i;
-  }
-
-  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-
-  let slopeScore: number;
-  if (slope < -0.005) slopeScore = 20;
-  else if (slope < -0.001) slopeScore = 55;
-  else if (slope < 0.000) slopeScore = 65;
-  else if (slope < 0.002) slopeScore = 70;
-  else if (slope < 0.005) slopeScore = 80;
-  else if (slope < 0.010) slopeScore = 60;
-  else slopeScore = 35;
-
-  const vol = input.volume || { todayVolume: 0, avg20dVolume: 1, avg20dValue: 0 };
-  const volumeRatio = vol.todayVolume / Math.max(vol.avg20dVolume, 1);
-
-  let volumeScore: number;
-  if (volumeRatio < 0.7) volumeScore = 30;
-  else if (volumeRatio < 1.3) volumeScore = 90;
-  else if (volumeRatio < 2) volumeScore = 60;
-  else volumeScore = 30;
-
-  const score = clamp100(
-    flowNormalizedScore * 0.40 +
-    slopeScore * 0.30 +
-    volumeScore * 0.30
-  );
-
-  return {
-    score,
-    level: buildLevelLabel(score),
-    components: [],
-    explanation: "Deteksi akumulasi stealth berdasarkan tren harga dan aliran",
-    isReliable: true,
-    reliabilityNote: null
-  };
-}
-
-// ═══════════════════════════════════════════════════════════
-// MODEL 9: FAKE BREAKOUT RISK (v1.1)
-// ═══════════════════════════════════════════════════════════
-
-function computeFakeBreakoutRisk(
-  input: BandarmologyInput,
-  flowNormalized: number,
-  brokerDominance: number
-): ScoreWithExplanation {
-  const p = input.price || {
-    close: input.lastPrice || 0,
-    prevClose: input.lastPrice || 1,
-    high: input.lastPrice || 0,
-    low: input.lastPrice || 0
-  };
-
-  const priceChangePct = ((p.close - p.prevClose) / Math.max(p.prevClose, 1)) * 100;
-
-  let priceScore: number;
-  if (priceChangePct < 1) priceScore = 10;
-  else if (priceChangePct < 3) priceScore = 40;
-  else if (priceChangePct < 6) priceScore = 70;
-  else priceScore = 90;
-
-  const weakFlow = 100 - flowNormalized;
-  const weakDominance = 100 - brokerDominance;
-
-  const range = (p.high - p.low) / Math.max(p.close, 1);
-
-  let volScore: number;
-  if (range < 0.01) volScore = 10;
-  else if (range < 0.02) volScore = 30;
-  else if (range < 0.04) volScore = 70;
-  else volScore = 90;
-
-  const score = clamp100(
-    priceScore * 0.35 +
-    weakFlow * 0.30 +
-    weakDominance * 0.20 +
-    volScore * 0.15
-  );
-
-  return {
-    score,
-    level: buildLevelLabel(score),
-    components: [],
-    explanation: "Risiko breakout palsu berdasarkan harga dan dukungan institusi",
-    isReliable: true,
-    reliabilityNote: null
-  };
-}
-
-// ═══════════════════════════════════════════════════════════
-// MODEL 10: REGIME PROBABILITIES (v1.1)
-// ═══════════════════════════════════════════════════════════
-
-function computeRegimeProbabilities(
-  accumulation: number,
-  absorption: number,
-  dominance: number,
-  risk: number
-): { strongAccumulation: number; distribution: number; sideways: number } {
-  const strongRaw = accumulation * 0.4 + absorption * 0.3 + dominance * 0.3;
-  const distRaw = risk * 0.6 + (100 - accumulation) * 0.4;
-  const sideRaw = 100 - Math.abs(accumulation - 50) * 2;
-
-  const total = strongRaw + distRaw + sideRaw;
-
-  if (total <= 0) {
-    return { strongAccumulation: 33, distribution: 33, sideways: 34 };
-  }
-
-  return {
-    strongAccumulation: clamp100(strongRaw / total * 100),
-    distribution: clamp100(distRaw / total * 100),
-    sideways: clamp100(sideRaw / total * 100)
-  };
-}
-
-// ═══════════════════════════════════════════════════════════
-// BUILD INPUT FROM RAW STOCK / PAYLOAD DATA
-// Transforms raw API payload into BandarmologyInput
-// ═══════════════════════════════════════════════════════════
-
-export function buildBandarmologyInput(payload: any, stockData?: any): BandarmologyInput {
-  let brokerArr: any[] = [];
-  try {
-    if (payload.broker_data) {
-      brokerArr = Array.isArray(payload.broker_data) ? payload.broker_data : JSON.parse(payload.broker_data);
-    } else if (stockData?.brokerData) {
-      brokerArr = typeof stockData.brokerData === "string" ? JSON.parse(stockData.brokerData) : stockData.brokerData;
-    }
-  } catch { brokerArr = []; }
-
-  const flowSignals = payload.flow_signals || {};
-  const priceContext = payload.price_context || {};
-
-  return {
-    flowBias: flowSignals.flow_bias || stockData?.flowBias || "Netral",
-    flowIntensity: flowSignals.flow_intensity || stockData?.flowIntensity || "",
-    flowReliability: flowSignals.flow_reliability || stockData?.flowReliability || "Sedang",
-    netForeignBuyIdr: flowSignals.net_foreign_buy_idr || 0,
-    netDomesticBuyIdr: flowSignals.net_domestic_buy_idr || 0,
-    buyAvg: flowSignals.buy_avg_price || 0,
-    sellAvg: flowSignals.sell_avg_price || 0,
-    lastPrice: priceContext.last_price || 0,
-    brokerData: brokerArr,
-    foreignActivityData: stockData?.foreignActivityData || "{}",
-    changePercent: parseFloat(String(stockData?.changePercent || payload.changePercent || "0")),
-    growth: parseFloat(String(stockData?.growth || "0")),
-    insiderData: stockData?.insiderData || null,
-    stockCharacter: stockData?.stockCharacter || null,
-    eventType: payload.event_specifics?.event_type || ""
-  };
-}
-
-// ═══════════════════════════════════════════════════════════
-// MAIN COMPUTATION FUNCTION
-// Single entry point for ALL bandarmology intelligence
-// ═══════════════════════════════════════════════════════════
-
-export function computeBandarmology(input: BandarmologyInput): BandarmologyResult {
+export function computeDetailFields(input: BandarmologyDetailInput): BandarmologyDetail {
   // ─── STEP 1: FLOW QUALITY SCORE ───
   let flowQuality = calculateFlowQualityScore({
     netForeignFlow: input.netForeignBuyIdr,
@@ -1353,7 +777,7 @@ export function computeBandarmology(input: BandarmologyInput): BandarmologyResul
   // ─── STEP 6: BROKER CLASSIFICATION ───
   const brokerInsights = classifyBrokers(input.brokerData, tapeControlFlag);
 
-  // ─── STEP 7: MARKET MODE (A/D Engine) ───
+  // ─── STEP 7: MARKET MODE ───
   const { mode: marketMode, explanation: marketModeExplanation } =
     computeMarketMode(flowQuality, earlyDistributionFlag, tapeControlFlag, input.flowBias);
 
@@ -1366,7 +790,7 @@ export function computeBandarmology(input: BandarmologyInput): BandarmologyResul
     brokerInsights, flowQuality, earlyDistributionFlag, tapeControlFlag, marketMode, conviction.phase
   );
 
-  // Modify conviction explanation based on intent
+  // Conviction explanation modifier based on intent
   if (smartMoneyIntent.primaryIntent === "Persiapan Mark-Up") {
     convictionExplanation += " Analisis intensi smart money memperkuat pandangan konstruktif, dengan karakteristik aliran menunjukkan persiapan aktif untuk potensi apresiasi harga.";
   } else if (smartMoneyIntent.primaryIntent === "Keluar Inventori" && (conviction.phase === "Kepadatan" || conviction.phase === "Distribusi")) {
@@ -1397,22 +821,18 @@ export function computeBandarmology(input: BandarmologyInput): BandarmologyResul
       net: parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell)
     }));
 
-  const phaseTimeline = [{
-    phase: currentPhaseLabel,
-    confidence: input.flowReliability
-  }];
-
+  const phaseTimeline = [{ phase: currentPhaseLabel, confidence: input.flowReliability }];
   const bandarPhaseInterpretation = `Fase saat ini terdeteksi sebagai "${currentPhaseLabel}" berdasarkan bias aliran (${input.flowBias}), intensitas (${input.flowIntensity}), dan reliabilitas (${input.flowReliability}). Interpretasi ini diturunkan secara deterministik dari sinyal pasar aktual.`;
 
   // ─── STEP 12: TRAP DETECTION ───
   const trapDetection = computeTrapDetection(currentPhaseLabel, input.flowBias);
 
-  // ─── STEP 13: DECISION ENGINE (Part A) ───
+  // ─── STEP 13: DECISION ENGINE ───
   const decisionEngine = computeDecisionEngine(
     flowQuality, earlyDistributionFlag, marketMode, brokerStabilityScore.level
   );
 
-  // ─── STEP 14: CONTROL QUALITY (Part B) ───
+  // ─── STEP 14: CONTROL QUALITY SCORE ───
   const controlQualityScore = computeControlQualityScore(
     flowQuality, input.flowReliability, brokerStabilityScore.score
   );
@@ -1422,7 +842,7 @@ export function computeBandarmology(input: BandarmologyInput): BandarmologyResul
     input.flowBias, input.insiderData, flowQuality
   );
 
-  // ─── STEP 16: SIMPLIFIED RISK (Part C) ───
+  // ─── STEP 16: SIMPLIFIED RISK ───
   const simplifiedRisk = computeSimplifiedRisk(
     flowQuality, earlyDistributionFlag, marketMode, brokerStabilityScore.level
   );
@@ -1439,85 +859,7 @@ export function computeBandarmology(input: BandarmologyInput): BandarmologyResul
     earlyDistributionFlag
   );
 
-  // ─── STEP 18: GORENGAN DETECTION ───
-  const foreignParsed = parseForeignData(input.foreignActivityData || "{}");
-  const sortedBrokers = [...input.brokerData].sort((a, b) => {
-    const aNet = parseBrokerIDR(a.netBuy) - parseBrokerIDR(a.netSell);
-    const bNet = parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell);
-    return bNet - aNet;
-  });
-  const totalNetBuy = input.brokerData.reduce((sum: number, b: any) => sum + Math.max(0, parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell)), 0);
-  const top3NetBuy = sortedBrokers.slice(0, 3).reduce((sum, b) => sum + Math.max(0, parseBrokerIDR(b.netBuy) - parseBrokerIDR(b.netSell)), 0);
-  const top3Percent = totalNetBuy > 0 ? (top3NetBuy / totalNetBuy) * 100 : 50;
-  const hasBrokerFragmentation = input.brokerData.length > 10 && top3Percent < 40;
-  const totalVolume = input.brokerData.reduce((s: number, b: any) => s + parseBrokerIDR(b.netBuy) + parseBrokerIDR(b.netSell), 0);
-  const smallBrokerCount = totalVolume > 0
-    ? input.brokerData.filter((b: any) => parseBrokerIDR(b.netBuy) + parseBrokerIDR(b.netSell) < totalVolume * 0.02).length
-    : 0;
-  const retailProxyDominates = input.brokerData.length > 0 && smallBrokerCount > input.brokerData.length * 0.5;
-  const foreignFlowAbsent = Math.abs(foreignParsed.netForeignFlow) < Math.abs(foreignParsed.netDomesticFlow) * 0.1;
-  const hasAccumulationLadder = input.flowReliability === "Tinggi" && input.flowBias === "Akumulasi" && !input.flowIntensity.includes("Distribusi");
-  const priceChangePercent = Math.abs(input.changePercent);
-  let gorenganRegime = "Transisi";
-  if (input.flowBias === "Akumulasi") {
-    gorenganRegime = input.flowIntensity.includes("Besar") ? "Active Accumulation" : "Akumulasi Awal";
-  } else if (input.flowBias === "Distribusi") {
-    gorenganRegime = "Distribution into Strength";
-  }
-  const avgBuyPrice = parseFloat(String(sortedBrokers[0]?.avgBuy || "0").replace(/[^\d.]/g, "")) || 0;
-  const volumeRatio = 1.2;
-  const hasTapeControlResult = detectTapeControl({
-    high: avgBuyPrice * 1.002,
-    low: avgBuyPrice * 0.998,
-    lastPrice: avgBuyPrice,
-    volumeRatio,
-    netFlow: totalNetBuy,
-    buyAvg: avgBuyPrice
-  });
-
-  const gorenganResult = detectGorengan({
-    priceChangePercent5d: priceChangePercent,
-    hasIntradaySpikes: priceChangePercent > 10,
-    volumeRatio,
-    top3BrokerNetBuyPercent: top3Percent,
-    hasBrokerFragmentation,
-    retailProxyDominates,
-    smallLotDominates: input.brokerData.length > 15 && top3Percent < 25,
-    foreignFlowAbsent,
-    hasAccumulationLadder,
-    marketRegime: gorenganRegime,
-    hasTapeControl: hasTapeControlResult,
-    hasAbsorptionFailure: input.flowBias === "Distribusi" && priceChangePercent > 0,
-    hasPostSpikeDistribution: input.flowBias === "Distribusi" && priceChangePercent > 15
-  });
-
-  // ─── STEP 19: FLOW NORMALIZATION (v1.1 — Model 6, fix B-1) ───
-  const flowNormalized = computeFlowNormalized(input);
-
-  // ─── STEP 20: BROKER ROTATION (v1.1 — Model 7) ───
-  const brokerRotation = computeBrokerRotation(input);
-
-  // ─── STEP 21: STEALTH ACCUMULATION (v1.1 — Model 8, fix B-2) ───
-  const stealthAccumulation = computeStealthAccumulation(input, flowNormalized.score);
-
-  // ─── STEP 22: FAKE BREAKOUT RISK (v1.1 — Model 9) ───
-  const fakeBreakoutRisk = computeFakeBreakoutRisk(
-    input,
-    flowNormalized.score,
-    brokerControlScore.score
-  );
-
-  // ─── STEP 23: REGIME PROBABILITIES (v1.1 — Model 10) ───
-  const regimeProbabilities = computeRegimeProbabilities(
-    smartMoneyReadinessScore.score,
-    flowQuality,
-    brokerControlScore.score,
-    simplifiedRisk.level === "Tinggi" ? 80 : simplifiedRisk.level === "Sedang" ? 50 : 20
-  );
-
-  // ─── RETURN COMPLETE RESULT ───
   return {
-    engineVersion: "1.1.0",
     flowQualityScore: flowQuality,
     flowQualityInterpretation,
     earlyDistributionFlag,
@@ -1541,12 +883,6 @@ export function computeBandarmology(input: BandarmologyInput): BandarmologyResul
     controlQualityScore,
     insiderBandarAlignment,
     simplifiedRisk,
-    smartMoneyReadinessScore,
-    gorenganResult,
-    flowNormalized,
-    brokerRotation,
-    stealthAccumulation,
-    fakeBreakoutRisk,
-    regimeProbabilities
+    smartMoneyReadinessScore
   };
 }

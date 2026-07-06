@@ -404,9 +404,10 @@ export interface BandarmologyInput {
   price: PriceData;
   volume: VolumeData;
   signals: FlowSignals;
-  netFlowHistory: number[] | null;    // oldest→newest. CRITICAL: data contract.
+  netFlowHistory: number[] | null;         // oldest→newest netTotal (for legacy use). CRITICAL: data contract.
+  foreignFlowHistory: number[] | null;     // oldest→newest netForeignFlow. Used by M6/M8/M12/M14.
   priceHistory: number[] | null;
-  m6ScoreHistory: number[] | null;    // prior-session M6 scores for M16. NEVER today.
+  m6ScoreHistory: number[] | null;         // prior-session M6 scores for M16. NEVER today.
   calendarFlags?: Partial<CalendarFlags> | null;
 }
 
@@ -707,17 +708,16 @@ function computeM9(input: BandarmologyInput): ModelScore {
 /**
  * M6 — FlowNormalized v2.0
  *
- * SYMMETRIC BOUNDS (-1.0, 1.0) — THE CRITICAL v2.0 FIX.
+ * Uses netForeignFlow (not netTotal) as the primary signal.
+ * In IDX, foreign net flow IS the institutional/smart-money signal.
+ * netTotal = netForeign + netDomestic ≈ 0 always (they are mathematical mirrors),
+ * so using netTotal yields a ratio ≈ 0 every day → score stuck at 50.
  *
- * PROOF: normalize(0, -1.0, 1.0) = 50.0 (true neutral) ✓
- * v1.x was normalize(0, -0.5, 1.5) = 25.0 (biased toward distribution) ✗
- *
- * Upper clamp fires at ratio ≥ 1.0 (flow ≥ avg20dValue).
- * This is the correct institutional ceiling — matching or exceeding
- * the entire average daily session volume in one direction is maximum signal.
+ * SYMMETRIC BOUNDS (-1.0, 1.0) — true neutral at ratio=0 → score=50.0 ✓
+ * Upper clamp fires at foreignFlow ≥ avg20dValue (maximum institutional signal).
  */
 export function computeM6(
-  netTotalFlow: number | null,
+  netForeignFlow: number | null,
   avg20dValue: number | null
 ): ModelScore {
   const WEIGHT = 0.13;
@@ -727,7 +727,7 @@ export function computeM6(
     return { score: null, isReliable: false, weight: WEIGHT, note: "tier 4 — below liquidity floor" };
   }
 
-  const flowRatio = safe_div(netTotalFlow, avg20dValue);
+  const flowRatio = safe_div(netForeignFlow, avg20dValue);
   if (flowRatio === null) {
     return { score: null, isReliable: false, weight: WEIGHT, note: "flow or avg20d unavailable" };
   }
@@ -763,7 +763,7 @@ export function computeM6(
  *   - min 5 clean sessions required
  */
 export function computeM8(
-  netFlowHistory: (number | null | undefined)[] | null,
+  foreignFlowHistory: (number | null | undefined)[] | null,
   avg20dValue: number | null,
   brokerDominanceScore?: number | null
 ): ModelScore {
@@ -774,7 +774,7 @@ export function computeM8(
     return { score: null, isReliable: false, weight: WEIGHT, note: "tier 4" };
   }
 
-  const history = clean_history(netFlowHistory);
+  const history = clean_history(foreignFlowHistory);
   if (!history) {
     return { score: null, isReliable: false, weight: WEIGHT, note: "insufficient history" };
   }
@@ -895,7 +895,7 @@ export function computeM11(
  * M6-M12 divergence = spike detection signal.
  */
 export function computeM12(
-  netFlowHistory: (number | null | undefined)[] | null,
+  foreignFlowHistory: (number | null | undefined)[] | null,
   avg20dValue: number | null
 ): ModelScore {
   const WEIGHT = 0.07;
@@ -905,7 +905,7 @@ export function computeM12(
     return { score: null, isReliable: false, weight: WEIGHT, note: "tier 4" };
   }
 
-  const history = clean_history(netFlowHistory);
+  const history = clean_history(foreignFlowHistory);
   if (!history) {
     return { score: null, isReliable: false, weight: WEIGHT, note: "insufficient history" };
   }
@@ -953,7 +953,7 @@ export function computeM12(
  *   EXTENDED (>15):   watch for distribution setup
  */
 export function computeM14(
-  netFlowHistory: (number | null | undefined)[] | null,
+  foreignFlowHistory: (number | null | undefined)[] | null,
   avg20dValue: number | null
 ): M14Output {
   const WEIGHT = 0.06;
@@ -966,7 +966,7 @@ export function computeM14(
     };
   }
 
-  const history = clean_history(netFlowHistory, 3);
+  const history = clean_history(foreignFlowHistory, 3);
   if (!history) {
     return {
       score: null, isReliable: false, weight: WEIGHT,
@@ -1359,7 +1359,7 @@ export function computeComposite(
 export function computeBandarmologyV2(
   input: BandarmologyInput
 ): BandarmologyV2Result {
-  console.log("Bandarmology Engine v2.0 running");
+  // debug: engine entry — removed console.log to avoid flooding batch runners
 
   // ── Phase 0: Data Preparation ──────────────────────────────
   const validatorInput: RawValidatorInput = {
@@ -1386,21 +1386,25 @@ export function computeBandarmologyV2(
   const M2 = computeM2(input);
   const M3 = computeM3(input);
 
-  const netTotalFlow = input.flow.netForeignFlow + input.flow.netDomesticFlow;
-  const M6 = computeM6(netTotalFlow, input.volume.avg20dValue);
+  // M6 uses netForeignFlow (the institutional/smart-money signal).
+  // netTotal = netForeign + netDomestic ≈ 0 always — not a useful signal.
+  const M6 = computeM6(input.flow.netForeignFlow, input.volume.avg20dValue);
   const M9 = computeM9(input);
+
+  // netTotalFlow still used by M15 (price elasticity measurement).
+  const netTotalFlow = input.flow.netForeignFlow + input.flow.netDomesticFlow;
 
   // ── Phase 2: Pattern Models ────────────────────────────────
   // M8 reads M3.score (Phase 1 complete — safe, no circular dep.)
   const M7  = computeM7(input);
-  const M8  = computeM8(input.netFlowHistory, input.volume.avg20dValue, M3.score);
+  const M8  = computeM8(input.foreignFlowHistory, input.volume.avg20dValue, M3.score);
   const M11 = computeM11(
     input.flow.netForeignFlow,
     input.flow.netDomesticFlow,
     input.volume.avg20dValue
   );
-  const M12 = computeM12(input.netFlowHistory, input.volume.avg20dValue);
-  const M14 = computeM14(input.netFlowHistory, input.volume.avg20dValue);
+  const M12 = computeM12(input.foreignFlowHistory, input.volume.avg20dValue);
+  const M14 = computeM14(input.foreignFlowHistory, input.volume.avg20dValue);
   const M15 = computeM15(
     validatorInput.priceChangePct ?? null,
     netTotalFlow,

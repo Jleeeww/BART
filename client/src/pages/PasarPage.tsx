@@ -1,9 +1,25 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-const mono = "'IBM Plex Mono', monospace";
-const sora = "'Sora', sans-serif";
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
+const inter = "'Inter', system-ui, sans-serif";
+const S0 = "#000000";
+const S1 = "#0a0a0a";
+const S2 = "#0f0f0f";
+const S3 = "#141414";
+const B1 = "rgba(255,255,255,0.06)";
+const B2 = "rgba(255,255,255,0.10)";
+const T1 = "#F4F4F5";
+const T2 = "#A1A1AA";
+const T3 = "#71717A";
+const T4 = "#3F3F46";
+const SIGNAL = "#4FC3F7";
+const POSITIVE = "#4ADE80";
+const WARNING = "#FBBF24";
+const DANGER = "#F87171";
 
+// ─── Interfaces ───────────────────────────────────────────────────────────────
 interface StockData {
   symbol: string;
   name: string;
@@ -99,6 +115,7 @@ interface AltDataSnapshot {
   degradedSources: string[];
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function getIDXSessionStatus(): { label: string; color: "green" | "yellow" | "red" } {
   const now = new Date();
   const wibOffset = 7 * 60;
@@ -116,88 +133,1113 @@ function getIDXSessionStatus(): { label: string; color: "green" | "yellow" | "re
   return { label: "Pasar Tutup", color: "red" };
 }
 
-const SECTORS = [
-  "Keuangan", "Konsumer Primer", "Konsumer Sekunder", "Energi",
-  "Material & Tambang", "Industri", "Teknologi", "Telekomunikasi",
-  "Kesehatan", "Properti", "Infrastruktur",
-];
-
-const WEATHER_REGIONS = ["Riau", "Kalimantan Selatan", "Kalimantan Timur", "Sulawesi Tengah"];
-
-function LiveIDXBadge() {
-  return (
-    <span
-      className="px-2 py-0.5 rounded-sm border"
-      style={{
-        fontFamily: mono,
-        fontSize: 9,
-        background: "rgba(255,255,255,0.02)",
-        color: "rgba(255,255,255,0.12)",
-        borderColor: "rgba(255,255,255,0.06)",
-      }}
-    >
-      Live IDX
-    </span>
-  );
-}
-
-function SourceBadge({ source }: { source: string }) {
-  const isFallback = source.includes("FALLBACK");
-  return (
-    <span
-      className="px-2 py-0.5 rounded-sm border"
-      style={{
-        fontFamily: mono,
-        fontSize: 9,
-        background: isFallback ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.1)",
-        color: isFallback ? "rgba(245,158,11,0.6)" : "#34d399",
-        borderColor: isFallback ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)",
-      }}
-    >
-      {isFallback ? "Fallback" : "Live"}
-    </span>
-  );
-}
-
-function StockLogo({ symbol }: { symbol: string }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <div
-      className="w-6 h-6 rounded-sm flex-shrink-0 flex items-center justify-center overflow-hidden"
-      style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
-    >
-      {failed ? (
-        <span className="text-[8px] font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>
-          {symbol.slice(0, 2)}
-        </span>
-      ) : (
-        <img
-          src={`https://assets.stockbit.com/logos/companies/${symbol}.png`}
-          alt={symbol}
-          className="w-4 h-4 object-contain"
-          onError={() => setFailed(true)}
-        />
-      )}
-    </div>
-  );
-}
-
 function formatTimestamp(ts: string) {
   try {
     const d = new Date(ts);
-    return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return ts;
   }
 }
 
+const SECTOR_MAP: Record<string, string> = {
+  Financials: "Keuangan",
+  Energy: "Energi",
+  Industrials: "Industri",
+  "Communication Services": "Telekomunikasi",
+  "Consumer Staples": "Konsumer Primer",
+  "Consumer Discretionary": "Konsumer Sekunder",
+  "Real Estate": "Properti",
+  "Basic Materials": "Material & Tambang",
+  ALL: "Semua Sektor",
+};
+
+// short 2-3 char label for scatter plot
+function sectorShortName(name: string): string {
+  const map: Record<string, string> = {
+    Financials: "FIN",
+    Energy: "ENR",
+    Industrials: "IND",
+    "Communication Services": "TEL",
+    "Consumer Staples": "KNS",
+    "Consumer Discretionary": "KND",
+    "Real Estate": "PRO",
+    "Basic Materials": "MTB",
+  };
+  if (map[name]) return map[name];
+  return name.slice(0, 3).toUpperCase();
+}
+
+// Map momentum to SVG x coordinate
+function momentumToX(momentum: "NAIK" | "TURUN" | "STABIL"): number {
+  const pct = momentum === "TURUN" ? 20 : momentum === "STABIL" ? 50 : 80;
+  // map 0..100 → 40..300
+  return 40 + (pct / 100) * 260;
+}
+
+// Map rotationScore (0-100) to SVG y coordinate (inverted)
+function scoreToY(score: number): number {
+  // 0→300, 100→40
+  return 300 - (score / 100) * 260;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <p
+      style={{
+        fontFamily: mono,
+        fontSize: 9,
+        letterSpacing: "0.18em",
+        color: T4,
+        textTransform: "uppercase" as const,
+        margin: "0 0 14px",
+      }}
+    >
+      {children}
+    </p>
+  );
+}
+
+function Divider() {
+  return <div style={{ height: 1, background: B1, margin: "12px 0" }} />;
+}
+
+// ─── Zone A: Header Bar ───────────────────────────────────────────────────────
+function HeaderBar({ sessionStatus }: { sessionStatus: ReturnType<typeof getIDXSessionStatus> }) {
+  const dotColor =
+    sessionStatus.color === "green"
+      ? POSITIVE
+      : sessionStatus.color === "yellow"
+      ? WARNING
+      : DANGER;
+
+  return (
+    <div
+      style={{
+        position: "sticky",
+        top: 0,
+        zIndex: 100,
+        background: S0,
+        borderBottom: `1px solid ${B1}`,
+        padding: "0 32px",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1280,
+          margin: "0 auto",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          height: 56,
+        }}
+      >
+        {/* Left */}
+        <div>
+          <p
+            style={{
+              fontFamily: mono,
+              fontSize: 9,
+              letterSpacing: "0.2em",
+              color: T4,
+              textTransform: "uppercase" as const,
+              margin: "0 0 2px",
+            }}
+          >
+            MACRO TERMINAL
+          </p>
+          <h1
+            style={{
+              fontFamily: inter,
+              fontSize: 20,
+              fontWeight: 600,
+              color: T1,
+              letterSpacing: "-0.02em",
+              margin: 0,
+              lineHeight: 1,
+            }}
+          >
+            Pasar & Makro
+          </h1>
+        </div>
+
+        {/* Right */}
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          {/* Session status */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: dotColor,
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ fontFamily: mono, fontSize: 10, color: dotColor }}>
+              {sessionStatus.label}
+            </span>
+          </div>
+
+          {/* LIVE indicator */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              background: "rgba(79,195,247,0.07)",
+              border: `1px solid rgba(79,195,247,0.18)`,
+              borderRadius: 4,
+              padding: "3px 8px",
+            }}
+          >
+            <div
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: "50%",
+                background: SIGNAL,
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ fontFamily: mono, fontSize: 9, color: SIGNAL, letterSpacing: "0.12em" }}>
+              LIVE
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Zone B: Commodity Ticker Strip ──────────────────────────────────────────
+interface TickerItem {
+  key: string;
+  label: string;
+  price: string;
+  change5d: number | null;
+  trend: string | null;
+  source: string;
+}
+
+function CommodityTicker({ items }: { items: TickerItem[] }) {
+  return (
+    <div
+      style={{
+        background: S1,
+        borderBottom: `1px solid ${B1}`,
+        padding: "0 32px",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 1280,
+          margin: "0 auto",
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 0,
+        }}
+      >
+        {items.map((item, idx) => {
+          const changeColor =
+            item.change5d == null ? T4 : item.change5d >= 0 ? POSITIVE : DANGER;
+          const trendArrow =
+            item.trend === "NAIK" ? "▲" : item.trend === "TURUN" ? "▼" : "—";
+          const isFallback = item.source?.includes("FALLBACK");
+
+          return (
+            <div
+              key={item.key}
+              style={{
+                padding: "10px 16px",
+                borderRight: idx < items.length - 1 ? `1px solid ${B1}` : "none",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              {/* Label */}
+              <span style={{ fontFamily: mono, fontSize: 9, color: T4, letterSpacing: "0.1em", flexShrink: 0 }}>
+                {item.label}
+              </span>
+
+              {/* Divider pip */}
+              <span style={{ color: B2, fontSize: 10 }}>|</span>
+
+              {/* Price */}
+              <span style={{ fontFamily: mono, fontSize: 11, color: T1, fontWeight: 600, flexShrink: 0 }}>
+                {item.price}
+              </span>
+
+              {/* Change % */}
+              <span style={{ fontFamily: mono, fontSize: 10, color: changeColor, flexShrink: 0 }}>
+                {item.change5d == null
+                  ? "—"
+                  : `${item.change5d >= 0 ? "+" : ""}${item.change5d.toFixed(2)}%`}
+              </span>
+
+              {/* Trend arrow */}
+              <span style={{ fontFamily: mono, fontSize: 10, color: changeColor, flexShrink: 0 }}>
+                {trendArrow}
+              </span>
+
+              {/* STALE badge */}
+              {isFallback && (
+                <span
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 8,
+                    color: T4,
+                    background: "rgba(63,63,70,0.4)",
+                    border: `1px solid ${T4}`,
+                    borderRadius: 3,
+                    padding: "1px 5px",
+                    letterSpacing: "0.06em",
+                    flexShrink: 0,
+                  }}
+                >
+                  STALE
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Zone C Col 1: Sector Rotation SVG Scatter Plot ──────────────────────────
+interface ScatterPlotProps {
+  sectors: SectorRotationSector[];
+  hoveredSector: string | null;
+  onHover: (sector: string | null) => void;
+  hotSectors: string[];
+}
+
+function SectorScatterPlot({ sectors, hoveredSector, onHover, hotSectors }: ScatterPlotProps) {
+  const W = 340;
+  const H = 340;
+
+  // tooltip state
+  const hoveredObj = hoveredSector ? sectors.find((s) => s.sector === hoveredSector) : null;
+
+  return (
+    <div
+      style={{
+        background: S1,
+        border: `1px solid ${B1}`,
+        borderRadius: 10,
+        padding: "20px",
+        position: "relative" as const,
+      }}
+    >
+      <Eyebrow>MATRIKS ROTASI SEKTOR</Eyebrow>
+
+      <div style={{ position: "relative" as const, width: W, height: H }}>
+        <svg width={W} height={H} style={{ display: "block" }}>
+          {/* Quadrant divider lines */}
+          <line x1={170} y1={40} x2={170} y2={300} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
+          <line x1={40} y1={170} x2={300} y2={170} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
+
+          {/* Quadrant labels */}
+          {/* Top-right: MEMIMPIN */}
+          <text x={238} y={55} fill={T4} fontSize={8} fontFamily={mono} textAnchor="middle">
+            MEMIMPIN
+          </text>
+          {/* Top-left: MEMBAIK */}
+          <text x={100} y={55} fill={T4} fontSize={8} fontFamily={mono} textAnchor="middle">
+            MEMBAIK
+          </text>
+          {/* Bottom-right: MELEMAH */}
+          <text x={238} y={295} fill={T4} fontSize={8} fontFamily={mono} textAnchor="middle">
+            MELEMAH
+          </text>
+          {/* Bottom-left: TERTINGGAL */}
+          <text x={100} y={295} fill={T4} fontSize={8} fontFamily={mono} textAnchor="middle">
+            TERTINGGAL
+          </text>
+
+          {/* Axis labels */}
+          <text x={40} y={320} fill={T4} fontSize={7} fontFamily={mono}>TURUN</text>
+          <text x={155} y={320} fill={T4} fontSize={7} fontFamily={mono}>MOMENTUM</text>
+          <text x={270} y={320} fill={T4} fontSize={7} fontFamily={mono}>NAIK</text>
+
+          {/* Sectors */}
+          {sectors.map((s) => {
+            const cx = momentumToX(s.momentum);
+            const cy = scoreToY(s.rotationScore);
+            const isHovered = hoveredSector === s.sector;
+            const isHot = hotSectors.includes(s.sector);
+
+            const baseColor =
+              s.direction === "MASUK"
+                ? POSITIVE
+                : s.direction === "KELUAR"
+                ? DANGER
+                : T4;
+
+            const fillOpacity = isHovered ? 0.55 : 0.4;
+            const r = isHovered ? 10 : 8;
+
+            return (
+              <g
+                key={s.sector}
+                style={{ cursor: "pointer" }}
+                onMouseEnter={() => onHover(s.sector)}
+                onMouseLeave={() => onHover(null)}
+              >
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={r + 6}
+                  fill="transparent"
+                />
+                <circle
+                  cx={cx}
+                  cy={cy}
+                  r={r}
+                  fill={baseColor}
+                  fillOpacity={fillOpacity}
+                  stroke={baseColor}
+                  strokeWidth={isHovered ? 1.5 : 1}
+                />
+                {isHot && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={r + 3}
+                    fill="none"
+                    stroke={WARNING}
+                    strokeWidth={1}
+                    strokeDasharray="2 2"
+                    opacity={0.6}
+                  />
+                )}
+                <text
+                  x={cx}
+                  y={cy + r + 10}
+                  fill={T3}
+                  fontSize={7}
+                  fontFamily={mono}
+                  textAnchor="middle"
+                >
+                  {sectorShortName(s.sector)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Tooltip */}
+        {hoveredObj && (
+          <div
+            style={{
+              position: "absolute" as const,
+              top: 0,
+              right: -220,
+              width: 200,
+              background: S3,
+              border: `1px solid ${B2}`,
+              borderRadius: 8,
+              padding: "12px 14px",
+              zIndex: 10,
+              pointerEvents: "none" as const,
+            }}
+          >
+            <p style={{ fontFamily: mono, fontSize: 9, color: T4, margin: "0 0 4px", letterSpacing: "0.1em", textTransform: "uppercase" as const }}>
+              {sectorShortName(hoveredObj.sector)}
+            </p>
+            <p style={{ fontFamily: inter, fontSize: 11, color: T1, fontWeight: 600, margin: "0 0 8px" }}>
+              {hoveredObj.displayName}
+            </p>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <span
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  color:
+                    hoveredObj.direction === "MASUK"
+                      ? POSITIVE
+                      : hoveredObj.direction === "KELUAR"
+                      ? DANGER
+                      : T3,
+                  background:
+                    hoveredObj.direction === "MASUK"
+                      ? "rgba(74,222,128,0.1)"
+                      : hoveredObj.direction === "KELUAR"
+                      ? "rgba(248,113,113,0.1)"
+                      : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${
+                    hoveredObj.direction === "MASUK"
+                      ? "rgba(74,222,128,0.2)"
+                      : hoveredObj.direction === "KELUAR"
+                      ? "rgba(248,113,113,0.2)"
+                      : B1
+                  }`,
+                  borderRadius: 3,
+                  padding: "1px 6px",
+                }}
+              >
+                {hoveredObj.direction}
+              </span>
+              <span style={{ fontFamily: mono, fontSize: 10, color: T1, fontWeight: 700 }}>
+                {hoveredObj.rotationScore}
+              </span>
+            </div>
+            {hoveredObj.topStocks.length > 0 && (
+              <div>
+                <p style={{ fontFamily: mono, fontSize: 8, color: T4, margin: "0 0 4px", letterSpacing: "0.08em" }}>TOP STOCKS</p>
+                {hoveredObj.topStocks.slice(0, 3).map((ts) => (
+                  <p key={ts.symbol} style={{ fontFamily: mono, fontSize: 9, color: T2, margin: "2px 0" }}>
+                    {ts.symbol} <span style={{ color: T4 }}>{ts.readinessScore}</span>
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 16, marginTop: 12 }}>
+        {[
+          { color: POSITIVE, label: "MASUK" },
+          { color: DANGER, label: "KELUAR" },
+          { color: T4, label: "NETRAL" },
+        ].map((leg) => (
+          <div key={leg.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: leg.color,
+                opacity: 0.7,
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.08em" }}>
+              {leg.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Zone C Col 2: Macro Signals Causal Chain ────────────────────────────────
+interface MacroSignalsCardProps {
+  macroContext: MacroContextSnapshot | null;
+}
+
+function MacroSignalsCard({ macroContext }: MacroSignalsCardProps) {
+  const sentimentLabel =
+    macroContext?.marketSentiment === "RISK_ON"
+      ? "RISK ON"
+      : macroContext?.marketSentiment === "RISK_OFF"
+      ? "RISK OFF"
+      : "NETRAL";
+
+  const sentimentColor =
+    macroContext?.marketSentiment === "RISK_ON"
+      ? POSITIVE
+      : macroContext?.marketSentiment === "RISK_OFF"
+      ? DANGER
+      : T3;
+
+  const sentimentBg =
+    macroContext?.marketSentiment === "RISK_ON"
+      ? "rgba(74,222,128,0.06)"
+      : macroContext?.marketSentiment === "RISK_OFF"
+      ? "rgba(248,113,113,0.06)"
+      : "rgba(255,255,255,0.02)";
+
+  const sentimentBorder =
+    macroContext?.marketSentiment === "RISK_ON"
+      ? "rgba(74,222,128,0.2)"
+      : macroContext?.marketSentiment === "RISK_OFF"
+      ? "rgba(248,113,113,0.2)"
+      : B1;
+
+  const typeColor = (type: string): string => {
+    const t = type.toLowerCase();
+    if (t.includes("commodity") || t.includes("oil") || t.includes("gold") || t.includes("coal") || t.includes("cpo")) return SIGNAL;
+    if (t.includes("fx") || t.includes("usd") || t.includes("idr") || t.includes("currency")) return WARNING;
+    return T2;
+  };
+
+  const typeBg = (type: string): string => {
+    const t = type.toLowerCase();
+    if (t.includes("commodity") || t.includes("oil") || t.includes("gold") || t.includes("coal") || t.includes("cpo")) return "rgba(79,195,247,0.08)";
+    if (t.includes("fx") || t.includes("usd") || t.includes("idr") || t.includes("currency")) return "rgba(251,191,36,0.08)";
+    return "rgba(161,161,170,0.06)";
+  };
+
+  const typeBorder = (type: string): string => {
+    const t = type.toLowerCase();
+    if (t.includes("commodity") || t.includes("oil") || t.includes("gold") || t.includes("coal") || t.includes("cpo")) return "rgba(79,195,247,0.18)";
+    if (t.includes("fx") || t.includes("usd") || t.includes("idr") || t.includes("currency")) return "rgba(251,191,36,0.18)";
+    return "rgba(161,161,170,0.12)";
+  };
+
+  return (
+    <div
+      style={{
+        background: S1,
+        border: `1px solid ${B1}`,
+        borderRadius: 10,
+        padding: "20px",
+        display: "flex",
+        flexDirection: "column" as const,
+        gap: 0,
+      }}
+    >
+      <Eyebrow>RANTAI KAUSALITAS MAKRO</Eyebrow>
+
+      {/* Signals list */}
+      <div style={{ flex: 1 }}>
+        {!macroContext ? (
+          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>
+            [ MEMUAT... ]
+          </p>
+        ) : macroContext.signals?.length ? (
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 0 }}>
+            {macroContext.signals.map((sig, i) => {
+              const effectColor =
+                sig.effect === "POSITIF" ? POSITIVE : sig.effect === "NEGATIF" ? DANGER : T3;
+              const effectBg =
+                sig.effect === "POSITIF"
+                  ? "rgba(74,222,128,0.08)"
+                  : sig.effect === "NEGATIF"
+                  ? "rgba(248,113,113,0.08)"
+                  : "rgba(255,255,255,0.03)";
+              const effectBorder =
+                sig.effect === "POSITIF"
+                  ? "rgba(74,222,128,0.2)"
+                  : sig.effect === "NEGATIF"
+                  ? "rgba(248,113,113,0.2)"
+                  : B1;
+
+              return (
+                <div
+                  key={i}
+                  style={{
+                    paddingTop: i === 0 ? 0 : 12,
+                    paddingBottom: i < macroContext.signals.length - 1 ? 12 : 0,
+                    borderBottom:
+                      i < macroContext.signals.length - 1 ? `1px solid ${B1}` : "none",
+                  }}
+                >
+                  {/* Cause → Effect row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" as const }}>
+                    {/* Source type badge */}
+                    <span
+                      style={{
+                        fontFamily: mono,
+                        fontSize: 8,
+                        color: typeColor(sig.type),
+                        background: typeBg(sig.type),
+                        border: `1px solid ${typeBorder(sig.type)}`,
+                        borderRadius: 3,
+                        padding: "2px 6px",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase" as const,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {sig.type}
+                    </span>
+
+                    {/* Arrow */}
+                    <span style={{ fontFamily: mono, fontSize: 11, color: T4 }}>→</span>
+
+                    {/* Sector name */}
+                    <span style={{ fontFamily: mono, fontSize: 9, color: T2 }}>
+                      {SECTOR_MAP[sig.sector] ?? sig.sector}
+                    </span>
+
+                    {/* Effect badge */}
+                    <span
+                      style={{
+                        fontFamily: mono,
+                        fontSize: 8,
+                        color: effectColor,
+                        background: effectBg,
+                        border: `1px solid ${effectBorder}`,
+                        borderRadius: 3,
+                        padding: "2px 6px",
+                        letterSpacing: "0.06em",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {sig.effect}
+                    </span>
+
+                    {/* Strength */}
+                    <span style={{ fontFamily: mono, fontSize: 8, color: T4, marginLeft: "auto" }}>
+                      {sig.strength}
+                    </span>
+                  </div>
+
+                  {/* Description */}
+                  <p style={{ fontFamily: inter, fontSize: 11, color: T3, margin: 0, lineHeight: 1.55 }}>
+                    {sig.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>
+            [ TIDAK ADA SINYAL AKTIF ]
+          </p>
+        )}
+      </div>
+
+      {/* Market sentiment block */}
+      {macroContext && (
+        <div style={{ marginTop: 16 }}>
+          <Divider />
+          <div
+            style={{
+              background: sentimentBg,
+              border: `1px solid ${sentimentBorder}`,
+              borderRadius: 8,
+              padding: "14px 16px",
+              marginTop: 12,
+            }}
+          >
+            <p
+              style={{
+                fontFamily: mono,
+                fontSize: 18,
+                fontWeight: 700,
+                color: sentimentColor,
+                letterSpacing: "0.06em",
+                margin: "0 0 6px",
+              }}
+            >
+              {sentimentLabel}
+            </p>
+            {macroContext.sentimentReason && (
+              <p style={{ fontFamily: inter, fontSize: 11, color: T3, margin: 0, lineHeight: 1.5 }}>
+                {macroContext.sentimentReason}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Zone C Col 3: Alt Data Stack ────────────────────────────────────────────
+interface AltDataCardProps {
+  altData: AltDataSnapshot | null;
+}
+
+function AltDataCard({ altData }: AltDataCardProps) {
+  const weatherColors = (mm: number | null): string => {
+    if (mm === null) return T4;
+    if (mm > 100) return "#60A5FA"; // blue
+    if (mm >= 50) return SIGNAL;
+    return T4;
+  };
+
+  const weatherIcon = (code: string | null): string => {
+    if (!code) return "—";
+    const c = code.toLowerCase();
+    if (c.includes("rain") || c.includes("hujan")) return "🌧";
+    if (c.includes("cloud") || c.includes("awan")) return "☁";
+    if (c.includes("sun") || c.includes("cerah")) return "☀";
+    if (c.includes("storm") || c.includes("badai")) return "⛈";
+    return code;
+  };
+
+  return (
+    <div
+      style={{
+        background: S1,
+        border: `1px solid ${B1}`,
+        borderRadius: 10,
+        padding: "20px",
+        display: "flex",
+        flexDirection: "column" as const,
+        gap: 0,
+      }}
+    >
+      <Eyebrow>DATA ALTERNATIF</Eyebrow>
+
+      {/* Degraded sources warning */}
+      {altData && altData.degradedSources?.length > 0 && (
+        <div
+          style={{
+            background: "rgba(251,191,36,0.06)",
+            border: `1px solid rgba(251,191,36,0.18)`,
+            borderRadius: 6,
+            padding: "6px 10px",
+            marginBottom: 14,
+          }}
+        >
+          <p style={{ fontFamily: mono, fontSize: 9, color: WARNING, margin: 0 }}>
+            Sumber data degraded: {altData.degradedSources.join(", ")}
+          </p>
+        </div>
+      )}
+
+      {/* ── Commodities sub-section ── */}
+      <div style={{ marginBottom: 16 }}>
+        <p style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.14em", textTransform: "uppercase" as const, margin: "0 0 10px" }}>
+          KOMODITAS
+        </p>
+
+        {!altData ? (
+          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>[ MEMUAT... ]</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
+            {/* Coal HBA1 */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ fontFamily: mono, fontSize: 9, color: T4, margin: "0 0 2px", letterSpacing: "0.08em" }}>BATUBARA HBA1</p>
+                <p style={{ fontFamily: mono, fontSize: 15, fontWeight: 700, color: T1, margin: 0 }}>
+                  {altData.coal.hba1USD != null ? `$${altData.coal.hba1USD}` : "—"}
+                </p>
+                <p style={{ fontFamily: mono, fontSize: 8, color: T4, margin: "2px 0 0" }}>USD/ton</p>
+              </div>
+              <div style={{ textAlign: "right" as const }}>
+                {altData.coal.trend && (
+                  <span
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 9,
+                      color:
+                        altData.coal.trend === "NAIK"
+                          ? POSITIVE
+                          : altData.coal.trend === "TURUN"
+                          ? DANGER
+                          : T3,
+                      display: "block",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {altData.coal.trend === "NAIK" ? "▲ NAIK" : altData.coal.trend === "TURUN" ? "▼ TURUN" : "→ STABIL"}
+                  </span>
+                )}
+                <span
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 8,
+                    color: altData.coal.source?.includes("FALLBACK") ? T4 : POSITIVE,
+                    background: altData.coal.source?.includes("FALLBACK") ? "rgba(63,63,70,0.3)" : "rgba(74,222,128,0.07)",
+                    border: `1px solid ${altData.coal.source?.includes("FALLBACK") ? T4 : "rgba(74,222,128,0.2)"}`,
+                    borderRadius: 3,
+                    padding: "1px 5px",
+                  }}
+                >
+                  {altData.coal.source?.includes("FALLBACK") ? "STALE" : "LIVE"}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ height: 1, background: B1 }} />
+
+            {/* CPO */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <p style={{ fontFamily: mono, fontSize: 9, color: T4, margin: "0 0 2px", letterSpacing: "0.08em" }}>CPO SAWIT</p>
+                <p style={{ fontFamily: mono, fontSize: 15, fontWeight: 700, color: T1, margin: 0 }}>
+                  {altData.cpo.priceUSD != null ? `$${altData.cpo.priceUSD}` : altData.cpo.priceIDR != null ? altData.cpo.priceIDR.toLocaleString("id-ID") : "—"}
+                </p>
+                <p style={{ fontFamily: mono, fontSize: 8, color: T4, margin: "2px 0 0" }}>
+                  {altData.cpo.priceUSD != null ? "USD/MT" : "IDR/kg"}
+                </p>
+              </div>
+              <div style={{ textAlign: "right" as const }}>
+                {altData.cpo.trend && (
+                  <span
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 9,
+                      color:
+                        altData.cpo.trend === "NAIK"
+                          ? POSITIVE
+                          : altData.cpo.trend === "TURUN"
+                          ? DANGER
+                          : T3,
+                      display: "block",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {altData.cpo.trend === "NAIK" ? "▲ NAIK" : altData.cpo.trend === "TURUN" ? "▼ TURUN" : "→ STABIL"}
+                  </span>
+                )}
+                <span
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 8,
+                    color: altData.cpo.source?.includes("FALLBACK") ? T4 : POSITIVE,
+                    background: altData.cpo.source?.includes("FALLBACK") ? "rgba(63,63,70,0.3)" : "rgba(74,222,128,0.07)",
+                    border: `1px solid ${altData.cpo.source?.includes("FALLBACK") ? T4 : "rgba(74,222,128,0.2)"}`,
+                    borderRadius: 3,
+                    padding: "1px 5px",
+                  }}
+                >
+                  {altData.cpo.source?.includes("FALLBACK") ? "STALE" : "LIVE"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <Divider />
+
+      {/* ── Weather sub-section ── */}
+      <div>
+        <p style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.14em", textTransform: "uppercase" as const, margin: "0 0 10px" }}>
+          CUACA REGIONAL
+        </p>
+
+        {!altData ? (
+          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>[ MEMUAT... ]</p>
+        ) : altData.weather.length === 0 ? (
+          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>[ MEMUAT... ]</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" as const, gap: 0 }}>
+            {altData.weather.slice(0, 4).map((w, i, arr) => (
+              <div
+                key={w.regionId}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingTop: i === 0 ? 0 : 8,
+                  paddingBottom: i < arr.length - 1 ? 8 : 0,
+                  borderBottom: i < arr.length - 1 ? `1px solid ${B1}` : "none",
+                }}
+              >
+                <div>
+                  <p style={{ fontFamily: inter, fontSize: 11, color: T2, margin: "0 0 2px" }}>
+                    {w.regionName}
+                  </p>
+                  {w.temperature !== null && (
+                    <p style={{ fontFamily: mono, fontSize: 9, color: T4, margin: 0 }}>
+                      {w.temperature}°C
+                    </p>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12 }}>{weatherIcon(w.weatherCode)}</span>
+                  <span
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 9,
+                      color: weatherColors(w.rainfallMm),
+                      fontWeight: 600,
+                    }}
+                  >
+                    {w.rainfallMm != null ? `${w.rainfallMm}mm` : "—"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Zone D: Sector Detail Panel ─────────────────────────────────────────────
+interface SectorDetailPanelProps {
+  sectorData: SectorRotationSnapshot;
+  hoveredSector: string | null;
+  onSelectSector: (sector: string | null) => void;
+}
+
+function SectorDetailPanel({ sectorData, hoveredSector, onSelectSector }: SectorDetailPanelProps) {
+  return (
+    <div
+      style={{
+        maxWidth: 1280,
+        margin: "20px auto 0",
+        padding: "0 32px",
+      }}
+    >
+      <div
+        style={{
+          background: S1,
+          border: `1px solid ${B1}`,
+          borderRadius: 10,
+          padding: "16px 20px",
+        }}
+      >
+        {/* Scrollable pills row */}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            overflowX: "auto" as const,
+            paddingBottom: 8,
+          }}
+        >
+          {sectorData.sectors.map((s) => {
+            const scoreColor =
+              s.rotationScore >= 60
+                ? POSITIVE
+                : s.rotationScore >= 40
+                ? WARNING
+                : DANGER;
+            const isHot = sectorData.hotSectors.includes(s.sector);
+            const isSelected = hoveredSector === s.sector;
+
+            return (
+              <div
+                key={s.sector}
+                onClick={() => onSelectSector(isSelected ? null : s.sector)}
+                style={{
+                  flexShrink: 0,
+                  background: isSelected ? S3 : S2,
+                  border: `1px solid ${isSelected ? B2 : B1}`,
+                  borderRadius: 8,
+                  padding: "10px 14px",
+                  cursor: "pointer",
+                  minWidth: 160,
+                  transition: "border-color 0.15s",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <p style={{ fontFamily: inter, fontSize: 11, fontWeight: 600, color: T1, margin: 0, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>
+                    {s.displayName}
+                  </p>
+                  {isHot && (
+                    <span
+                      style={{
+                        fontFamily: mono,
+                        fontSize: 7,
+                        color: WARNING,
+                        background: "rgba(251,191,36,0.1)",
+                        border: `1px solid rgba(251,191,36,0.2)`,
+                        borderRadius: 3,
+                        padding: "1px 4px",
+                        letterSpacing: "0.06em",
+                        flexShrink: 0,
+                      }}
+                    >
+                      HOT
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                  <span style={{ fontFamily: mono, fontSize: 16, fontWeight: 700, color: scoreColor, lineHeight: 1 }}>
+                    {s.rotationScore}
+                  </span>
+                  <span style={{ fontFamily: mono, fontSize: 9, color: T4 }}>
+                    {s.momentum === "NAIK" ? "↑" : s.momentum === "TURUN" ? "↓" : "→"}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+                  <span style={{ fontFamily: mono, fontSize: 8, color: POSITIVE }}>
+                    ↑{s.akumulasiCount} akum
+                  </span>
+                  <span style={{ fontFamily: mono, fontSize: 8, color: DANGER }}>
+                    ↓{s.distribusiCount} dist
+                  </span>
+                </div>
+
+                {s.topStocks.length > 0 && (
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" as const }}>
+                    {s.topStocks.slice(0, 3).map((ts) => (
+                      <span
+                        key={ts.symbol}
+                        style={{
+                          fontFamily: mono,
+                          fontSize: 8,
+                          color: T4,
+                          background: B1,
+                          borderRadius: 3,
+                          padding: "1px 5px",
+                        }}
+                      >
+                        {ts.symbol}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Metadata row */}
+        <div style={{ display: "flex", gap: 20, marginTop: 10, alignItems: "center" }}>
+          {sectorData.dominantTheme && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.08em" }}>TEMA</span>
+              <span
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  color: SIGNAL,
+                  background: "rgba(79,195,247,0.06)",
+                  border: `1px solid rgba(79,195,247,0.15)`,
+                  borderRadius: 4,
+                  padding: "2px 8px",
+                }}
+              >
+                {sectorData.dominantTheme}
+              </span>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.08em" }}>ROTASI</span>
+            <span
+              style={{
+                fontFamily: mono,
+                fontSize: 9,
+                color:
+                  sectorData.rotationStrength === "KUAT"
+                    ? POSITIVE
+                    : sectorData.rotationStrength === "SEDANG"
+                    ? WARNING
+                    : T3,
+              }}
+            >
+              {sectorData.rotationStrength}
+            </span>
+          </div>
+          {sectorData.computedAt && (
+            <span style={{ fontFamily: mono, fontSize: 8, color: T4, marginLeft: "auto" }}>
+              {formatTimestamp(sectorData.computedAt)}
+              {sectorData.isStale && (
+                <span style={{ color: WARNING, marginLeft: 6 }}>· STALE</span>
+              )}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function PasarPage() {
   const [sessionStatus, setSessionStatus] = useState(getIDXSessionStatus());
   const [altData, setAltData] = useState<AltDataSnapshot | null>(null);
-  const [altLoading, setAltLoading] = useState(true);
-  const [altError, setAltError] = useState(false);
-  const [sectorRotation, setSectorRotation] = useState<SectorRotationSnapshot | null>(null);
+  const [sectorData, setSectorData] = useState<SectorRotationSnapshot | null>(null);
   const [macroContext, setMacroContext] = useState<MacroContextSnapshot | null>(null);
+  const [hoveredSector, setHoveredSector] = useState<string | null>(null);
 
   const { data: stocks } = useQuery<StockData[]>({ queryKey: ["/api/stocks"] });
 
@@ -207,12 +1249,10 @@ export default function PasarPage() {
   }, []);
 
   useEffect(() => {
-    setAltLoading(true);
     fetch("/api/alt-data/snapshot")
       .then((r) => r.json())
-      .then((d) => { setAltData(d); setAltError(false); })
-      .catch(() => setAltError(true))
-      .finally(() => setAltLoading(false));
+      .then((d) => setAltData(d))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -220,7 +1260,7 @@ export default function PasarPage() {
       .then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
-        if (data && Array.isArray(data.sectors)) setSectorRotation(data);
+        if (data && Array.isArray(data.sectors)) setSectorData(data);
       })
       .catch(() => {});
 
@@ -235,730 +1275,149 @@ export default function PasarPage() {
       .catch(() => {});
   }, []);
 
-  const topAkumulasi = useMemo(() => {
-    if (!stocks) return [];
-    return stocks
-      .filter((s) => s.homepageBucket === "siap_dipantau" || s.homepageBucket === "watchlist_prioritas")
-      .sort((a, b) => b.readinessScore - a.readinessScore)
-      .slice(0, 5);
-  }, [stocks]);
+  // Commodity ticker items
+  const tickerItems: TickerItem[] = useMemo(() => [
+    {
+      key: "oil",
+      label: "WTI OIL",
+      price:
+        macroContext?.oil?.currentPrice != null
+          ? `$${macroContext.oil.currentPrice.toFixed(2)}`
+          : "—",
+      change5d: macroContext?.oil?.change5d ?? null,
+      trend: macroContext?.oil?.trend ?? null,
+      source: macroContext?.oil?.source ?? "FALLBACK",
+    },
+    {
+      key: "gold",
+      label: "GOLD",
+      price:
+        macroContext?.gold?.currentPrice != null
+          ? `$${macroContext.gold.currentPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+          : "—",
+      change5d: macroContext?.gold?.change5d ?? null,
+      trend: macroContext?.gold?.trend ?? null,
+      source: macroContext?.gold?.source ?? "FALLBACK",
+    },
+    {
+      key: "usdIdr",
+      label: "USD/IDR",
+      price:
+        macroContext?.usdIdr?.currentPrice != null
+          ? macroContext.usdIdr.currentPrice.toLocaleString("id-ID")
+          : "—",
+      change5d: macroContext?.usdIdr?.change5d ?? null,
+      trend: macroContext?.usdIdr?.trend ?? null,
+      source: macroContext?.usdIdr?.source ?? "FALLBACK",
+    },
+    {
+      key: "cpo",
+      label: "CPO",
+      price:
+        altData?.cpo?.priceUSD != null
+          ? `$${altData.cpo.priceUSD}/MT`
+          : altData?.cpo?.priceIDR != null
+          ? altData.cpo.priceIDR.toLocaleString("id-ID")
+          : "—",
+      change5d: null,
+      trend: altData?.cpo?.trend ?? null,
+      source: altData?.cpo?.source ?? "FALLBACK",
+    },
+  ], [macroContext, altData]);
 
-  const statusDotColor = sessionStatus.color === "green" ? "bg-emerald-500" : sessionStatus.color === "yellow" ? "bg-amber-500" : "bg-rose-500";
-  const statusTextColor = sessionStatus.color === "green" ? "text-emerald-400" : sessionStatus.color === "yellow" ? "text-amber-400" : "text-rose-400";
-  const statusValueColor = sessionStatus.color === "green" ? "#34d399" : sessionStatus.color === "yellow" ? "#fbbf24" : "#f87171";
+  // suppress unused var warning — stocks is kept for potential use
+  void stocks;
 
   return (
-    <div className="px-6 py-6 min-h-screen" style={{ background: "#0f0f0f" }}>
-      <div className="flex items-start justify-between mb-5">
-        <div>
-          <p className="text-[10px] tracking-[0.25em] uppercase mb-1" style={{ fontFamily: mono, color: "#38BDF8" }} data-testid="text-pasar-label">
-            PASAR
-          </p>
-          <h1 className="text-2xl font-bold text-white" style={{ fontFamily: sora }} data-testid="text-pasar-title">
-            Kondisi Pasar IDX
-          </h1>
-          <p className="text-sm mt-1" style={{ fontFamily: mono, color: "#6b7280" }}>
-            Gambaran institusional pasar Indonesia hari ini
-          </p>
-        </div>
-        <div className={`flex items-center gap-2 text-xs ${statusTextColor}`} data-testid="badge-pasar-session">
-          <div className={`w-1.5 h-1.5 rounded-full ${statusDotColor} ${sessionStatus.color === "green" ? "animate-pulse" : ""}`} />
-          <span style={{ fontFamily: mono }}>{sessionStatus.label}</span>
-        </div>
-      </div>
+    <div style={{ minHeight: "100vh", background: S0, paddingBottom: 80 }}>
 
+      {/* ── Zone A: Header Bar ───────────────────────────────────────────── */}
+      <HeaderBar sessionStatus={sessionStatus} />
+
+      {/* ── Zone B: Commodity Ticker ─────────────────────────────────────── */}
+      <CommodityTicker items={tickerItems} />
+
+      {/* ── Zone C: Three-column body ────────────────────────────────────── */}
       <div
-        className="flex items-center gap-0 px-4 py-3 mb-6 rounded-md"
-        style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-        data-testid="bar-market-pulse"
+        style={{
+          maxWidth: 1280,
+          margin: "24px auto 0",
+          padding: "0 32px",
+          display: "flex",
+          gap: 16,
+          alignItems: "flex-start",
+        }}
       >
-        <div className="flex-1">
-          <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>IHSG</p>
-          <p className="text-xl font-bold text-white" style={{ fontFamily: mono }}>—</p>
-          <p className="text-[10px]" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>Live IDX</p>
-        </div>
-        <div className="w-px h-8 mx-6" style={{ background: "rgba(255,255,255,0.08)" }} />
-        <div className="flex-1">
-          <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>VOLUME PASAR</p>
-          <p className="text-xl font-bold text-white" style={{ fontFamily: mono }}>—</p>
-          <p className="text-[10px]" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>Live IDX</p>
-        </div>
-        <div className="w-px h-8 mx-6" style={{ background: "rgba(255,255,255,0.08)" }} />
-        <div className="flex-1">
-          <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>NET FOREIGN</p>
-          <p className="text-xl font-bold text-white" style={{ fontFamily: mono }}>—</p>
-          <p className="text-[10px]" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>Live IDX</p>
-        </div>
-        <div className="w-px h-8 mx-6" style={{ background: "rgba(255,255,255,0.08)" }} />
-        <div className="flex-1">
-          <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>STATUS PASAR</p>
-          <p className="text-sm font-bold" style={{ fontFamily: mono, color: statusValueColor }}>{sessionStatus.label}</p>
-        </div>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div>
-          <div className="rounded-md p-4 mb-4" style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }} data-testid="card-ihsg-chart">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-                INDEKS HARGA SAHAM GABUNGAN
-              </span>
-              <LiveIDXBadge />
-            </div>
+        {/* Column 1: Sector Rotation Scatter Plot */}
+        <div style={{ flex: "1.2", minWidth: 0 }}>
+          {!sectorData ? (
             <div
-              className="h-48 rounded-sm flex flex-col items-center justify-center"
-              style={{ background: "#111111", border: "1px dashed rgba(255,255,255,0.03)" }}
+              style={{
+                background: S1,
+                border: `1px solid ${B1}`,
+                borderRadius: 10,
+                padding: "20px",
+                minHeight: 300,
+                display: "flex",
+                flexDirection: "column" as const,
+              }}
             >
-              <p className="text-3xl mb-2" style={{ color: "rgba(255,255,255,0.03)" }}>◎</p>
-              <p className="text-[10px] text-center" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>
-                Grafik IHSG tersedia dengan data IDX live
-              </p>
-              <p className="text-[9px] mt-1" style={{ fontFamily: mono, color: "rgba(255,255,255,0.08)" }}>
-                PT Berkat Digital Investasi
+              <Eyebrow>MATRIKS ROTASI SEKTOR</Eyebrow>
+              <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>
+                [ MEMUAT... ]
               </p>
             </div>
-          </div>
-
-          <div className="rounded-md p-4 mb-4" style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }} data-testid="card-sector-heatmap">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-                PERFORMA SEKTOR HARI INI
-              </span>
-              <LiveIDXBadge />
-            </div>
-
-            {sectorRotation ? (
-              <>
-                {sectorRotation.dominantTheme && (
-                  <div
-                    className="rounded-sm px-3 py-2 mb-3"
-                    style={{
-                      background: "#0d1a0d",
-                      border: "1px solid rgba(16,185,129,0.15)",
-                      fontFamily: mono,
-                      fontSize: 10,
-                      color: "rgba(52,211,153,0.8)",
-                    }}
-                    data-testid="banner-dominant-theme"
-                  >
-                    ◎ {sectorRotation.dominantTheme}
-                  </div>
-                )}
-
-                <div className="grid grid-cols-3 gap-2">
-                  {sectorRotation.sectors?.map((s: any) => {
-                    const sectorBorderLeft =
-                      s.direction === "MASUK" ? "2px solid #34d399" :
-                      s.direction === "KELUAR" ? "2px solid #f87171" :
-                      "2px solid rgba(255,255,255,0.04)";
-                    const sectorGlow =
-                      s.direction === "MASUK" ? "0 0 12px rgba(52,211,153,0.07)" :
-                      s.direction === "KELUAR" ? "0 0 12px rgba(248,113,113,0.07)" :
-                      "none";
-                    const scoreColor =
-                      s.direction === "MASUK" ? "#34d399" :
-                      s.direction === "KELUAR" ? "#f87171" :
-                      "#ffffff";
-                    const dirLabel =
-                      s.direction === "MASUK" ? "↑ Masuk" :
-                      s.direction === "KELUAR" ? "↓ Keluar" :
-                      "→ Netral";
-                    const dirColor =
-                      s.direction === "MASUK" ? "#34d399" :
-                      s.direction === "KELUAR" ? "#f87171" :
-                      "#6b7280";
-                    return (
-                      <div
-                        key={s.sector}
-                        className="rounded-sm p-3 relative"
-                        style={{
-                          background: "#111111",
-                          border: "1px solid rgba(255,255,255,0.04)",
-                          borderLeft: sectorBorderLeft,
-                          boxShadow: sectorGlow,
-                        }}
-                        data-testid={`sector-tile-${s.sector}`}
-                      >
-                        {(s.momentum === "NAIK" || s.momentum === "TURUN") && (
-                          <span
-                            className="absolute top-2 right-2"
-                            style={{
-                              fontFamily: mono,
-                              fontSize: 9,
-                              color: s.momentum === "NAIK" ? "rgba(52,211,153,0.6)" : "rgba(248,113,113,0.6)",
-                            }}
-                          >
-                            {s.momentum === "NAIK" ? "▲" : "▼"}
-                          </span>
-                        )}
-                        <p className="text-[10px] truncate mb-1" style={{ fontFamily: mono, color: "#6b7280" }}>
-                          {s.displayName}
-                        </p>
-                        <p className="text-xl font-bold" style={{ fontFamily: mono, color: scoreColor }}>
-                          {s.rotationScore}
-                        </p>
-                        <p className="text-[9px] mt-0.5" style={{ fontFamily: mono, color: dirColor }}>
-                          {dirLabel}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <div className="grid grid-cols-3 gap-2 mt-2">
-                {SECTORS.map((s) => (
-                  <div
-                    key={s}
-                    className="rounded-sm p-3"
-                    style={{ background: "#111111", border: "1px solid rgba(255,255,255,0.03)" }}
-                  >
-                    <p className="text-[10px] truncate" style={{ fontFamily: mono, color: "#6b7280" }}>{s}</p>
-                    <p className="text-sm font-bold" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>—%</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {sectorRotation && sectorRotation.hotSectors.length > 0 && (
-            <div
-              className="rounded-md p-4 mb-4"
-              style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-              data-testid="card-saham-unggulan"
-            >
-              <p className="text-[9px] tracking-widest uppercase mb-3" style={{ fontFamily: mono, color: "#6b7280" }}>
-                SAHAM UNGGULAN DI SEKTOR PANAS
-              </p>
-              {sectorRotation.hotSectors.slice(0, 2).map((sectorKey: string) => {
-                const sectorObj = sectorRotation.sectors.find((x) => x.sector === sectorKey);
-                if (!sectorObj) return null;
-                return (
-                  <div key={sectorKey} className="mb-4 last:mb-0">
-                    <p className="text-[10px] mb-2" style={{ fontFamily: mono, color: "#38BDF8" }}>
-                      {sectorObj.displayName}
-                    </p>
-                    {sectorObj.topStocks.map((ts, i) => {
-                      const scoreColor =
-                        ts.readinessScore >= 60 ? "#34d399" :
-                        ts.readinessScore >= 40 ? "#fbbf24" :
-                        "#f87171";
-                      const cycleLabel =
-                        ts.cyclePosition === "ENTRY_WINDOW" ? "Entry Window" :
-                        ts.cyclePosition === "KONFIRMASI_MULAI" ? "Konfirmasi" :
-                        null;
-                      const cycleColor =
-                        ts.cyclePosition === "ENTRY_WINDOW" ? "rgba(52,211,153,0.7)" :
-                        ts.cyclePosition === "KONFIRMASI_MULAI" ? "rgba(56,189,248,0.7)" :
-                        "#6b7280";
-                      return (
-                        <div
-                          key={ts.symbol}
-                          className="flex items-center gap-3 py-1.5"
-                          style={{ borderBottom: i < sectorObj.topStocks.length - 1 ? "1px solid rgba(255,255,255,0.02)" : "none" }}
-                          data-testid={`row-saham-unggulan-${ts.symbol}`}
-                        >
-                          <div
-                            className="w-5 h-5 rounded-sm flex-shrink-0 flex items-center justify-center overflow-hidden"
-                            style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
-                          >
-                            <img
-                              src={`https://assets.stockbit.com/logos/companies/${ts.symbol}.png`}
-                              alt={ts.symbol}
-                              className="w-3.5 h-3.5 object-contain"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                            />
-                          </div>
-                          <span className="text-sm font-bold text-white w-14" style={{ fontFamily: sora }}>
-                            {ts.symbol}
-                          </span>
-                          <span className="text-xs font-bold" style={{ fontFamily: mono, color: scoreColor }}>
-                            {ts.readinessScore}
-                          </span>
-                          {cycleLabel && (
-                            <span className="text-[9px]" style={{ fontFamily: mono, color: cycleColor }}>
-                              {cycleLabel}
-                            </span>
-                          )}
-                          <a
-                            href={`/stock/${ts.symbol}`}
-                            className="ml-auto text-[10px] hover:text-white transition-colors"
-                            style={{ fontFamily: mono, color: "#6b7280" }}
-                            data-testid={`link-detail-${ts.symbol}`}
-                          >
-                            ANALISIS →
-                          </a>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
+          ) : (
+            <SectorScatterPlot
+              sectors={sectorData.sectors}
+              hoveredSector={hoveredSector}
+              onHover={setHoveredSector}
+              hotSectors={sectorData.hotSectors}
+            />
           )}
         </div>
 
-        <div>
-          <div className="rounded-md p-4 mb-4" style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }} data-testid="card-top-akumulasi">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-                TOP AKUMULASI
-              </span>
-              <LiveIDXBadge />
-            </div>
-            {topAkumulasi.length === 0 ? (
-              <div className="py-8 text-center">
-                <p className="text-[10px]" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>
-                  Tidak ada akumulasi aktif terdeteksi
-                </p>
-              </div>
-            ) : (
-              topAkumulasi.map((stock, i) => {
-                const cp = parseFloat(stock.changePercent);
-                return (
-                  <div
-                    key={stock.symbol}
-                    className="flex items-center gap-3 py-2"
-                    style={{ borderBottom: i < topAkumulasi.length - 1 ? "1px solid rgba(255,255,255,0.02)" : "none" }}
-                    data-testid={`row-top-akumulasi-${stock.symbol}`}
-                  >
-                    <StockLogo symbol={stock.symbol} />
-                    <span className="text-sm font-bold text-white w-16" style={{ fontFamily: sora }}>{stock.symbol}</span>
-                    <span className="text-[10px] flex-1 truncate" style={{ fontFamily: mono, color: "#6b7280" }}>{stock.name}</span>
-                    <span
-                      className="text-sm font-bold w-12 text-right"
-                      style={{
-                        fontFamily: mono,
-                        color: stock.readinessScore >= 80 ? "#34d399" : stock.readinessScore >= 60 ? "#fbbf24" : "#f87171",
-                      }}
-                    >
-                      {stock.readinessScore}
-                    </span>
-                    <span
-                      className={`text-xs w-16 text-right ${cp > 0 ? "text-emerald-400" : cp < 0 ? "text-red-400" : "text-[#6b7280]"}`}
-                      style={{ fontFamily: mono }}
-                    >
-                      {cp > 0 ? `+${cp.toFixed(2)}%` : cp < 0 ? `${cp.toFixed(2)}%` : "0.00%"}
-                    </span>
-                  </div>
-                );
-              })
-            )}
-          </div>
+        {/* Column 2: Macro Signals Causal Chain */}
+        <div style={{ flex: "1", minWidth: 0 }}>
+          <MacroSignalsCard macroContext={macroContext} />
+        </div>
 
-          <div className="rounded-md p-4 mb-4" style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }} data-testid="card-aktivitas-asing">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-                AKTIVITAS ASING
-              </span>
-              <LiveIDXBadge />
-            </div>
-            {["Net Foreign Flow", "Foreign Buy", "Foreign Sell"].map((label, i) => (
-              <div
-                key={label}
-                className="flex justify-between items-center py-2"
-                style={{ borderBottom: i < 2 ? "1px solid rgba(255,255,255,0.02)" : "none" }}
-              >
-                <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>{label}</span>
-                <span className="text-sm" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>—</span>
-              </div>
-            ))}
-            <p className="text-[9px] mt-3" style={{ fontFamily: mono, color: "rgba(255,255,255,0.08)" }}>
-              Data asing real-time tersedia dengan lisensi IDX
-            </p>
-          </div>
-
-          <div className="rounded-md p-4" style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }} data-testid="card-top-broker">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-                TOP BROKER
-              </span>
-              <LiveIDXBadge />
-            </div>
-            {[1, 2, 3, 4, 5].map((rank, i) => (
-              <div
-                key={rank}
-                className="flex items-center gap-3 py-2"
-                style={{ borderBottom: i < 4 ? "1px solid rgba(255,255,255,0.02)" : "none" }}
-              >
-                <span className="text-[10px] w-4" style={{ fontFamily: mono, color: "rgba(255,255,255,0.19)" }}>#{rank}</span>
-                <span className="text-sm font-bold w-8" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>—</span>
-                <span className="text-[10px] flex-1" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>—</span>
-                <span className="text-xs" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>—</span>
-              </div>
-            ))}
-            <p className="text-[9px] mt-2" style={{ fontFamily: mono, color: "rgba(255,255,255,0.08)" }}>
-              Data broker real-time tersedia dengan lisensi IDX
-            </p>
-          </div>
+        {/* Column 3: Alt Data Stack */}
+        <div style={{ flex: "0.8", minWidth: 0 }}>
+          <AltDataCard altData={altData} />
         </div>
       </div>
 
-      {macroContext && (
-        <div className="mt-6 mb-4" data-testid="section-macro-context">
-          <p className="text-[10px] tracking-[0.25em] uppercase mb-3" style={{ fontFamily: mono, color: "#38BDF8" }}>
-            KONDISI MAKRO SAAT INI
-          </p>
-          <p className="text-[10px] mb-4" style={{ fontFamily: mono, color: "#6b7280" }}>
-            Sinyal komoditas dan forex yang mempengaruhi sektor IDX
-          </p>
-
-          <div
-            className="rounded-md px-4 py-3 mb-4 flex items-center justify-between"
-            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-            data-testid="bar-market-sentiment"
-          >
-            {(() => {
-              const sentiment = macroContext.marketSentiment;
-              const bg =
-                sentiment === "RISK_ON" ? "rgba(16,185,129,0.1)" :
-                sentiment === "RISK_OFF" ? "rgba(239,68,68,0.1)" :
-                "rgba(255,255,255,0.02)";
-              const color =
-                sentiment === "RISK_ON" ? "#34d399" :
-                sentiment === "RISK_OFF" ? "#f87171" :
-                "#6b7280";
-              const border =
-                sentiment === "RISK_ON" ? "rgba(16,185,129,0.3)" :
-                sentiment === "RISK_OFF" ? "rgba(239,68,68,0.3)" :
-                "rgba(255,255,255,0.06)";
-              const label =
-                sentiment === "RISK_ON" ? "RISK ON" :
-                sentiment === "RISK_OFF" ? "RISK OFF" :
-                "NETRAL";
-              return (
-                <span
-                  className="px-3 py-1 rounded-sm border"
-                  style={{ background: bg, color, borderColor: border, fontFamily: mono, fontSize: 12 }}
-                  data-testid={`badge-sentiment-${sentiment}`}
-                >
-                  {label}
-                </span>
-              );
-            })()}
-            <span
-              className="max-w-sm text-right"
-              style={{ fontFamily: mono, fontSize: 10, color: "#6b7280" }}
-            >
-              {macroContext.sentimentReason}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            {(() => {
-              const cards: Array<{ key: string; label: string; price: string; change: number | null; source: string }> = [
-                {
-                  key: "oil",
-                  label: "MINYAK WTI",
-                  price: macroContext.oil?.currentPrice != null ? `USD ${macroContext.oil.currentPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—",
-                  change: macroContext.oil?.change5d ?? null,
-                  source: macroContext.oil?.source ?? "FALLBACK",
-                },
-                {
-                  key: "gold",
-                  label: "EMAS",
-                  price: macroContext.gold?.currentPrice != null ? `USD ${macroContext.gold.currentPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "—",
-                  change: macroContext.gold?.change5d ?? null,
-                  source: macroContext.gold?.source ?? "FALLBACK",
-                },
-                {
-                  key: "usdIdr",
-                  label: "USD/IDR",
-                  price: macroContext.usdIdr?.currentPrice != null ? `Rp ${macroContext.usdIdr.currentPrice.toLocaleString("id-ID")}` : "—",
-                  change: macroContext.usdIdr?.change5d ?? null,
-                  source: macroContext.usdIdr?.source ?? "FALLBACK",
-                },
-                {
-                  key: "cpo",
-                  label: "CPO",
-                  price: altData?.cpo?.priceIDR
-                    ? `Rp ${altData.cpo.priceIDR.toLocaleString("id-ID")}/kg`
-                    : altData?.cpo?.priceUSD
-                      ? `USD ${altData.cpo.priceUSD}/MT`
-                      : "—",
-                  change: null,
-                  source: altData?.cpo?.source ?? "FALLBACK",
-                },
-              ];
-              const sectorImpactMap: Record<string, string> = {
-                oil: "Energi · Industri",
-                gold: "Material · Emas",
-                usdIdr: "Semua Sektor",
-                cpo: "Konsumer Primer",
-              };
-              return cards.map((c) => (
-                <div
-                  key={c.key}
-                  className="rounded-md p-3"
-                  style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-                  data-testid={`card-macro-${c.key}`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-                      {c.label}
-                    </p>
-                    <SourceBadge source={c.source} />
-                  </div>
-                  <p className="font-bold text-white" style={{ fontFamily: mono, fontSize: 22 }}>
-                    {c.price}
-                  </p>
-                  <p
-                    className="mt-1 mb-2"
-                    style={{
-                      fontFamily: mono,
-                      fontSize: 10,
-                      color: c.change == null ? "rgba(255,255,255,0.2)" : c.change > 0 ? "#34d399" : c.change < 0 ? "#f87171" : "#6b7280",
-                    }}
-                  >
-                    {c.change == null ? "5d: —" : c.change > 0 ? `▲ +${c.change.toFixed(2)}% (5d)` : c.change < 0 ? `▼ ${c.change.toFixed(2)}% (5d)` : `→ 0.00% (5d)`}
-                  </p>
-                  <span
-                    style={{
-                      fontFamily: mono,
-                      fontSize: 8,
-                      color: "#38BDF8",
-                      background: "rgba(56,189,248,0.08)",
-                      border: "1px solid rgba(56,189,248,0.15)",
-                      borderRadius: 3,
-                      padding: "1px 6px",
-                    }}
-                  >
-                    {sectorImpactMap[c.key] ?? "—"}
-                  </span>
-                </div>
-              ));
-            })()}
-          </div>
-
-          <div
-            className="rounded-md p-4 mb-4"
-            style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-            data-testid="card-macro-signals"
-          >
-            <p className="text-[9px] tracking-widest uppercase mb-3" style={{ fontFamily: mono, color: "#6b7280" }}>
-              SINYAL MAKRO AKTIF
-            </p>
-            {macroContext.signals?.length ? (
-              macroContext.signals.map((sig: any, i: number) => {
-                const sectorMap: Record<string, string> = {
-                  "Financials": "Keuangan",
-                  "Energy": "Energi",
-                  "Industrials": "Industri",
-                  "Communication Services": "Telekomunikasi",
-                  "Consumer Staples": "Konsumer Primer",
-                  "Consumer Discretionary": "Konsumer Sekunder",
-                  "Real Estate": "Properti",
-                  "Basic Materials": "Material & Tambang",
-                  "ALL": "Semua Sektor",
-                };
-                return (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 py-2"
-                    style={{ borderBottom: i < macroContext.signals.length - 1 ? "1px solid rgba(255,255,255,0.03)" : "none" }}
-                    data-testid={`row-signal-${sig.type}`}
-                  >
-                    <span
-                      className="font-bold w-4 flex-shrink-0"
-                      style={{
-                        fontFamily: mono,
-                        fontSize: 14,
-                        color: sig.effect === "POSITIF" ? "#34d399" : sig.effect === "NEGATIF" ? "#f87171" : "#6b7280",
-                      }}
-                    >
-                      {sig.effect === "POSITIF" ? "↑" : sig.effect === "NEGATIF" ? "↓" : "→"}
-                    </span>
-                    <span
-                      className="px-2 py-0.5 rounded-sm border flex-shrink-0"
-                      style={{
-                        background: "rgba(255,255,255,0.02)",
-                        borderColor: "rgba(255,255,255,0.06)",
-                        fontFamily: mono,
-                        fontSize: 9,
-                        color: "#38BDF8",
-                      }}
-                    >
-                      {sectorMap[sig.sector] ?? sig.sector}
-                    </span>
-                    <span
-                      className="flex-1"
-                      style={{ fontFamily: mono, fontSize: 10, color: "#9ca3af" }}
-                    >
-                      {sig.description}
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <p style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.2)" }}>
-                Tidak ada sinyal makro signifikan saat ini
-              </p>
-            )}
-          </div>
-        </div>
+      {/* ── Zone D: Sector Detail Panel ──────────────────────────────────── */}
+      {sectorData && sectorData.sectors?.length > 0 && (
+        <SectorDetailPanel
+          sectorData={sectorData}
+          hoveredSector={hoveredSector}
+          onSelectSector={setHoveredSector}
+        />
       )}
 
-      <div className="mt-6">
-        <p className="text-[10px] tracking-[0.25em] uppercase mb-3" style={{ fontFamily: mono, color: "#38BDF8" }} data-testid="text-alt-data-label">
-          DATA ALTERNATIF
+      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          maxWidth: 1280,
+          margin: "40px auto 0",
+          padding: "20px 32px 0",
+          borderTop: `1px solid ${B1}`,
+        }}
+      >
+        <p
+          style={{
+            fontFamily: mono,
+            fontSize: 9,
+            color: T4,
+            textAlign: "center" as const,
+            letterSpacing: "0.06em",
+          }}
+        >
+          BART MACRO TERMINAL · Data alternatif: BMKG, ESDM · PT Berkat Digital Investasi
         </p>
-        <p className="text-[10px] mb-4" style={{ fontFamily: mono, color: "#6b7280" }}>
-          Sinyal dari sumber data publik Indonesia — aktif
-        </p>
-
-        {altLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[1, 2, 3].map((k) => (
-              <div key={k} className="h-40 rounded-md animate-pulse" style={{ background: "#161616" }} />
-            ))}
-          </div>
-        ) : altError ? (
-          <p className="text-[10px]" style={{ fontFamily: mono, color: "rgba(248,113,113,0.5)" }}>
-            Gagal memuat data alternatif
-          </p>
-        ) : altData ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-md p-4" style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }} data-testid="card-cpo-price">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-                  HARGA CPO
-                </span>
-                <SourceBadge source={altData.cpo.source} />
-              </div>
-              <p className="font-bold text-white mb-1" style={{ fontFamily: mono, fontSize: 22 }}>
-                {altData.cpo.priceIDR
-                  ? `Rp ${altData.cpo.priceIDR.toLocaleString("id-ID")}/kg`
-                  : altData.cpo.priceUSD
-                    ? `USD ${altData.cpo.priceUSD}/MT`
-                    : "—"}
-              </p>
-              {altData.cpo.trend && (
-                <p
-                  className={`text-xs ${altData.cpo.trend === "NAIK" ? "text-emerald-400" : altData.cpo.trend === "TURUN" ? "text-red-400" : "text-amber-400"}`}
-                  style={{ fontFamily: mono }}
-                >
-                  {altData.cpo.trend === "NAIK" ? "↑ Naik" : altData.cpo.trend === "TURUN" ? "↓ Turun" : "→ Stabil"}
-                </p>
-              )}
-              <p className="text-[9px] mt-2" style={{ fontFamily: mono, color: "#6b7280" }}>
-                Relevan: Konsumer Primer, Basic Materials
-              </p>
-              <p className="text-[9px] mt-2" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>
-                Diperbarui: {formatTimestamp(altData.cpo.fetchedAt)}
-              </p>
-            </div>
-
-            <div className="rounded-md p-4" style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }} data-testid="card-coal-price">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-                  HARGA BATUBARA (HBA)
-                </span>
-                <SourceBadge source={altData.coal.source} />
-              </div>
-              <p className="font-bold text-white mb-1" style={{ fontFamily: mono, fontSize: 22 }}>
-                {altData.coal.hba1USD ? `USD ${altData.coal.hba1USD}/ton (GAR 6322)` : "—"}
-              </p>
-              {altData.coal.trend && (
-                <p
-                  className={`text-xs ${altData.coal.trend === "NAIK" ? "text-emerald-400" : altData.coal.trend === "TURUN" ? "text-red-400" : "text-amber-400"}`}
-                  style={{ fontFamily: mono }}
-                >
-                  {altData.coal.trend === "NAIK" ? "↑ Naik" : altData.coal.trend === "TURUN" ? "↓ Turun" : "→ Stabil"}
-                </p>
-              )}
-              <div className="mt-2">
-                <p className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
-                  HBA2: USD {altData.coal.hba2USD ?? "—"}/ton
-                </p>
-                <p className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
-                  HBA3: USD {altData.coal.hba3USD ?? "—"}/ton
-                </p>
-              </div>
-              <p className="text-[9px] mt-2" style={{ fontFamily: mono, color: "#6b7280" }}>
-                Relevan: Energi, Basic Materials
-              </p>
-              <p className="text-[9px] mt-2" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>
-                Diperbarui: {formatTimestamp(altData.coal.fetchedAt)}
-              </p>
-            </div>
-
-            <div className="rounded-md p-4" style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }} data-testid="card-bmkg-weather">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-                  CUACA PRODUKSI
-                </span>
-                {(() => {
-                  const regions = altData.weather.filter((w) => WEATHER_REGIONS.includes(w.regionName));
-                  const allNull = regions.every((w) => w.rainfallMm === null);
-                  return (
-                    <span
-                      className="px-2 py-0.5 rounded-sm border"
-                      style={{
-                        fontFamily: mono,
-                        fontSize: 9,
-                        background: allNull ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.1)",
-                        color: allNull ? "rgba(245,158,11,0.6)" : "#34d399",
-                        borderColor: allNull ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)",
-                      }}
-                    >
-                      {allNull ? "Degraded" : "Live"}
-                    </span>
-                  );
-                })()}
-              </div>
-              {altData.weather
-                .filter((w) => WEATHER_REGIONS.includes(w.regionName))
-                .map((w, i, arr) => (
-                  <div
-                    key={w.regionId}
-                    className="flex items-center justify-between py-1.5"
-                    style={{ borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.02)" : "none" }}
-                  >
-                    <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>{w.regionName}</span>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-[10px] ${
-                          w.rainfallMm === null
-                            ? "text-[#ffffff12]"
-                            : w.rainfallMm >= 25
-                              ? "text-red-400"
-                              : w.rainfallMm >= 10
-                                ? "text-amber-400"
-                                : w.rainfallMm >= 1
-                                  ? "text-sky-400"
-                                  : "text-emerald-400"
-                        }`}
-                        style={{ fontFamily: mono }}
-                      >
-                        {w.rainfallMm === null
-                          ? "—"
-                          : w.rainfallMm >= 25
-                            ? "⛈ Lebat"
-                            : w.rainfallMm >= 10
-                              ? "🌧 Sedang"
-                              : w.rainfallMm >= 1
-                                ? "🌦 Ringan"
-                                : "☀ Cerah"}
-                      </span>
-                      {w.temperature !== null && (
-                        <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
-                          {w.temperature}°C
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              <p className="text-[9px] mt-3" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>
-                Data cuaca dari BMKG · Mempengaruhi produksi perkebunan & tambang
-              </p>
-            </div>
-          </div>
-        ) : null}
       </div>
-
-      <p className="mt-8 text-center text-[10px]" style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)" }}>
-        Data pasar lengkap tersedia setelah integrasi IDX live · PT Berkat Digital Investasi · Data alternatif: BMKG, ESDM
-      </p>
     </div>
   );
 }

@@ -1,0 +1,14 @@
+{
+  "symbol": "ASII",
+  "date": "2026-05-19",
+  "description": "ASII mixed signal — balanced buying and selling, indeterminate flow bias",
+  "netFlow": -8400000000,
+  "price": 4380,
+  "brokers": [
+    { "code": "BK",   "name": "PT Mandiri Sekuritas",   "netBuy": "45.2B IDR",  "netSell": null,        "volumePercent": "9.1%",  "avgBuy": "4,385", "avgSell": "4,375" },
+    { "code": "CS",   "name": "PT Credit Suisse",       "netBuy": "28.7B IDR",  "netSell": null,        "volumePercent": "5.8%",  "avgBuy": "4,382", "avgSell": "4,372" },
+    { "code": "YP",   "name": "PT eTrading Securities", "netBuy": null,         "netSell": "38.4B IDR", "volumePercent": "12.7%", "avgBuy": "4,390", "avgSell": "4,380" },
+    { "code": "DH",   "name": "PT Sinarmas Sekuritas",  "netBuy": null,         "netSell": "29.8B IDR", "volumePercent": "8.4%",  "avgBuy": "4,388", "avgSell": "4,378" },
+    { "code": "CIMB", "name": "PT CIMB Securities",     "netBuy": "14.3B IDR",  "netSell": null,        "volumePercent": "4.2%",  "avgBuy": "4,380", "avgSell": "4,370" }
+  ]
+}

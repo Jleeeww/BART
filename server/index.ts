@@ -111,7 +111,6 @@ app.use((req, res, next) => {
     {
       port,
       host: "127.0.0.1",
-      reusePort: true,
     },
     () => {
       log(`serving on port ${port}`);
@@ -119,6 +118,11 @@ app.use((req, res, next) => {
       import('./engine/altDataFetcher')
         .then(({ warmAltDataCaches }) => warmAltDataCaches())
         .catch(err => console.warn('[startup] altDataFetcher warmup error:', err));
+
+      // Cost projection — log immediately at startup (no API calls needed)
+      import('./engine/costTracker')
+        .then(({ logStartupCostEstimate }) => logStartupCostEstimate())
+        .catch(() => {});
 
       // News pipeline — first run after 30s (let server warm up), then every 15min
       setTimeout(() => {
@@ -136,11 +140,79 @@ app.use((req, res, next) => {
         .then(({ ensureRagSchema }) => ensureRagSchema())
         .catch(err => console.warn('[startup] RAG schema init error:', err));
 
+      // Macro flow fetch — 06:00 WIB (23:00 UTC prev day, post-US close) and 16:30 WIB (09:30 UTC, post-IDX close)
+      const runMacroFlow = async () => {
+        const { getMacroFlowSnapshot, persistMacroFlowSnapshot } = await import('./engine/macroFlowFetcher');
+        const { computeMacroRegime } = await import('./engine/macroRegimeDetector');
+        const snapshot = await getMacroFlowSnapshot();
+        await persistMacroFlowSnapshot(snapshot);
+        const regime = await computeMacroRegime();
+        // Persist regime to macro_regime_history
+        try {
+          const { pool } = await import('./db');
+          await pool.query(
+            `INSERT INTO macro_regime_history (date, regime, multiplier, confidence, triggers, duration_days)
+             VALUES (CURRENT_DATE, $1, $2, $3, $4, $5)
+             ON CONFLICT (date) DO UPDATE SET
+               regime = EXCLUDED.regime, multiplier = EXCLUDED.multiplier,
+               confidence = EXCLUDED.confidence, triggers = EXCLUDED.triggers,
+               duration_days = EXCLUDED.duration_days, computed_at = NOW()`,
+            [regime.regime, regime.multiplier, regime.confidence, JSON.stringify(regime.triggers), regime.durationDays]
+          );
+        } catch (err) {
+          log(`[macroFlow] regime persist error: ${err}`, 'macroFlow');
+        }
+        log(`[macroFlow] snapshot=${snapshot.dataQuality} regime=${regime.regime} mult=${regime.multiplier}`, 'macroFlow');
+      };
+      scheduleDaily(6, 0, 7, runMacroFlow, 'macroFlow_earlyAM');
+      scheduleDaily(16, 30, 7, runMacroFlow, 'macroFlow_postMarket');
+
       // Outcome tracker — daily at 17:00 WIB (10:00 UTC)
       scheduleDaily(17, 0, 7, async () => {
         const { runDailyOutcomeTracking } = await import('./engine/outcomeTracker');
         await runDailyOutcomeTracking();
       }, 'outcomeTracker');
+
+      // Insider research — daily post-market check 17:30 WIB (10:30 UTC)
+      // Light scan: only researches symbols already in the insider cache (refresh)
+      // Full research (new symbols) is triggered via POST /api/insider/:symbol/research
+      scheduleDaily(17, 30, 7, async () => {
+        const { getInsiderCacheStats, getCachedInsiderScore, cacheInsiderScore, scoreInsider } = await import('./engine/insiderScorer');
+        const { researchInsiderTransactions } = await import('./engine/insiderResearch');
+        if (!process.env.ANTHROPIC_API_KEY) return;
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const { symbols } = getInsiderCacheStats();
+        const staleSymbols = symbols.filter((sym) => {
+          const s = getCachedInsiderScore(sym);
+          if (!s) return true;
+          const ageDays = (Date.now() - new Date(s.computedAt).getTime()) / 86_400_000;
+          return ageDays > 7; // refresh weekly (cache TTL = 7 days)
+        });
+
+        log(`[insiderRefresh] Refreshing ${staleSymbols.length} symbols`, 'insiderRefresh');
+        const MAX_STOCKS_PER_RUN = 10;
+        for (const sym of staleSymbols.slice(0, MAX_STOCKS_PER_RUN)) {
+          try {
+            const transactions = await researchInsiderTransactions(sym, sym, client, 6);
+            const result = await scoreInsider(transactions, sym);
+            cacheInsiderScore(sym, result);
+            log(`[insiderRefresh] ${sym}: ${result.signal} (score=${result.score ?? 'null'})`, 'insiderRefresh');
+          } catch (err) {
+            log(`[insiderRefresh] ${sym}: error — ${err}`, 'insiderRefresh');
+          }
+        }
+      }, 'insiderRefresh');
+
+      // DEMO MODE: Broker scrape schedulers disabled — IDX/Stockbit blocked by Cloudflare.
+      // Use POST /api/admin/seed-broker-data or `npm run seed:demo` to inject broker data manually.
+      // Re-enable these three scheduleDaily calls when live scraping is unblocked.
+      //
+      // scheduleDaily(16, 45, 7, runBrokerScrape, 'brokerScrape_postClose');
+      // scheduleDaily(18, 30, 7, runBrokerScrape, 'brokerScrape_evening');
+      // scheduleDaily(20,  0, 7, runBrokerScrape, 'brokerScrape_night');
+      log('Broker scrape schedulers DISABLED (demo mode — manual seed via /api/admin/seed-broker-data)', 'brokerScrape');
     },
   );
 })();

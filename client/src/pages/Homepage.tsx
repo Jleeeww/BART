@@ -1,351 +1,750 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { Activity, Radio, ShieldCheck } from "lucide-react";
-import { ScoreRing } from "@/components/ScoreRing";
-import { DecisionBadge } from "@/components/DecisionBadge";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
-interface StockData {
-  symbol: string;
-  name: string;
-  readinessScore: number;
-  marketRegime: string;
-  homepageBucket: string;
-  sector: string | null;
-  changePercent: string;
-  isGorengan?: boolean;
-}
-
-const mono = "'IBM Plex Mono', monospace";
-const sora = "'Sora', sans-serif";
-
-function getIDXSessionStatus(): { label: string; live: boolean } {
-  const now = new Date();
-  const wibOffset = 7 * 60;
-  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const wibMinutes = (utcMinutes + wibOffset) % (24 * 60);
-  const totalMinutes = Math.floor(wibMinutes / 60) * 60 + (wibMinutes % 60);
-  const wibDate = new Date(now.getTime() + wibOffset * 60 * 1000);
-  const dayOfWeek = wibDate.getUTCDay();
-  if (dayOfWeek === 0 || dayOfWeek === 6) return { label: "PASAR TUTUP", live: false };
-  if (totalMinutes >= 9 * 60 && totalMinutes < 12 * 60) return { label: "SESI 1 BERLANGSUNG", live: true };
-  if (totalMinutes >= 13 * 60 + 30 && totalMinutes < 15 * 60 + 50) return { label: "SESI 2 BERLANGSUNG", live: true };
-  if (totalMinutes >= 8 * 60 + 45) return { label: "PRA-PEMBUKAAN", live: false };
-  return { label: "PASAR TUTUP", live: false };
-}
-
-function bucketToDecision(bucket: string): string {
-  if (bucket === "siap_dipantau") return "SIAP_DIPANTAU";
-  if (bucket === "watchlist_prioritas") return "WATCHLIST_PRIORITAS";
-  return "HINDARI_DULU";
-}
+const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
+const inter = "'Inter', system-ui, sans-serif";
 
 export default function Homepage() {
-  const { data: stocks } = useQuery<StockData[]>({ queryKey: ["/api/stocks"] });
-  const session = getIDXSessionStatus();
-  const today = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
-  const stockCount = stocks?.length ?? 0;
+  const [, setLocation] = useLocation();
+  const [stocks, setStocks] = useState<any[]>([]);
+  const [newsStats, setNewsStats] = useState({ total: 0, criticalAlerts: 0, highAlerts: 0 });
+  const [macroRegime, setMacroRegime] = useState<any>(null);
+
+  // Button hover states
+  const [primaryHover, setPrimaryHover] = useState(false);
+  const [secondaryHover, setSecondaryHover] = useState(false);
+  const [linkHover, setLinkHover] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/stocks")
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setStocks)
+      .catch(() => {});
+    fetch("/api/news")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.stats)
+          setNewsStats({
+            total: d.total ?? 0,
+            criticalAlerts: d.stats.criticalAlerts ?? 0,
+            highAlerts: d.stats.highAlerts ?? 0,
+          });
+      })
+      .catch(() => {});
+    fetch("/api/macro/regime")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.current) setMacroRegime(d.current); })
+      .catch(() => {});
+  }, []);
+
+  // Top sector derivation
+  const topSector = (() => {
+    if (!stocks.length) return null;
+    const counts: Record<string, number> = {};
+    stocks.forEach((s) => {
+      if (s.sector) counts[s.sector] = (counts[s.sector] ?? 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  })();
+
+  // Derived values
+  const sentimentValue =
+    newsStats.criticalAlerts > 2
+      ? { label: "RISK OFF", color: "#F87171" }
+      : newsStats.criticalAlerts > 0
+      ? { label: "WASPADA", color: "#FBBF24" }
+      : { label: "RISK ON", color: "#4ADE80" };
+
+  function accentColor(bucket: string) {
+    if (bucket === "siap_dipantau") return "#4ADE80";
+    if (bucket === "watchlist_prioritas") return "#FBBF24";
+    return "#F87171";
+  }
+
+  function scoreColor(score: number | null) {
+    if (score === null) return "#3F3F46";
+    if (score >= 60) return "#4ADE80";
+    if (score >= 40) return "#FBBF24";
+    return "#F87171";
+  }
+
+  const stats = [
+    { value: "6", label: "Layer Intelijen" },
+    { value: "v3.0", label: "Engine Bandarmologi", color: "#4FC3F7" },
+    { value: "IDX", label: "Seluruh Pasar" },
+  ];
+
+  const howItWorks = [
+    {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4FC3F7" strokeWidth="1.5">
+          <path d="M1 3h6M1 8h9M1 13h6M13 8l2-5M13 8l2 5" />
+        </svg>
+      ),
+      title: "Baca Aliran Broker",
+      desc: "Pantau institusi yang sebenarnya bergerak. Bandar, asing, retail — terpisah jelas.",
+    },
+    {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4FC3F7" strokeWidth="1.5">
+          <rect x="1" y="2" width="14" height="3" rx="1" />
+          <rect x="1" y="6.5" width="14" height="3" rx="1" />
+          <rect x="1" y="11" width="14" height="3" rx="1" />
+        </svg>
+      ),
+      title: "Analisis 6 Layer",
+      desc: "Bandarmologi, berita, fundamental, manajemen, valuasi, makro. Satu skor terintegrasi.",
+    },
+    {
+      icon: (
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4FC3F7" strokeWidth="1.5">
+          <circle cx="8" cy="8" r="6" />
+          <path d="M8 8L11 5" />
+          <circle cx="8" cy="8" r="1" fill="#4FC3F7" />
+        </svg>
+      ),
+      title: "Skor Kesiapan Trading",
+      desc: "0–100 dengan tiga keputusan jelas: Watchlist Prioritas, Pantau, atau Hindari.",
+    },
+  ];
+
+  const footerLinks = ["Tentang", "Kebijakan", "Kontak"];
 
   return (
-    <div style={{ background: "#080808" }}>
+    <>
+      {/* CSS Animations */}
+      <style>{`
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .ticker-track { animation: ticker-scroll 60s linear infinite; }
+        .ticker-track:hover { animation-play-state: paused; }
+        @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        @media (max-width: 768px) {
+          .homepage-hero-headline { font-size: 2.2rem !important; }
+          .homepage-grid-3 { grid-template-columns: 1fr !important; }
+          .homepage-stats { flex-direction: column !important; gap: 24px !important; }
+          .homepage-ctas { flex-direction: column !important; align-items: stretch !important; }
+        }
+      `}</style>
 
-      {/* ─── ZONE A: Terminal Header ─── */}
-      <div
-        className="flex items-center justify-between px-6 py-2.5"
-        style={{ background: "#0a0a0a", borderBottom: "1px solid rgba(255,255,255,0.04)" }}
-      >
-        <span style={{ fontFamily: mono, fontWeight: 700, fontSize: 16, color: "#38BDF8" }}>BART</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {session.live && (
-            <span
-              style={{
-                width: 6, height: 6, borderRadius: "50%",
-                background: "#34D399", display: "inline-block",
-                animation: "pulse 2s infinite",
-              }}
-            />
-          )}
-          <span style={{ fontFamily: mono, fontSize: 9, color: "#38BDF8", opacity: 0.7, letterSpacing: "0.1em" }}>
-            {session.live ? "● " : "○ "}{session.label}
-            {" · "}SESI: {today}
-            {" · "}{stockCount} SAHAM
-            {" · "}PIPELINE: AKTIF
-          </span>
-        </div>
-        <Link href="/radar">
-          <input
-            type="text"
-            placeholder="Cari saham..."
-            readOnly
-            className="cursor-pointer rounded-md px-3 py-1.5 text-xs outline-none"
+      <div style={{ background: "#000000", minHeight: "100vh" }}>
+
+        {/* ─── ZONE A: Hero ─── */}
+        <section
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#000000",
+            padding: "0 32px",
+            textAlign: "center",
+            position: "relative",
+          }}
+        >
+          {/* Pre-header */}
+          <p
             style={{
-              fontFamily: mono, background: "#161616",
-              border: "1px solid rgba(255,255,255,0.06)", color: "#6B7280", width: 160,
+              fontFamily: mono,
+              fontSize: 11,
+              letterSpacing: "0.3em",
+              color: "#4FC3F7",
+              textTransform: "uppercase",
+              marginBottom: 32,
             }}
-          />
-        </Link>
-      </div>
+          >
+            <span style={{ animation: "blink 1.2s ease-in-out infinite", display: "inline-block" }}>●</span>
+            {" BART INTELLIGENCE TERMINAL · v3.0"}
+          </p>
 
-      {/* ─── ZONE B: Hero ─── */}
-      <section
-        className="relative min-h-screen flex flex-col overflow-hidden"
-        style={{ background: "#080808" }}
-      >
-        {/* Background: blurred radar preview */}
-        <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 pt-32 overflow-hidden pointer-events-none select-none"
-            style={{ opacity: 0.15, filter: "blur(2px)" }}>
-            {stocks && stocks.length > 0 && (
-              <table className="w-full" style={{ minWidth: 800 }}>
-                <thead>
-                  <tr style={{ background: "#111111" }}>
-                    {["SAHAM", "SEKTOR", "SKOR", "REZIM", "POSISI SIKLUS", "ALIRAN DANA", "AKSI"].map((h) => (
-                      <th key={h} className="text-left px-4 py-2"
-                        style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.1em", color: "#6b7280", fontWeight: 400 }}>
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {stocks.slice(0, 14).map((stock) => (
-                    <tr key={stock.symbol}
-                      style={{ background: "#161616", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                      <td className="px-4 py-2">
-                        <p className="text-sm font-bold text-white" style={{ fontFamily: sora }}>{stock.symbol}</p>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span style={{ fontFamily: mono, fontSize: 10, color: "#6b7280" }}>{stock.sector || "—"}</span>
-                      </td>
-                      <td className="px-4 py-2 text-center">
-                        <span className="text-lg font-bold"
-                          style={{ fontFamily: mono, color: stock.readinessScore >= 60 ? "#34d399" : stock.readinessScore >= 40 ? "#fbbf24" : "#f87171" }}>
-                          {stock.readinessScore}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span style={{ fontFamily: mono, fontSize: 10, color: "#6b7280" }}>{stock.marketRegime}</span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span style={{ fontFamily: mono, fontSize: 10, color: "#9ca3af" }}>—</span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span style={{ fontFamily: mono, fontSize: 10, color: "#6b7280" }}>→ Netral</span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span style={{ fontFamily: mono, fontSize: 10, color: "#38BDF8" }}>ANALISIS →</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          {/* Main headline */}
+          <div
+            className="homepage-hero-headline"
+            style={{
+              fontFamily: inter,
+              fontSize: "clamp(2.8rem, 6vw, 3.75rem)",
+              fontWeight: 600,
+              letterSpacing: "-0.04em",
+              lineHeight: 1.05,
+              marginBottom: 20,
+            }}
+          >
+            <div style={{ color: "#F4F4F5" }}>Baca pasar IDX</div>
+            <div style={{ color: "#4FC3F7" }}>seperti institusi.</div>
           </div>
-          <div className="absolute inset-0"
-            style={{ background: "linear-gradient(to bottom, #080808 0%, #08080840 25%, #08080810 55%, #080808 100%)" }} />
-          <div className="absolute inset-0 pointer-events-none"
-            style={{ background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.012) 2px, rgba(255,255,255,0.012) 3px)" }} />
-        </div>
 
-        {/* Foreground */}
-        <div className="relative z-10 flex flex-col items-center justify-center min-h-screen px-8 text-center">
-          <p style={{ fontFamily: mono, fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: "#38BDF8", opacity: 0.9, marginBottom: 20 }}>
-            BART INTELLIGENCE TERMINAL
+          {/* Subline */}
+          <p
+            style={{
+              fontFamily: inter,
+              fontSize: 16,
+              color: "#71717A",
+              maxWidth: 480,
+              margin: "0 auto",
+              lineHeight: 1.65,
+              marginBottom: 48,
+            }}
+          >
+            Enam layer intelijen. Satu skor kesiapan trading. Khusus untuk pasar IDX.
           </p>
 
-          <h1 style={{ fontFamily: sora, fontWeight: 700, color: "#FFFFFF", lineHeight: 1.12, marginBottom: 16 }}
-            className="text-5xl md:text-6xl">
-            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards" }}>Baca Pasar</div>
-            <div style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "120ms" }}>
-              Seperti Institusi.
-            </div>
-          </h1>
-
-          <p style={{
-            fontFamily: sora, fontSize: 16, color: "#6B7280", maxWidth: 480,
-            lineHeight: 1.65, marginBottom: 32,
-            opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "280ms",
-          }}>
-            Enam layer intelijen. Satu skor kesiapan trading.
-            <br />Khusus untuk pasar IDX.
-          </p>
-
-          <div className="flex gap-4 items-center justify-center"
-            style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "420ms" }}>
-            <Link href="/radar">
-              <button
-                className="font-bold rounded-lg transition-all duration-150 hover:bg-[#7DD3FC] hover:scale-[1.02]"
-                style={{
-                  fontFamily: sora, fontSize: 14, fontWeight: 700,
-                  background: "#38BDF8", color: "#000",
-                  padding: "12px 28px",
-                  boxShadow: "0 8px 20px -4px rgba(56,189,248,0.25)",
-                }}
-                data-testid="button-open-radar"
-              >
-                Buka Radar →
-              </button>
-            </Link>
-            <Link href="/stock/BBCA">
-              <button
-                className="rounded-lg transition-all duration-150"
-                style={{
-                  fontFamily: sora, fontSize: 14,
-                  background: "transparent",
-                  color: "#38BDF8", padding: "12px 24px",
-                  border: "1px solid rgba(56,189,248,0.3)",
-                }}
-                data-testid="link-example-analysis"
-              >
-                Lihat Contoh Saham
-              </button>
-            </Link>
+          {/* CTAs */}
+          <div
+            className="homepage-ctas"
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 12,
+              justifyContent: "center",
+            }}
+          >
+            <button
+              onClick={() => setLocation("/radar")}
+              onMouseEnter={() => setPrimaryHover(true)}
+              onMouseLeave={() => setPrimaryHover(false)}
+              style={{
+                background: primaryHover ? "rgba(79,195,247,0.85)" : "#4FC3F7",
+                color: "#000000",
+                padding: "12px 28px",
+                borderRadius: 8,
+                border: "none",
+                fontFamily: mono,
+                fontSize: 12,
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                cursor: "pointer",
+              }}
+            >
+              Buka Radar →
+            </button>
+            <button
+              onClick={() => setLocation("/stock/BBCA")}
+              onMouseEnter={() => setSecondaryHover(true)}
+              onMouseLeave={() => setSecondaryHover(false)}
+              style={{
+                background: "transparent",
+                color: secondaryHover ? "#F4F4F5" : "#71717A",
+                padding: "12px 24px",
+                border: secondaryHover
+                  ? "1px solid rgba(255,255,255,0.25)"
+                  : "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 8,
+                fontFamily: mono,
+                fontSize: 12,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                cursor: "pointer",
+              }}
+            >
+              Lihat saham contoh
+            </button>
           </div>
 
           {/* Stats strip */}
-          <div className="flex gap-12 justify-center mt-16 items-center"
-            style={{ opacity: 0, animation: "fadeInUp 0.4s ease forwards", animationDelay: "560ms" }}>
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white" style={{ fontFamily: mono }}>6</p>
-              <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#6b7280" }}>Layer Intelijen</p>
-            </div>
-            <div className="w-px h-8 self-center" style={{ background: "rgba(255,255,255,0.06)" }} />
-            <div className="text-center">
-              <p className="text-2xl font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>v3.0</p>
-              <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#6b7280" }}>Engine Bandarmologi</p>
-            </div>
-            <div className="w-px h-8 self-center" style={{ background: "rgba(255,255,255,0.06)" }} />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white" style={{ fontFamily: mono }}>IDX</p>
-              <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#6b7280" }}>Seluruh Pasar</p>
-            </div>
+          <div
+            className="homepage-stats"
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 48,
+              justifyContent: "center",
+              alignItems: "center",
+              marginTop: 64,
+            }}
+          >
+            {stats.map((stat, i) => (
+              <div key={stat.label} style={{ display: "flex", alignItems: "center", gap: 48 }}>
+                <div style={{ textAlign: "center" }}>
+                  <p
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 22,
+                      fontWeight: 700,
+                      color: stat.color ?? "#F4F4F5",
+                      marginBottom: 4,
+                    }}
+                  >
+                    {stat.value}
+                  </p>
+                  <p
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 9,
+                      letterSpacing: "0.15em",
+                      textTransform: "uppercase",
+                      color: "#3F3F46",
+                    }}
+                  >
+                    {stat.label}
+                  </p>
+                </div>
+                {i < stats.length - 1 && (
+                  <div style={{ width: 1, height: 32, background: "rgba(255,255,255,0.06)" }} />
+                )}
+              </div>
+            ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ─── ZONE C: Live Signal Strip ─── */}
-      {stocks && stocks.length > 0 && (
-        <section style={{ background: "#0a0a0a", borderTop: "1px solid rgba(255,255,255,0.03)", padding: "16px 0" }}>
-          <div style={{ overflowX: "auto", paddingBottom: 4 }} className="no-scrollbar">
-            <div style={{ display: "flex", gap: 10, paddingLeft: 24, paddingRight: 24, width: "max-content" }}>
-              {stocks.slice(0, 16).map((stock) => {
+        {/* ─── ZONE B: Live Ticker Strip ─── */}
+        <div
+          style={{
+            background: "#0a0a0a",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            overflow: "hidden",
+            padding: "12px 0",
+          }}
+        >
+          {stocks.length === 0 ? (
+            <p
+              style={{
+                fontFamily: mono,
+                fontSize: 10,
+                color: "#3F3F46",
+                textAlign: "center",
+                padding: "12px 32px",
+              }}
+            >
+              Pipeline saham memuat...
+            </p>
+          ) : (
+            <div
+              className="ticker-track"
+              style={{ display: "flex", gap: 8, width: "max-content" }}
+            >
+              {[...stocks, ...stocks].map((stock, i) => {
                 const cp = parseFloat(stock.changePercent || "0");
-                const decision = bucketToDecision(stock.homepageBucket);
-                const accentColor = decision === "SIAP_DIPANTAU" ? "#34D399" : decision === "WATCHLIST_PRIORITAS" ? "#FBBF24" : "#F87171";
+                const accent = accentColor(stock.homepageBucket);
                 return (
-                  <Link href={`/stock/${stock.symbol}`} key={stock.symbol}>
-                    <div
-                      className="cursor-pointer transition-all duration-150 hover:border-[rgba(255,255,255,0.1)]"
-                      style={{
-                        width: 148, padding: "12px 14px",
-                        background: "#111111", border: "1px solid #1F2937",
-                        borderLeft: `3px solid ${accentColor}`,
-                        borderRadius: 10,
-                      }}
-                    >
-                      <p style={{ fontFamily: sora, fontSize: 13, fontWeight: 700, color: "#FFFFFF", marginBottom: 4 }}>
+                  <div
+                    key={`${stock.symbol}-${i}`}
+                    onClick={() => setLocation(`/stock/${stock.symbol}`)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "6px 14px",
+                      borderRadius: 6,
+                      background: "#131313",
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderLeft: `2px solid ${accent}`,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      minWidth: 130,
+                    }}
+                  >
+                    <div>
+                      <p
+                        style={{
+                          fontFamily: mono,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: "#F4F4F5",
+                          marginBottom: 2,
+                        }}
+                      >
                         {stock.symbol}
                       </p>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{
-                          fontFamily: mono, fontSize: 16, fontWeight: 700,
-                          color: stock.readinessScore >= 60 ? "#34D399" : stock.readinessScore >= 40 ? "#FBBF24" : "#F87171",
-                        }}>
-                          {stock.readinessScore}
-                        </span>
-                        <span style={{
-                          fontFamily: mono, fontSize: 10,
-                          color: cp > 0 ? "#34D399" : cp < 0 ? "#F87171" : "#6B7280",
-                        }}>
-                          {cp > 0 ? `+${cp.toFixed(2)}%` : `${cp.toFixed(2)}%`}
-                        </span>
-                      </div>
-                      <DecisionBadge decision={decision} size="sm" showIcon={false} />
+                      <p
+                        style={{
+                          fontFamily: mono,
+                          fontSize: 10,
+                          color: cp >= 0 ? "#4ADE80" : "#F87171",
+                        }}
+                      >
+                        {cp >= 0 ? `+${cp.toFixed(2)}%` : `${cp.toFixed(2)}%`}
+                      </p>
                     </div>
-                  </Link>
+                    <span
+                      style={{
+                        fontFamily: mono,
+                        fontSize: (stock as any).computeError ? 10 : 18,
+                        fontWeight: 700,
+                        color: scoreColor(stock.readinessScore),
+                        marginLeft: "auto",
+                        textAlign: "right",
+                      }}
+                    >
+                      {(stock as any).computeError ? "—" : stock.readinessScore}
+                    </span>
+                  </div>
                 );
               })}
             </div>
-          </div>
-        </section>
-      )}
+          )}
+        </div>
 
-      {/* ─── ZONE D: How It Works ─── */}
-      <section className="py-16 px-8" style={{ background: "#0a0a0a", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
-        <p style={{ fontFamily: mono, fontSize: 10, letterSpacing: "0.25em", textTransform: "uppercase", color: "#38BDF8", textAlign: "center", marginBottom: 12, opacity: 0.8 }}>
-          CARA KERJA
-        </p>
-        <h2 className="text-center mb-12" style={{ fontFamily: sora, fontSize: 22, fontWeight: 700, color: "#FFFFFF" }}>
-          Dirancang untuk trader yang berpikir seperti institusi.
-        </h2>
+        {/* ─── MACRO REGIME BANNER ─── */}
+        {(() => {
+          const regimeMap: Record<string, { label: string; color: string }> = {
+            CAPITAL_INFLOW:    { label: "KAPITAL MASUK",    color: "#4ADE80" },
+            NEUTRAL:           { label: "NETRAL",           color: "#71717A" },
+            CAPITAL_OUTFLOW:   { label: "KAPITAL KELUAR",   color: "#FBBF24" },
+            CAPITAL_FLIGHT:    { label: "PELARIAN MODAL",   color: "#F87171" },
+            INSUFFICIENT_DATA: { label: "DATA BELUM CUKUP", color: "#3F3F46" },
+          };
+          const regime = macroRegime?.regime ?? "INSUFFICIENT_DATA";
+          const { label, color } = regimeMap[regime] ?? regimeMap.INSUFFICIENT_DATA;
+          const multiplier: number = macroRegime?.multiplier ?? 1.0;
+          const note: string = macroRegime?.note ?? "Memuat data aliran modal...";
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          {[
-            {
-              icon: Activity,
-              title: "Baca Aliran Broker",
-              desc: "12 model deteksi perilaku institusi. Dari akumulasi stealth hingga stabilitas rezim pasar.",
-            },
-            {
-              icon: Radio,
-              title: "Analisis 6 Layer",
-              desc: "Bandarmologi, makro, fundamental, manajemen, valuasi, dan rotasi sektor — diintegrasikan dalam satu skor.",
-            },
-            {
-              icon: ShieldCheck,
-              title: "Satu Skor Kesiapan",
-              desc: "Bukan sinyal beli/jual. Satu angka yang memberi konteks lengkap: kapan, kenapa, dan seberapa siap.",
-            },
-          ].map((f) => {
-            const Icon = f.icon;
-            return (
-              <div
-                key={f.title}
-                className="p-6 rounded-xl transition-all duration-150"
-                style={{ background: "#111111", border: "1px solid #1F2937" }}
-              >
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-5"
-                  style={{ background: "rgba(56,189,248,0.1)" }}>
-                  <Icon style={{ width: 18, height: 18, color: "#38BDF8" }} />
+          return (
+            <div style={{
+              background: "#080808",
+              borderTop: "1px solid rgba(255,255,255,0.04)",
+              borderBottom: `1px solid ${color}22`,
+              padding: "14px 32px",
+            }}>
+              <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", alignItems: "flex-start", gap: 20, flexWrap: "wrap" }}>
+                {/* Badge */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}88` }} />
+                  <span style={{ fontFamily: mono, fontSize: 10, letterSpacing: "0.15em", color, fontWeight: 700 }}>
+                    REZIM MAKRO
+                  </span>
+                  <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, color, marginLeft: 4 }}>
+                    {label}
+                  </span>
+                  {multiplier !== 1.0 && (
+                    <span style={{ fontFamily: mono, fontSize: 9, color: "#52525B", marginLeft: 4 }}>
+                      ×{multiplier.toFixed(2)} bando
+                    </span>
+                  )}
                 </div>
-                <h3 className="mb-2" style={{ fontFamily: sora, fontSize: 15, fontWeight: 600, color: "#FFFFFF" }}>
-                  {f.title}
-                </h3>
-                <p style={{ fontFamily: mono, fontSize: 11, color: "#6B7280", lineHeight: 1.7 }}>
-                  {f.desc}
+
+                {/* Note */}
+                <p style={{ fontFamily: mono, fontSize: 10, color: "#52525B", lineHeight: 1.6, flex: 1, minWidth: 200 }}>
+                  {note}
                 </p>
               </div>
-            );
-          })}
-        </div>
-      </section>
+            </div>
+          );
+        })()}
 
-      {/* ─── Bottom CTA ─── */}
-      <section className="py-10 px-8" style={{ background: "#080808", borderTop: "1px solid rgba(255,255,255,0.03)" }}>
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <div>
-            <p style={{ fontFamily: sora, fontSize: 17, fontWeight: 700, color: "#FFFFFF" }}>
-              Siap memindai pasar?
-            </p>
-            <p style={{ fontFamily: mono, fontSize: 10, color: "#6B7280", marginTop: 4 }}>
-              Data IDX live segera hadir via PT Berkat Digital Investasi
-            </p>
-          </div>
-          <Link href="/radar">
-            <button
-              className="rounded-lg font-bold transition-all duration-150 hover:scale-[1.02]"
+        {/* ─── ZONE C: Status Pasar ─── */}
+        <section style={{ padding: "48px 32px", background: "#000000" }}>
+          <p
+            style={{
+              fontFamily: mono,
+              fontSize: 9,
+              letterSpacing: "0.2em",
+              color: "#3F3F46",
+              textTransform: "uppercase",
+              marginBottom: 24,
+              textAlign: "center",
+            }}
+          >
+            STATUS PASAR SAAT INI
+          </p>
+
+          <div
+            className="homepage-grid-3"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 12,
+              maxWidth: 860,
+              margin: "0 auto",
+            }}
+          >
+            {/* Card 1: Sentimen Pasar */}
+            <div
               style={{
-                fontFamily: sora, fontSize: 14, fontWeight: 700,
-                background: "#38BDF8", color: "#000",
-                padding: "12px 28px",
-                boxShadow: "0 8px 20px -4px rgba(56,189,248,0.2)",
+                background: "#0a0a0a",
+                border: "1px solid rgba(255,255,255,0.05)",
+                borderRadius: 10,
+                padding: "20px 22px",
               }}
-              data-testid="button-bottom-radar"
             >
-              BUKA RADAR →
-            </button>
-          </Link>
-        </div>
-      </section>
-    </div>
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 8,
+                  letterSpacing: "0.15em",
+                  color: "#3F3F46",
+                  textTransform: "uppercase",
+                  marginBottom: 10,
+                }}
+              >
+                SENTIMEN PASAR
+              </p>
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: sentimentValue.color,
+                }}
+              >
+                {sentimentValue.label}
+              </p>
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  color: "#3F3F46",
+                  marginTop: 6,
+                }}
+              >
+                Berdasarkan pipeline berita
+              </p>
+            </div>
+
+            {/* Card 2: Sektor Hari Ini */}
+            <div
+              style={{
+                background: "#0a0a0a",
+                border: "1px solid rgba(255,255,255,0.05)",
+                borderRadius: 10,
+                padding: "20px 22px",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 8,
+                  letterSpacing: "0.15em",
+                  color: "#3F3F46",
+                  textTransform: "uppercase",
+                  marginBottom: 10,
+                }}
+              >
+                SEKTOR AKTIF
+              </p>
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: "#4FC3F7",
+                }}
+              >
+                {topSector ? `${topSector} ↑` : "—"}
+              </p>
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  color: "#3F3F46",
+                  marginTop: 6,
+                }}
+              >
+                Sektor dengan aktivitas tertinggi
+              </p>
+            </div>
+
+            {/* Card 3: Pipeline Berita */}
+            <div
+              style={{
+                background: "#0a0a0a",
+                border: "1px solid rgba(255,255,255,0.05)",
+                borderRadius: 10,
+                padding: "20px 22px",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 8,
+                  letterSpacing: "0.15em",
+                  color: "#3F3F46",
+                  textTransform: "uppercase",
+                  marginBottom: 10,
+                }}
+              >
+                PIPELINE BERITA
+              </p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: "#4ADE80",
+                    boxShadow: "0 0 5px rgba(74,222,128,0.6)",
+                    animation: "blink 1.2s ease-in-out infinite",
+                    flexShrink: 0,
+                  }}
+                />
+                <p
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: "#4ADE80",
+                  }}
+                >
+                  AKTIF
+                </p>
+              </div>
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  color: "#3F3F46",
+                  marginTop: 6,
+                }}
+              >
+                {newsStats.total} artikel · {newsStats.criticalAlerts} kritis
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── ZONE D: How It Works ─── */}
+        <section
+          style={{
+            padding: "64px 32px",
+            background: "#0a0a0a",
+            borderTop: "1px solid rgba(255,255,255,0.04)",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: mono,
+              fontSize: 9,
+              letterSpacing: "0.3em",
+              textTransform: "uppercase",
+              color: "#4FC3F7",
+              textAlign: "center",
+              marginBottom: 12,
+              opacity: 0.8,
+            }}
+          >
+            CARA KERJA
+          </p>
+          <h2
+            style={{
+              fontFamily: inter,
+              fontSize: 22,
+              fontWeight: 600,
+              color: "#F4F4F5",
+              textAlign: "center",
+              marginBottom: 48,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Dirancang untuk trader yang berpikir seperti institusi.
+          </h2>
+
+          <div
+            className="homepage-grid-3"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: 16,
+              maxWidth: 900,
+              margin: "0 auto",
+            }}
+          >
+            {howItWorks.map((card) => (
+              <div
+                key={card.title}
+                style={{
+                  padding: 24,
+                  borderRadius: 8,
+                  background: "#131313",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              >
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    background: "rgba(79,195,247,0.08)",
+                    border: "1px solid rgba(79,195,247,0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 20,
+                  }}
+                >
+                  {card.icon}
+                </div>
+                <h3
+                  style={{
+                    fontFamily: inter,
+                    fontSize: 15,
+                    fontWeight: 600,
+                    color: "#F4F4F5",
+                    marginBottom: 10,
+                  }}
+                >
+                  {card.title}
+                </h3>
+                <p
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 11,
+                    color: "#71717A",
+                    lineHeight: 1.7,
+                  }}
+                >
+                  {card.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ─── ZONE E: Footer ─── */}
+        <footer
+          style={{
+            padding: "32px",
+            background: "#000000",
+            borderTop: "1px solid rgba(255,255,255,0.04)",
+            textAlign: "center",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: mono,
+              fontSize: 10,
+              color: "#3F3F46",
+              letterSpacing: "0.06em",
+              marginBottom: 12,
+            }}
+          >
+            PT Berkat Digital Investasi · BART v3.0 · IDX Indonesia
+          </p>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 24,
+              justifyContent: "center",
+            }}
+          >
+            {footerLinks.map((link, i) => (
+              <span
+                key={link}
+                onClick={() => {}}
+                onMouseEnter={(e) => {
+                  setLinkHover(i);
+                  (e.currentTarget as HTMLElement).style.color = "#71717A";
+                }}
+                onMouseLeave={(e) => {
+                  setLinkHover(null);
+                  (e.currentTarget as HTMLElement).style.color = "#27272A";
+                }}
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  color: linkHover === i ? "#71717A" : "#27272A",
+                  cursor: "pointer",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                {link}
+              </span>
+            ))}
+          </div>
+        </footer>
+
+      </div>
+    </>
   );
 }

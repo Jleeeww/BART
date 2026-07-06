@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { Star } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+
+// --- Interfaces ---
 
 interface SignalData {
   symbol: string;
@@ -43,55 +43,62 @@ interface WatchlistItem {
   addedAt: string | null;
 }
 
-const mono = "'IBM Plex Mono', monospace";
-const sora = "'Sora', sans-serif";
+// --- Design tokens ---
+const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
+const inter = "'Inter', system-ui, sans-serif";
+const S0 = "#000000";
+const S1 = "#0a0a0a";
+const S2 = "#0f0f0f";
+const S3 = "#141414";
+const S4 = "#1a1a1a";
+const B1 = "rgba(255,255,255,0.06)";
+const B2 = "rgba(255,255,255,0.10)";
+const T1 = "#F4F4F5";
+const T2 = "#A1A1AA";
+const T3 = "#71717A";
+const T4 = "#3F3F46";
+const SIGNAL = "#4FC3F7";
+const POSITIVE = "#4ADE80";
+const WARNING = "#FBBF24";
+const DANGER = "#F87171";
 
-function deriveV2(stock: StockData) {
-  const score = stock.readinessScore;
-  let cyclePosition: string | null = null;
-  const regime = stock.marketRegime?.toLowerCase() || "";
-  if (regime.includes("akumulasi") && score >= 80) cyclePosition = "ENTRY_WINDOW";
-  else if (regime.includes("akumulasi") && score >= 60) cyclePosition = "KONFIRMASI_MULAI";
-  else if (regime.includes("akumulasi")) cyclePosition = "TERLALU_DINI";
-  else if (regime.includes("distribusi") || regime.includes("spekulatif")) cyclePosition = "WASPADAI_DISTRIBUSI";
-
-  let flowBias: string | null = null;
-  if (stock.homepageBucket === "siap_dipantau") flowBias = "Akumulasi";
-  else if (stock.homepageBucket === "hindari_dulu") flowBias = "Distribusi";
-  else flowBias = "Netral";
-
-  return { cyclePosition, flowBias };
+function scoreColor(s: number) {
+  return s >= 60 ? "#4ADE80" : s >= 45 ? "#4FC3F7" : s >= 30 ? "#FBBF24" : "#F87171";
 }
 
-function scoreColor(score: number) {
-  if (score >= 80) return "#34d399";
-  if (score >= 60) return "#fbbf24";
-  return "#f87171";
+function bucketAccent(b: string) {
+  return b === "siap_dipantau" ? "#4ADE80" : b === "watchlist_prioritas" ? "#FBBF24" : "#F87171";
 }
 
-function bucketAccent(bucket: string) {
-  if (bucket === "siap_dipantau") return "#34d399";
-  if (bucket === "watchlist_prioritas") return "#fbbf24";
-  return "#f87171";
-}
+// --- Sub-components ---
 
 function StockLogo({ symbol }: { symbol: string }) {
   const [failed, setFailed] = useState(false);
   const src = `https://assets.stockbit.com/logos/companies/${symbol}.png`;
   return (
     <div
-      className="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden"
-      style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 6,
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        background: S4,
+        border: `1px solid ${B1}`,
+      }}
     >
       {failed ? (
-        <span className="text-[10px] font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>
+        <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 700, color: SIGNAL }}>
           {symbol.slice(0, 2)}
         </span>
       ) : (
         <img
           src={src}
           alt={symbol}
-          className="w-6 h-6 object-contain rounded-sm"
+          style={{ width: 24, height: 24, objectFit: "contain", borderRadius: 2 }}
           onError={() => setFailed(true)}
         />
       )}
@@ -99,37 +106,263 @@ function StockLogo({ symbol }: { symbol: string }) {
   );
 }
 
-function CycleLabel({ position }: { position: string | null }) {
-  if (!position) return <span style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}>—</span>;
-  const map: Record<string, { label: string; color: string }> = {
-    ENTRY_WINDOW: { label: "▶ Entry Window", color: "#34d399" },
-    KONFIRMASI_MULAI: { label: "◎ Konfirmasi", color: "#38bdf8" },
-    TERLALU_DINI: { label: "○ Terlalu Dini", color: "#94a3b8" },
-    WASPADAI_DISTRIBUSI: { label: "▼ Waspada Distribusi", color: "#fbbf24" },
-  };
-  const entry = map[position] || { label: position, color: "#6b7280" };
-  return <span className="text-[11px]" style={{ fontFamily: mono, color: entry.color }}>{entry.label}</span>;
-}
-
-function FlowLabel({ bias }: { bias: string | null }) {
-  if (!bias) return <span style={{ fontFamily: mono, fontSize: 11, color: "#6b7280" }}>—</span>;
-  if (bias === "Akumulasi") return <span className="text-[11px]" style={{ fontFamily: mono, color: "#34d399" }}>↑ Akumulasi</span>;
-  if (bias === "Distribusi") return <span className="text-[11px]" style={{ fontFamily: mono, color: "#f87171" }}>↓ Distribusi</span>;
-  return <span className="text-[11px]" style={{ fontFamily: mono, color: "#6b7280" }}>→ Netral</span>;
-}
-
 interface UndoState {
   symbol: string;
   timerId: ReturnType<typeof setTimeout>;
 }
 
+// --- WatchlistCard component ---
+
+function WatchlistCard({
+  item,
+  stock,
+  signal,
+  distWarn,
+  accent,
+  scoreColor: sColor,
+  onRemove,
+  onClick,
+}: {
+  item: WatchlistItem;
+  stock?: StockData;
+  signal?: SignalData;
+  distWarn?: any;
+  accent: string;
+  scoreColor: string;
+  onRemove: () => void;
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const statusColor =
+    signal?.status === "aktif"
+      ? POSITIVE
+      : signal?.status === "diragukan"
+      ? WARNING
+      : signal?.status === "gugur"
+      ? DANGER
+      : T4;
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      data-testid={`watchlist-row-${item.symbol}`}
+      style={{
+        background: hovered ? S3 : S1,
+        border: `1px solid ${hovered ? B2 : B1}`,
+        borderTop: `2px solid ${accent}`,
+        borderRadius: 10,
+        padding: "14px 16px",
+        cursor: "pointer",
+        transition: "all 0.15s",
+        position: "relative",
+      }}
+    >
+      {/* Remove button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        data-testid={`watchlist-star-${item.symbol}`}
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          width: 22,
+          height: 22,
+          borderRadius: 3,
+          cursor: "pointer",
+          background: "transparent",
+          border: `1px solid ${B1}`,
+          color: T4,
+          fontSize: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.12s",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color = DANGER;
+          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(248,113,113,0.3)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.color = T4;
+          (e.currentTarget as HTMLButtonElement).style.borderColor = B1;
+        }}
+      >
+        ×
+      </button>
+
+      {/* Symbol + name */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, paddingRight: 28 }}>
+        <StockLogo symbol={item.symbol} />
+        <div style={{ minWidth: 0 }}>
+          <p
+            style={{
+              fontFamily: mono,
+              fontSize: 13,
+              fontWeight: 700,
+              color: T1,
+              marginBottom: 1,
+            }}
+          >
+            {item.symbol}
+          </p>
+          <p
+            style={{
+              fontFamily: inter,
+              fontSize: 10,
+              color: T3,
+              maxWidth: 140,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {stock?.name ?? "—"}
+          </p>
+        </div>
+      </div>
+
+      {/* Score + status row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        {stock ? (
+          <>
+            <span
+              style={{
+                fontFamily: mono,
+                fontSize: 26,
+                fontWeight: 700,
+                color: sColor,
+                lineHeight: 1,
+              }}
+            >
+              {stock.readinessScore}
+            </span>
+            <div style={{ flex: 1 }}>
+              <div
+                style={{
+                  height: 2,
+                  background: "rgba(255,255,255,0.06)",
+                  borderRadius: 9999,
+                  marginBottom: 6,
+                }}
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${stock.readinessScore}%`,
+                    background: sColor,
+                    borderRadius: 9999,
+                  }}
+                />
+              </div>
+              {signal?.status && (
+                <span
+                  data-testid={`signal-status-${item.symbol}`}
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 7,
+                    letterSpacing: "0.1em",
+                    fontWeight: 700,
+                    color: statusColor,
+                  }}
+                >
+                  {signal.status.toUpperCase()}
+                </span>
+              )}
+            </div>
+          </>
+        ) : (
+          <span style={{ fontFamily: mono, fontSize: 10, color: T4 }}>[ DATA TIDAK TERSEDIA ]</span>
+        )}
+      </div>
+
+      {/* Price change + sector */}
+      {stock && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontFamily: mono, fontSize: 10, color: T4 }}>{stock.sector ?? "—"}</span>
+          <span
+            style={{
+              fontFamily: mono,
+              fontSize: 10,
+              color:
+                parseFloat(stock.changePercent) > 0
+                  ? POSITIVE
+                  : parseFloat(stock.changePercent) < 0
+                  ? DANGER
+                  : T3,
+            }}
+          >
+            {parseFloat(stock.changePercent) > 0
+              ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
+              : parseFloat(stock.changePercent) < 0
+              ? `▼ ${parseFloat(stock.changePercent).toFixed(2)}%`
+              : "—"}
+          </span>
+        </div>
+      )}
+
+      {/* Distribution warning */}
+      {distWarn && distWarn.alertLevel !== "AMAN" && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: "4px 8px",
+            borderRadius: 4,
+            background: "rgba(248,113,113,0.08)",
+            border: "1px solid rgba(248,113,113,0.2)",
+          }}
+        >
+          <p
+            data-testid={`badge-distwarn-${item.symbol}`}
+            style={{
+              fontFamily: mono,
+              fontSize: 8,
+              color: DANGER,
+              letterSpacing: "0.06em",
+            }}
+          >
+            ⚠{" "}
+            {distWarn.alertLevel === "BAHAYA_DISTRIBUSI"
+              ? "BAHAYA DISTRIBUSI"
+              : distWarn.alertLevel === "WASPADA_DISTRIBUSI"
+              ? "WASPADA DISTRIBUSI"
+              : "PANTAU DISTRIBUSI"}
+          </p>
+        </div>
+      )}
+
+      {/* Detail button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          window.location.href = `/stock/${item.symbol}`;
+        }}
+        data-testid={`watchlist-detail-${item.symbol}`}
+        style={{
+          display: "none",
+        }}
+      >
+        ANALISIS
+      </button>
+    </div>
+  );
+}
+
+// --- Main page ---
+
 export default function WatchlistPage() {
+  const [removedSymbols, setRemovedSymbols] = useState<Set<string>>(new Set());
   const [undoToast, setUndoToast] = useState<UndoState | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
-  const [removedSymbols, setRemovedSymbols] = useState<Set<string>>(new Set());
-  const [refreshingSignals, setRefreshingSignals] = useState(false);
   const [distWarnings, setDistWarnings] = useState<Record<string, any>>({});
+  const [refreshingSignals, setRefreshingSignals] = useState(false);
+  const [sortMode, setSortMode] = useState<"skor" | "status" | "nama">("skor");
 
+  // --- Data fetching ---
   const { data: watchlistItems } = useQuery<WatchlistItem[]>({
     queryKey: ["/api/watchlist"],
   });
@@ -138,27 +371,36 @@ export default function WatchlistPage() {
     queryKey: ["/api/stocks"],
   });
 
-  const { data: signalsData } = useQuery<SignalsResponse>({
+  const { data: signalData } = useQuery<SignalsResponse>({
     queryKey: ["/api/signals"],
   });
 
-  const signals = useMemo(() => {
-    const map: Record<string, SignalData> = {};
-    (signalsData?.signals ?? []).forEach((s: SignalData) => {
+  // --- Derived maps ---
+  const stocksMap = useMemo(() => {
+    const map: Record<string, StockData> = {};
+    (allStocks ?? []).forEach((s) => {
       map[s.symbol] = s;
     });
     return map;
-  }, [signalsData]);
+  }, [allStocks]);
 
-  const watchlistMap = useMemo(() => {
-    const m = new Map<string, WatchlistItem>();
-    watchlistItems?.forEach((w) => m.set(w.symbol, w));
-    return m;
-  }, [watchlistItems]);
+  const signalsMap = useMemo(() => {
+    const map: Record<string, SignalData> = {};
+    (signalData?.signals ?? []).forEach((s: SignalData) => {
+      map[s.symbol] = s;
+    });
+    return map;
+  }, [signalData]);
 
+  const signalSummary = signalData ?? null;
+
+  // --- Distribution warnings ---
   useEffect(() => {
-    const symbols = (watchlistItems ?? []).map(w => w.symbol);
-    if (!symbols.length) { setDistWarnings({}); return; }
+    const symbols = (watchlistItems ?? []).map((w) => w.symbol);
+    if (!symbols.length) {
+      setDistWarnings({});
+      return;
+    }
     let cancelled = false;
     const fetchWarnings = async () => {
       const results: Record<string, any> = {};
@@ -168,48 +410,46 @@ export default function WatchlistPage() {
             const r = await fetch(`/api/distribution/${sym}`);
             if (!r.ok) return;
             const d = await r.json();
-            if (d && d.alertLevel && d.alertLevel !== 'AMAN') results[sym] = d;
+            if (d && d.alertLevel && d.alertLevel !== "AMAN") results[sym] = d;
           } catch {}
         })
       );
       if (!cancelled) setDistWarnings(results);
     };
     fetchWarnings();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [watchlistItems]);
 
-  const watchlistedStocks = useMemo(() => {
-    if (!allStocks || !watchlistItems) return [];
-    const symbols = new Set(watchlistItems.map((w) => w.symbol));
-    for (const sym of removedSymbols) symbols.delete(sym);
-    return allStocks.filter((s) => symbols.has(s.symbol));
-  }, [allStocks, watchlistItems, removedSymbols]);
-
-  const counts = useMemo(() => ({
-    akumulasi: watchlistedStocks.filter((s) => s.homepageBucket === "siap_dipantau").length,
-    distribusi: watchlistedStocks.filter((s) => s.homepageBucket === "hindari_dulu").length,
-  }), [watchlistedStocks]);
-
-  const removeFromWatchlist = useCallback(async (symbol: string) => {
-    if (undoToast) {
-      clearTimeout(undoToast.timerId);
-      setUndoToast(null);
-      setToastVisible(false);
-    }
-    setRemovedSymbols((prev) => new Set(prev).add(symbol));
-    const timerId = setTimeout(() => {
-      setToastVisible(false);
-      setTimeout(() => setUndoToast(null), 200);
-    }, 3000);
-    setUndoToast({ symbol, timerId });
-    requestAnimationFrame(() => setToastVisible(true));
-    try {
-      await apiRequest("DELETE", `/api/watchlist/${symbol}`);
-      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
-    } catch {
-      setRemovedSymbols((prev) => { const next = new Set(prev); next.delete(symbol); return next; });
-    }
-  }, [undoToast]);
+  // --- Watchlist actions ---
+  const removeFromWatchlist = useCallback(
+    async (symbol: string) => {
+      if (undoToast) {
+        clearTimeout(undoToast.timerId);
+        setUndoToast(null);
+        setToastVisible(false);
+      }
+      setRemovedSymbols((prev) => new Set(prev).add(symbol));
+      const timerId = setTimeout(() => {
+        setToastVisible(false);
+        setTimeout(() => setUndoToast(null), 200);
+      }, 3000);
+      setUndoToast({ symbol, timerId });
+      requestAnimationFrame(() => setToastVisible(true));
+      try {
+        await apiRequest("DELETE", `/api/watchlist/${symbol}`);
+        queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      } catch {
+        setRemovedSymbols((prev) => {
+          const next = new Set(prev);
+          next.delete(symbol);
+          return next;
+        });
+      }
+    },
+    [undoToast]
+  );
 
   const undoRemove = useCallback(async () => {
     if (!undoToast) return;
@@ -217,7 +457,11 @@ export default function WatchlistPage() {
     const symbol = undoToast.symbol;
     setToastVisible(false);
     setTimeout(() => setUndoToast(null), 200);
-    setRemovedSymbols((prev) => { const next = new Set(prev); next.delete(symbol); return next; });
+    setRemovedSymbols((prev) => {
+      const next = new Set(prev);
+      next.delete(symbol);
+      return next;
+    });
     try {
       await apiRequest("POST", `/api/watchlist/${symbol}`);
       queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
@@ -227,322 +471,544 @@ export default function WatchlistPage() {
   }, [undoToast]);
 
   useEffect(() => {
-    return () => { if (undoToast) clearTimeout(undoToast.timerId); };
+    return () => {
+      if (undoToast) clearTimeout(undoToast.timerId);
+    };
   }, [undoToast]);
 
+  // --- Derived watchlist state ---
+  const visibleItems = useMemo(() => {
+    return (watchlistItems ?? []).filter((item) => !removedSymbols.has(item.symbol));
+  }, [watchlistItems, removedSymbols]);
+
+  const watchlistedStocks = useMemo(() => {
+    return visibleItems.map((item) => stocksMap[item.symbol]).filter(Boolean) as StockData[];
+  }, [visibleItems, stocksMap]);
+
+  const sortedWatchlistItems = useMemo(() => {
+    if (!watchlistItems) return [];
+    const visible = watchlistItems.filter((i) => !removedSymbols.has(i.symbol));
+    return [...visible].sort((a, b) => {
+      if (sortMode === "skor") {
+        return (stocksMap[b.symbol]?.readinessScore ?? 0) - (stocksMap[a.symbol]?.readinessScore ?? 0);
+      }
+      if (sortMode === "status") {
+        const order: Record<string, number> = { aktif: 0, diragukan: 1, gugur: 2 };
+        const sa = signalsMap[a.symbol]?.status ?? "z";
+        const sb = signalsMap[b.symbol]?.status ?? "z";
+        return (order[sa] ?? 3) - (order[sb] ?? 3);
+      }
+      return a.symbol.localeCompare(b.symbol);
+    });
+  }, [watchlistItems, removedSymbols, sortMode, stocksMap, signalsMap]);
+
+  // --- Alert feed items ---
+  const alertItems = useMemo(() => {
+    const items: {
+      symbol: string;
+      message: string;
+      color: string;
+      time: string;
+      severity?: string;
+    }[] = [];
+    if (!watchlistItems) return items;
+    watchlistItems
+      .filter((i) => !removedSymbols.has(i.symbol))
+      .forEach((item) => {
+        const signal = signalsMap[item.symbol];
+        const distWarn = distWarnings[item.symbol];
+        if (signal?.status === "diragukan") {
+          items.push({
+            symbol: item.symbol,
+            message: signal.statusReason ?? "Skor berubah signifikan",
+            color: WARNING,
+            time: "Sesi ini",
+            severity: "DIRAGUKAN",
+          });
+        }
+        if (signal?.status === "gugur") {
+          items.push({
+            symbol: item.symbol,
+            message: signal.statusReason ?? "Sinyal gugur",
+            color: DANGER,
+            time: "Sesi ini",
+            severity: "GUGUR",
+          });
+        }
+        if (distWarn && distWarn.alertLevel !== "AMAN") {
+          items.push({
+            symbol: item.symbol,
+            message: distWarn.recommendation ?? "Tanda distribusi terdeteksi",
+            color:
+              distWarn.alertLevel === "BAHAYA_DISTRIBUSI" ? DANGER : WARNING,
+            time: "Saat ini",
+            severity: distWarn.alertLevel,
+          });
+        }
+        if (signal?.scoreDrift != null && Math.abs(signal.scoreDrift) >= 3) {
+          items.push({
+            symbol: item.symbol,
+            message: `Skor ${signal.scoreDrift > 0 ? "naik" : "turun"} ${Math.abs(signal.scoreDrift)} poin`,
+            color: signal.scoreDrift > 0 ? POSITIVE : DANGER,
+            time: "3 sesi",
+            severity: undefined,
+          });
+        }
+      });
+    return items;
+  }, [watchlistItems, removedSymbols, signalsMap, distWarnings]);
+
+  // --- Render ---
   return (
-    <div className="px-6 py-6 min-h-screen" style={{ background: "#0f0f0f" }}>
-      {/* SECTION A — Header */}
-      <div className="mb-5">
-        <p className="text-[10px] tracking-[0.25em] uppercase mb-1.5" style={{ fontFamily: mono, color: "#38BDF8" }}>
-          WATCHLIST ANDA
-        </p>
-        <h1 className="text-2xl font-bold text-white" style={{ fontFamily: sora }}>
-          Saham Pantauan
-        </h1>
-        <p className="text-sm mt-1" style={{ fontFamily: mono, color: "#6b7280" }}>
-          Kampanye akumulasi yang sedang Anda ikuti
-        </p>
-      </div>
+    <div style={{ minHeight: "100vh", background: S0 }}>
+      {/* TOP HEADER */}
+      <div style={{ padding: "20px 32px 0", borderBottom: `1px solid ${B1}` }}>
+        <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", marginBottom: 16 }}>
+            <div>
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  letterSpacing: "0.2em",
+                  color: T4,
+                  textTransform: "uppercase",
+                  marginBottom: 4,
+                }}
+              >
+                PUSAT KOMANDO PERSONAL
+              </p>
+              <h1
+                style={{
+                  fontFamily: inter,
+                  fontSize: 20,
+                  fontWeight: 600,
+                  color: T1,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                Watchlist
+              </h1>
+            </div>
 
-      {/* Alert bar for diragukan / gugur signals */}
-      {(() => {
-        const diragukan = Object.values(signals).filter(s => s.status === 'DIRAGUKAN').length;
-        const gugur = Object.values(signals).filter(s => s.status === 'GUGUR').length;
-        if (diragukan === 0 && gugur === 0) return null;
-        return (
-          <div
-            className="px-4 py-2 mb-3 rounded-sm flex items-center gap-3"
-            style={{ background: "#1a1100", border: "1px solid rgba(245,158,11,0.2)" }}
-            data-testid="signal-warning-bar"
-          >
-            <span style={{ fontFamily: mono, fontSize: 10, color: "rgba(251,191,36,0.8)" }}>
-              ⚠{" "}
-              {diragukan > 0 ? `${diragukan} sinyal diragukan` : ""}
-              {diragukan > 0 && gugur > 0 ? " · " : ""}
-              {gugur > 0 ? `${gugur} sinyal gugur` : ""}
-            </span>
-            <span
-              className="ml-auto cursor-pointer hover:underline"
-              style={{ fontFamily: mono, fontSize: 10, color: "#38BDF8" }}
-              data-testid="button-refresh-signals"
-              onClick={async () => {
-                if (refreshingSignals) return;
-                setRefreshingSignals(true);
-                try {
-                  const symbols = watchlistedStocks.map(s => s.symbol);
-                  await Promise.all(symbols.map(sym =>
-                    apiRequest("POST", `/api/signals/${sym}/update`).catch(() => {})
-                  ));
-                  queryClient.invalidateQueries({ queryKey: ["/api/signals"] });
-                } catch {}
-                setRefreshingSignals(false);
-              }}
+            {/* Stats chips — right side */}
+            <div
+              style={{ marginLeft: "auto", display: "flex", gap: 2 }}
+              data-testid="watchlist-stats-bar"
             >
-              {refreshingSignals ? "Memperbarui..." : "Perbarui"}
-            </span>
-          </div>
-        );
-      })()}
-
-      {/* Stats bar */}
-      <div
-        className="flex items-center justify-between px-4 py-3 mb-4 rounded-md"
-        style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-        data-testid="watchlist-stats-bar"
-      >
-        <span className="text-sm font-bold text-white" style={{ fontFamily: mono }}>
-          {watchlistedStocks.length} saham dipantau
-        </span>
-        <div className="flex gap-4">
-          <span className="text-xs" style={{ fontFamily: mono, color: "#34d399" }}>
-            {counts.akumulasi} Akumulasi
-          </span>
-          <span className="text-xs" style={{ fontFamily: mono, color: "#f87171" }}>
-            {counts.distribusi} Distribusi
-          </span>
-        </div>
-      </div>
-
-      {watchlistedStocks.length === 0 ? (
-        <div className="py-20 text-center" data-testid="watchlist-empty-state">
-          <p
-            className="text-sm mb-3"
-            style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)", letterSpacing: "0.15em" }}
-          >
-            [ WATCHLIST KOSONG ]
-          </p>
-          <p className="text-xs mb-6" style={{ fontFamily: mono, color: "#6b7280" }}>
-            Tambahkan saham dari Radar untuk mulai memantau
-          </p>
-          <Link href="/radar">
-            <button
-              className="px-4 py-2 rounded-sm transition-all text-[10px]"
-              style={{
-                fontFamily: mono,
-                background: "rgba(56,189,248,0.1)",
-                color: "#38BDF8",
-                border: "1px solid rgba(56,189,248,0.2)",
-              }}
-              data-testid="button-go-to-radar"
-            >
-              Buka Radar →
-            </button>
-          </Link>
-        </div>
-      ) : (
-        <div className="w-full overflow-x-auto">
-          <table className="w-full min-w-[960px]">
-            <thead>
-              <tr style={{ background: "#0d0d0d", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                {["SAHAM", "SEKTOR", "HARGA", "SKOR", "SIKLUS", "ALIRAN", "STATUS", "AKSI"].map((h) => (
-                  <th
-                    key={h}
-                    className="text-left px-4 py-3"
+              {[
+                {
+                  label: "Total",
+                  value: (watchlistItems?.length ?? 0) - removedSymbols.size,
+                  color: T1,
+                },
+                { label: "Aktif", value: signalSummary?.aktif ?? 0, color: POSITIVE },
+                { label: "Diragukan", value: signalSummary?.diragukan ?? 0, color: WARNING },
+                { label: "Gugur", value: signalSummary?.gugur ?? 0, color: DANGER },
+              ].map((stat, i) => (
+                <div
+                  key={stat.label}
+                  style={{
+                    background: S1,
+                    border: `1px solid ${B1}`,
+                    borderLeft: i > 0 ? "none" : undefined,
+                    borderRadius:
+                      i === 0 ? "8px 0 0 8px" : i === 3 ? "0 8px 8px 0" : 0,
+                    padding: "8px 16px",
+                    textAlign: "center",
+                    minWidth: 72,
+                  }}
+                >
+                  <p
                     style={{
                       fontFamily: mono,
-                      fontSize: 9,
-                      letterSpacing: "0.12em",
-                      color: "#6B7280",
-                      textTransform: "uppercase",
-                      fontWeight: 400,
-                      background: "#0d0d0d",
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: stat.color,
+                      lineHeight: 1,
+                      marginBottom: 2,
                     }}
                   >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {watchlistedStocks.map((stock) => {
-                const v2 = deriveV2(stock);
-                const accent = bucketAccent(stock.homepageBucket);
-                return (
-                  <tr
-                    key={stock.symbol}
-                    className="transition-colors duration-100 hover:bg-[#1a1a1a]"
+                    {stat.value}
+                  </p>
+                  <p
                     style={{
-                      background: "#161616",
-                      borderBottom: "1px solid rgba(255,255,255,0.03)",
-                      borderLeft: `2px solid ${accent}`,
+                      fontFamily: mono,
+                      fontSize: 8,
+                      letterSpacing: "0.1em",
+                      color: T4,
+                      textTransform: "uppercase",
                     }}
-                    data-testid={`watchlist-row-${stock.symbol}`}
                   >
-                    {/* SAHAM */}
-                    <td className="px-4 py-3 w-48">
-                      <div className="flex items-center gap-3 py-1">
-                        <StockLogo symbol={stock.symbol} />
-                        <div className="flex flex-col gap-0.5">
-                          <p className="text-base font-bold text-white" style={{ fontFamily: sora }}>
-                            {stock.symbol}
-                          </p>
-                          <p className="text-[11px] truncate" style={{ fontFamily: mono, color: "#6b7280", maxWidth: 160 }}>
-                            {stock.name}
-                          </p>
-                          {distWarnings[stock.symbol] && (
-                            <span
-                              className={`inline-block font-mono text-[8px] px-1.5 py-0.5 rounded-sm border mt-0.5 w-fit ${
-                                distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI'
-                                  ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                                  : distWarnings[stock.symbol].alertLevel === 'WASPADA_DISTRIBUSI'
-                                  ? 'bg-orange-500/10 text-orange-400 border-orange-500/20'
-                                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                              }`}
-                              data-testid={`badge-distwarn-${stock.symbol}`}
-                            >
-                              {distWarnings[stock.symbol].alertLevel === 'BAHAYA_DISTRIBUSI' && '⚠ BAHAYA DISTRIBUSI'}
-                              {distWarnings[stock.symbol].alertLevel === 'WASPADA_DISTRIBUSI' && '⚠ WASPADA DISTRIBUSI'}
-                              {distWarnings[stock.symbol].alertLevel === 'PANTAU_DISTRIBUSI' && '· PANTAU DISTRIBUSI'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
+                    {stat.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
 
-                    {/* SEKTOR */}
-                    <td className="px-4 py-3 w-28">
-                      <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
-                        {stock.sector || "—"}
-                      </span>
-                    </td>
-
-                    {/* HARGA */}
-                    <td className="px-4 py-3 w-28">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-sm font-medium text-white" style={{ fontFamily: mono }}>
-                          Rp {parseFloat(String(stock.price).replace(/[^0-9.-]/g, "") || "0").toLocaleString("id-ID")}
-                        </span>
-                        <span
-                          className={`text-xs font-medium ${
-                            parseFloat(stock.changePercent) > 0
-                              ? "text-emerald-400"
-                              : parseFloat(stock.changePercent) < 0
-                                ? "text-red-400"
-                                : "text-[#6b7280]"
-                          }`}
-                          style={{ fontFamily: mono }}
-                        >
-                          {parseFloat(stock.changePercent) > 0
-                            ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
-                            : parseFloat(stock.changePercent) < 0
-                              ? `▼ ${parseFloat(stock.changePercent).toFixed(2)}%`
-                              : `— 0.00%`}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* SKOR */}
-                    <td className="px-4 py-3 w-20">
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-lg font-bold" style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}>
-                          {stock.readinessScore}
-                        </span>
-                        <div style={{ height: 3, width: 48, background: "rgba(255,255,255,0.06)", borderRadius: 9999 }}>
-                          <div style={{
-                            height: "100%",
-                            width: `${stock.readinessScore}%`,
-                            background: scoreColor(stock.readinessScore),
-                            borderRadius: 9999,
-                          }} />
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* SIKLUS */}
-                    <td className="px-4 py-3 w-40">
-                      <CycleLabel position={v2.cyclePosition} />
-                    </td>
-
-                    {/* ALIRAN */}
-                    <td className="px-4 py-3 w-28">
-                      <FlowLabel bias={v2.flowBias} />
-                    </td>
-
-                    {/* STATUS */}
-                    <td className="px-4 py-3 w-32" data-testid={`signal-status-${stock.symbol}`}>
-                      {(() => {
-                        const signal = signals[stock.symbol];
-                        const status = signal?.status ?? 'AKTIF';
-                        const drift = signal?.scoreDrift;
-                        const badgeMap: Record<string, { label: string; bg: string; text: string; border: string }> = {
-                          AKTIF:     { label: '● AKTIF',     bg: 'rgba(16,185,129,0.1)', text: '#34d399', border: 'rgba(16,185,129,0.3)' },
-                          DIRAGUKAN: { label: '⚠ DIRAGUKAN', bg: 'rgba(245,158,11,0.1)', text: '#fbbf24', border: 'rgba(245,158,11,0.3)' },
-                          GUGUR:     { label: '✕ GUGUR',     bg: 'rgba(239,68,68,0.1)',  text: '#f87171', border: 'rgba(239,68,68,0.3)' },
-                        };
-                        const badge = badgeMap[status] || badgeMap.AKTIF;
-                        return (
-                          <div title={signal?.statusReason ?? ''}>
-                            <span
-                              className="inline-block px-2 py-0.5 rounded-sm"
-                              style={{ fontFamily: mono, fontSize: 9, color: badge.text, background: badge.bg, border: `1px solid ${badge.border}` }}
-                            >
-                              {badge.label}
-                            </span>
-                            {drift !== null && drift !== undefined && status !== 'AKTIF' && (
-                              <div style={{ fontFamily: mono, fontSize: 9, color: '#6b7280', marginTop: 2 }}>
-                                {drift > 0 ? `▲ +${drift}` : `▼ ${drift} poin`}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })()}
-                    </td>
-
-                    {/* AKSI */}
-                    <td className="px-4 py-3 w-32 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => removeFromWatchlist(stock.symbol)}
-                          className="p-1.5 rounded-sm border transition-all duration-150 border-amber-500/40 bg-amber-500/10 hover:border-amber-500/60 hover:bg-amber-500/20"
-                          data-testid={`watchlist-star-${stock.symbol}`}
-                        >
-                          <Star size={14} className="fill-amber-400 text-amber-400" />
-                        </button>
-                        <Link href={`/stock/${stock.symbol}`}>
-                          <button
-                            className="text-[10px] px-3 py-1.5 rounded-sm transition-all"
-                            style={{
-                              fontFamily: mono,
-                              background: "rgba(56,189,248,0.1)",
-                              color: "#38BDF8",
-                              border: "1px solid rgba(56,189,248,0.2)",
-                            }}
-                            data-testid={`watchlist-detail-${stock.symbol}`}
-                          >
-                            ANALISIS →
-                          </button>
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {/* Signal warning bar — kept for data-testid compat */}
+          {((signalSummary?.diragukan ?? 0) + (signalSummary?.gugur ?? 0)) > 0 && (
+            <div
+              style={{
+                background: "rgba(251,191,36,0.05)",
+                border: "1px solid rgba(251,191,36,0.15)",
+                borderRadius: "6px 6px 0 0",
+                padding: "8px 14px",
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+              data-testid="signal-warning-bar"
+            >
+              <span style={{ fontFamily: mono, fontSize: 9, color: WARNING, letterSpacing: "0.1em" }}>
+                ⚠ PERHATIAN
+              </span>
+              <span style={{ fontFamily: inter, fontSize: 11, color: T2 }}>
+                {signalSummary?.diragukan ?? 0} saham diragukan dan {signalSummary?.gugur ?? 0} gugur — tinjau segera.
+              </span>
+              <span
+                style={{
+                  marginLeft: "auto",
+                  fontFamily: mono,
+                  fontSize: 10,
+                  color: SIGNAL,
+                  cursor: "pointer",
+                }}
+                data-testid="button-refresh-signals"
+                onClick={async () => {
+                  if (refreshingSignals) return;
+                  setRefreshingSignals(true);
+                  try {
+                    const symbols = watchlistedStocks.map((s) => s.symbol);
+                    await Promise.all(
+                      symbols.map((sym) =>
+                        apiRequest("POST", `/api/signals/${sym}/update`).catch(() => {})
+                      )
+                    );
+                    queryClient.invalidateQueries({ queryKey: ["/api/signals"] });
+                  } catch {}
+                  setRefreshingSignals(false);
+                }}
+              >
+                {refreshingSignals ? "Memperbarui..." : "Perbarui"}
+              </span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
+      {/* MAIN BODY — two columns */}
+      <div
+        style={{
+          display: "flex",
+          maxWidth: 1400,
+          margin: "0 auto",
+          padding: "20px 32px 80px",
+          gap: 20,
+        }}
+      >
+        {/* LEFT: Alert Feed (28%) */}
+        <div style={{ width: "28%", flexShrink: 0 }}>
+          <div
+            style={{
+              background: S1,
+              border: `1px solid ${B1}`,
+              borderRadius: 10,
+              overflow: "hidden",
+              position: "sticky",
+              top: 20,
+              maxHeight: "calc(100vh - 140px)",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                padding: "14px 16px",
+                borderBottom: `1px solid ${B1}`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  letterSpacing: "0.16em",
+                  color: T4,
+                  textTransform: "uppercase",
+                }}
+              >
+                UMPAN SINYAL
+              </p>
+              <button
+                onClick={async () => {
+                  if (refreshingSignals) return;
+                  setRefreshingSignals(true);
+                  try {
+                    const symbols = watchlistedStocks.map((s) => s.symbol);
+                    await Promise.all(
+                      symbols.map((sym) =>
+                        apiRequest("POST", `/api/signals/${sym}/update`).catch(() => {})
+                      )
+                    );
+                    queryClient.invalidateQueries({ queryKey: ["/api/signals"] });
+                  } catch {}
+                  setRefreshingSignals(false);
+                }}
+                style={{
+                  fontFamily: mono,
+                  fontSize: 8,
+                  color: refreshingSignals ? T4 : T3,
+                  cursor: "pointer",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  letterSpacing: "0.08em",
+                }}
+              >
+                {refreshingSignals ? "..." : "↻ PERBARUI"}
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+              {alertItems.length === 0 ? (
+                <div style={{ padding: "32px 16px", textAlign: "center" }}>
+                  <p style={{ fontFamily: mono, fontSize: 9, color: T4 }}>
+                    [ TIDAK ADA SINYAL AKTIF ]
+                  </p>
+                </div>
+              ) : (
+                alertItems.map((alert, i) => (
+                  <div
+                    key={i}
+                    onClick={() => (window.location.href = `/stock/${alert.symbol}`)}
+                    style={{
+                      padding: "10px 16px",
+                      borderBottom: "1px solid rgba(255,255,255,0.03)",
+                      cursor: "pointer",
+                      transition: "background 0.1s",
+                      borderLeft: `3px solid ${alert.color}`,
+                    }}
+                    onMouseEnter={(e) =>
+                      ((e.currentTarget as HTMLDivElement).style.background = S3)
+                    }
+                    onMouseLeave={(e) =>
+                      ((e.currentTarget as HTMLDivElement).style.background = "transparent")
+                    }
+                  >
+                    <div
+                      style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}
+                    >
+                      <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: T1 }}>
+                        {alert.symbol}
+                      </span>
+                      <span style={{ fontFamily: mono, fontSize: 8, color: T4 }}>{alert.time}</span>
+                    </div>
+                    <p style={{ fontFamily: inter, fontSize: 11, color: T3, lineHeight: 1.4 }}>
+                      {alert.message}
+                    </p>
+                    {alert.severity && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          marginTop: 4,
+                          fontFamily: mono,
+                          fontSize: 7,
+                          letterSpacing: "0.08em",
+                          padding: "2px 5px",
+                          borderRadius: 3,
+                          color: alert.color,
+                          background: `${alert.color}12`,
+                          border: `1px solid ${alert.color}30`,
+                        }}
+                      >
+                        {alert.severity}
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: Card Grid (72%) */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Empty state */}
+          {(!watchlistItems ||
+            watchlistItems.filter((i) => !removedSymbols.has(i.symbol)).length === 0) ? (
+            <div
+              style={{
+                background: S1,
+                border: `1px solid ${B1}`,
+                borderRadius: 10,
+                padding: "80px 40px",
+                textAlign: "center",
+              }}
+              data-testid="watchlist-empty-state"
+            >
+              <p
+                style={{
+                  fontFamily: mono,
+                  fontSize: 10,
+                  letterSpacing: "0.15em",
+                  color: T4,
+                  marginBottom: 10,
+                }}
+              >
+                [ WATCHLIST KOSONG ]
+              </p>
+              <p
+                style={{
+                  fontFamily: inter,
+                  fontSize: 13,
+                  color: T4,
+                  marginBottom: 20,
+                }}
+              >
+                Tambahkan saham dari Radar untuk mulai memantau portofolio intelijen.
+              </p>
+              <button
+                onClick={() => (window.location.href = "/radar")}
+                data-testid="button-go-to-radar"
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  letterSpacing: "0.1em",
+                  padding: "10px 22px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  background: "rgba(79,195,247,0.1)",
+                  border: "1px solid rgba(79,195,247,0.3)",
+                  color: SIGNAL,
+                }}
+              >
+                BUKA RADAR →
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Sort controls */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  marginBottom: 14,
+                  alignItems: "center",
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: mono,
+                    fontSize: 8,
+                    color: T4,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  URUT:
+                </span>
+                {(["skor", "status", "nama"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSortMode(s)}
+                    style={{
+                      fontFamily: mono,
+                      fontSize: 8,
+                      padding: "4px 10px",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                      background:
+                        sortMode === s ? "rgba(79,195,247,0.1)" : "transparent",
+                      border:
+                        sortMode === s
+                          ? "1px solid rgba(79,195,247,0.25)"
+                          : `1px solid ${B1}`,
+                      color: sortMode === s ? SIGNAL : T4,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Card grid */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                {sortedWatchlistItems.map((item) => {
+                  const stock = stocksMap[item.symbol];
+                  const signal = signalsMap[item.symbol];
+                  const distWarn = distWarnings[item.symbol];
+                  const accent = stock ? bucketAccent(stock.homepageBucket) : B1;
+                  const sColor = stock ? scoreColor(stock.readinessScore) : T4;
+                  return (
+                    <WatchlistCard
+                      key={item.symbol}
+                      item={item}
+                      stock={stock}
+                      signal={signal}
+                      distWarn={distWarn}
+                      accent={accent}
+                      scoreColor={sColor}
+                      onRemove={() => removeFromWatchlist(item.symbol)}
+                      onClick={() => (window.location.href = `/stock/${item.symbol}`)}
+                    />
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* UNDO TOAST */}
       {undoToast && (
         <div
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-4 py-3 rounded-md transition-all duration-200"
           style={{
-            background: "#1a1a1a",
-            border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)",
-            transform: `translateX(-50%) translateY(${toastVisible ? "0" : "8px"})`,
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            padding: "12px 18px",
+            borderRadius: 8,
+            background: S1,
+            border: `1px solid ${B1}`,
+            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.6)",
+            transition: "opacity 0.2s, transform 0.2s",
             opacity: toastVisible ? 1 : 0,
+            transform: toastVisible ? "translateY(0)" : "translateY(8px)",
           }}
           data-testid="undo-toast"
         >
-          <span className="text-xs text-white" style={{ fontFamily: mono }}>
+          <span style={{ fontFamily: mono, fontSize: 11, color: T2 }}>
             {undoToast.symbol} dihapus dari watchlist
           </span>
           <button
             onClick={undoRemove}
-            className="text-xs cursor-pointer ml-2 transition-colors"
-            style={{ fontFamily: mono, color: "#38BDF8" }}
             data-testid="button-undo-remove"
+            style={{
+              fontFamily: mono,
+              fontSize: 10,
+              letterSpacing: "0.06em",
+              cursor: "pointer",
+              color: SIGNAL,
+              background: "transparent",
+              border: "none",
+              padding: 0,
+            }}
           >
             Batalkan
           </button>

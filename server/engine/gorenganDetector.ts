@@ -1,19 +1,15 @@
 import { parseBrokerIDR } from './parseBrokerIDR';
 import { parseForeignData } from './foreignParser';
 import { detectTapeControl } from './tapeControl';
+import { LQ45_UNIVERSE } from './lq45Universe';
 
-const GORENGAN_WHITELIST = new Set([
-  'BBCA','BBRI','BMRI','BBNI','BRIS',
-  'TLKM','ASII','UNVR','ICBP','INDF',
-  'KLBF','GGRM','HMSP','SMGR','INCO',
-  'PTBA','ADRO','ANTM','ITMG','PGAS',
-  'JSMR','WIKA','WSKT','PTPP','AKRA',
-  'EXCL','ISAT','MNCN','SCMA','EMTK',
-  'CPIN','JPFA','MAIN','SIDO','MYOR',
-  'ACES','LPPF','ERAA','MAPI','RALS',
-  'BSDE','CTRA','LPKR','PWON','SMRA',
-  'AALI','LSIP','SIMP','TBLA','SSMS',
-]);
+/** Parse "52T IDR" → trillions in IDR (returns raw IDR value). */
+function parseMarketCapIDR(cap: string | null | undefined): number {
+  if (!cap) return 0;
+  const m = cap.match(/([\d,.]+)\s*T/i);
+  if (!m) return 0;
+  return parseFloat(m[1].replace(/,/g, '')) * 1e12;
+}
 
 export interface GorenganResult {
   isGorengan: boolean;
@@ -56,31 +52,33 @@ function detectGorengan(input: GorenganDetectionInput): GorenganResult {
     layerDetails.push(`Layer 1 (Anomali Harga & Volume): ${details.join(", ")}`);
   }
 
+  // Threshold raised: require top-3 share < 20% (not < 35%) to reduce false
+  // positives on stocks with few legitimate institutional brokers.
   const layer2Triggered =
-    input.top3BrokerNetBuyPercent < 35 ||
+    input.top3BrokerNetBuyPercent < 20 ||
     input.hasBrokerFragmentation ||
     input.retailProxyDominates;
 
   if (layer2Triggered) {
     triggeredLayers.push(2);
     const details: string[] = [];
-    if (input.top3BrokerNetBuyPercent < 35) details.push(`Top 3 broker hanya ${input.top3BrokerNetBuyPercent.toFixed(0)}% net buy`);
+    if (input.top3BrokerNetBuyPercent < 20) details.push(`Top 3 broker hanya ${input.top3BrokerNetBuyPercent.toFixed(0)}% net buy`);
     if (input.hasBrokerFragmentation) details.push("Fragmentasi broker tinggi");
     if (input.retailProxyDominates) details.push("Broker proxy ritel mendominasi");
     layerDetails.push(`Layer 2 (Fragmentasi Broker): ${details.join(", ")}`);
   }
 
+  // Layer 3 now requires BOTH foreignFlowAbsent AND absence of accumulation
+  // (not just one) to reduce triggering on blue-chips with neutral flow.
   const layer3Triggered =
     input.smallLotDominates ||
-    input.foreignFlowAbsent ||
-    !input.hasAccumulationLadder;
+    (input.foreignFlowAbsent && !input.hasAccumulationLadder);
 
   if (layer3Triggered) {
     triggeredLayers.push(3);
     const details: string[] = [];
     if (input.smallLotDominates) details.push("Transaksi lot kecil mendominasi");
-    if (input.foreignFlowAbsent) details.push("Aliran asing absen");
-    if (!input.hasAccumulationLadder) details.push("Tidak ada pola akumulasi bertahap");
+    if (input.foreignFlowAbsent && !input.hasAccumulationLadder) details.push("Aliran asing absen + tidak ada pola akumulasi bertahap");
     layerDetails.push(`Layer 3 (Dominasi Ritel): ${details.join(", ")}`);
   }
 
@@ -104,7 +102,11 @@ function detectGorengan(input: GorenganDetectionInput): GorenganResult {
     layerDetails.push(`Layer 4 (Kegagalan Struktural): ${details.join(", ")}`);
   }
 
-  const isGorengan = triggeredLayers.length >= 2;
+  // Gorengan verdict: requires an active gorengan signal (Layer 1 price/volume anomaly
+  // OR Layer 2 broker fragmentation) PLUS at least one corroborating layer.
+  // Stocks that only trigger Layers 3+4 (weak flow) are NOT gorengan.
+  const hasActiveSignal = triggeredLayers.includes(1) || triggeredLayers.includes(2);
+  const isGorengan = triggeredLayers.length >= 2 && hasActiveSignal;
 
   return {
     isGorengan,
@@ -125,13 +127,27 @@ export function computeGorenganFromStock(stock: {
   todayValue?: number | null;
   avg20dValue?: number | null;
   symbol?: string | null;
+  marketCap?: string | null;
 }): GorenganResult {
-  const sym = (stock as any).symbol?.toUpperCase() ?? '';
-  if (sym && GORENGAN_WHITELIST.has(sym)) {
+  const sym = stock.symbol?.toUpperCase() ?? '';
+
+  // LQ45 exemption — always checked first
+  if (sym && LQ45_UNIVERSE.has(sym)) {
     return {
       isGorengan: false,
       triggeredLayers: [],
-      layerDetails: ['Saham blue-chip — dikecualikan dari deteksi gorengan'],
+      layerDetails: ['Konstituen LQ45 — dikecualikan dari deteksi gorengan'],
+      riskOverride: null,
+    };
+  }
+
+  // Market cap floor: > Rp 5 Triliun → institutional stock, not gorengan
+  const marketCapIDR = parseMarketCapIDR(stock.marketCap);
+  if (marketCapIDR > 5e12) {
+    return {
+      isGorengan: false,
+      triggeredLayers: [],
+      layerDetails: ['Market cap > Rp 5T — dikecualikan dari deteksi gorengan'],
       riskOverride: null,
     };
   }
@@ -139,7 +155,7 @@ export function computeGorenganFromStock(stock: {
   let brokerData: any[] = [];
   try {
     brokerData = JSON.parse(stock.brokerData || "[]");
-  } catch (e) {
+  } catch {
     brokerData = [];
   }
 
@@ -183,10 +199,8 @@ export function computeGorenganFromStock(stock: {
 
   const avgBuyPrice = parseFloat(String(stock.brokerData ? sortedBrokers[0]?.avgBuy || "0" : "0").replace(/[^\d.]/g, "")) || 0;
 
-  const todayVal = typeof stock.todayValue === 'number'
-    ? stock.todayValue : null;
-  const avg20Val = typeof stock.avg20dValue === 'number'
-    ? stock.avg20dValue : null;
+  const todayVal = typeof stock.todayValue === 'number' ? stock.todayValue : null;
+  const avg20Val = typeof stock.avg20dValue === 'number' ? stock.avg20dValue : null;
   const volumeRatio = (todayVal && avg20Val && avg20Val > 0)
     ? todayVal / avg20Val
     : 1.2;

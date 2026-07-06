@@ -1,0 +1,14 @@
+{
+  "symbol": "BBCA",
+  "date": "2026-05-19",
+  "description": "BBCA accumulation pattern — institutional buying across 3 smart-money brokers",
+  "netFlow": 223200000000,
+  "price": 9540,
+  "brokers": [
+    { "code": "BK",   "name": "PT Mandiri Sekuritas",  "netBuy": "125.5B IDR", "netSell": null,        "volumePercent": "12.4%", "avgBuy": "9,540", "avgSell": "9,530" },
+    { "code": "BNI",  "name": "PT BNI Securities",      "netBuy": "98.2B IDR",  "netSell": null,        "volumePercent": "9.8%",  "avgBuy": "9,545", "avgSell": "9,535" },
+    { "code": "CIMB", "name": "PT CIMB Securities",     "netBuy": "72.3B IDR",  "netSell": null,        "volumePercent": "7.2%",  "avgBuy": "9,542", "avgSell": "9,532" },
+    { "code": "MBK",  "name": "PT Maybank Kim Eng",     "netBuy": null,         "netSell": "45.3B IDR", "volumePercent": "8.7%",  "avgBuy": "9,548", "avgSell": "9,538" },
+    { "code": "BHS",  "name": "PT Bahana Securities",   "netBuy": null,         "netSell": "28.4B IDR", "volumePercent": "6.5%",  "avgBuy": "9,550", "avgSell": "9,540" }
+  ]
+}

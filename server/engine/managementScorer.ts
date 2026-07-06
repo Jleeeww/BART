@@ -66,7 +66,7 @@ const DIMENSION_WEIGHTS = {
   reputation:       0.10,
 } as const;
 
-const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days — BOD changes infrequently
 
 // ── In-memory score cache ────────────────────────────────────
 

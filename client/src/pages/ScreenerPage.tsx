@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { Star } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface StockData {
   symbol: string;
@@ -11,7 +11,8 @@ interface StockData {
   change: string;
   changePercent: string;
   sector: string | null;
-  readinessScore: number;
+  readinessScore: number | null;
+  computeError?: boolean;
   marketRegime: string;
   actionGuidance: string;
   actionState: string;
@@ -28,11 +29,104 @@ interface WatchlistItem {
 
 type SortKey = "score_desc" | "score_asc" | "name_az" | "change_desc";
 
-const mono = "'IBM Plex Mono', monospace";
-const sora = "'Sora', sans-serif";
+interface Preset {
+  id: string;
+  label: string;
+  description: string;
+  minScore: number;
+  rezimFilter: string[];
+  siklusFilter: string[];
+  flowFilter: string[];
+  sektorFilter: string[];
+}
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+
+const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
+const inter = "'Inter', system-ui, sans-serif";
+const S0 = "#000000";
+const S1 = "#0a0a0a";
+const S2 = "#0f0f0f";
+const S3 = "#141414";
+const S4 = "#1a1a1a";
+const B1 = "rgba(255,255,255,0.06)";
+const B2 = "rgba(255,255,255,0.10)";
+const T1 = "#F4F4F5";
+const T2 = "#A1A1AA";
+const T3 = "#71717A";
+const T4 = "#3F3F46";
+const SIGNAL = "#4FC3F7";
+const POSITIVE = "#4ADE80";
+const WARNING = "#FBBF24";
+const DANGER = "#F87171";
+
+function scoreColor(s: number) {
+  return s >= 60 ? "#4ADE80" : s >= 45 ? "#4FC3F7" : s >= 30 ? "#FBBF24" : "#F87171";
+}
+
+function bucketAccent(b: string) {
+  return b === "siap_dipantau" ? "#4ADE80" : b === "watchlist_prioritas" ? "#FBBF24" : "#F87171";
+}
+
+// ─── Presets ──────────────────────────────────────────────────────────────────
+
+const PRESETS: Preset[] = [
+  {
+    id: "akumulasi_mature",
+    label: "Akumulasi Mature",
+    description: "Skor ≥60 + aliran positif",
+    minScore: 60,
+    rezimFilter: [],
+    siklusFilter: [],
+    flowFilter: ["Akumulasi"],
+    sektorFilter: [],
+  },
+  {
+    id: "entry_window",
+    label: "Entry Window",
+    description: "Siklus entry terkonfirmasi",
+    minScore: 45,
+    rezimFilter: [],
+    siklusFilter: ["ENTRY_WINDOW", "KONFIRMASI_MULAI"],
+    flowFilter: [],
+    sektorFilter: [],
+  },
+  {
+    id: "distribution_trap",
+    label: "Jebakan Distribusi",
+    description: "Waspada distribusi terdeteksi",
+    minScore: 0,
+    rezimFilter: ["Distribusi"],
+    siklusFilter: ["WASPADAI_DISTRIBUSI"],
+    flowFilter: ["Distribusi"],
+    sektorFilter: [],
+  },
+  {
+    id: "stealth_setup",
+    label: "Stealth Setup",
+    description: "Akumulasi dini, belum konfirmasi",
+    minScore: 35,
+    rezimFilter: [],
+    siklusFilter: ["TERLALU_DINI"],
+    flowFilter: ["Akumulasi"],
+    sektorFilter: [],
+  },
+  {
+    id: "sektor_keuangan",
+    label: "Sektor Keuangan",
+    description: "Bank + Asuransi + Fintech",
+    minScore: 0,
+    rezimFilter: [],
+    siklusFilter: [],
+    flowFilter: [],
+    sektorFilter: ["Financials"],
+  },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function deriveV2(stock: StockData) {
-  const score = stock.readinessScore;
+  const score = stock.readinessScore ?? 0;
   let cyclePosition: string | null = null;
   const regime = stock.marketRegime?.toLowerCase() || "";
   if (regime.includes("akumulasi") && score >= 80) cyclePosition = "ENTRY_WINDOW";
@@ -48,150 +142,320 @@ function deriveV2(stock: StockData) {
   return { cyclePosition, flowBias };
 }
 
-function scoreColor(score: number) {
-  if (score >= 80) return "#34d399";
-  if (score >= 60) return "#fbbf24";
-  return "#f87171";
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function MiniScoreRing({ score, size = 44 }: { score: number; size?: number }) {
+  const r = size / 2 - 4;
+  const circ = 2 * Math.PI * r;
+  const filled = (score / 100) * circ;
+  const color = scoreColor(score);
+  return (
+    <svg width={size} height={size} style={{ flexShrink: 0 }}>
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="rgba(255,255,255,0.06)"
+        strokeWidth={3}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={3}
+        strokeDasharray={`${filled} ${circ - filled}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: "stroke-dasharray 0.4s ease" }}
+      />
+    </svg>
+  );
 }
 
-function bucketAccent(bucket: string) {
-  if (bucket === "siap_dipantau") return "#34d399";
-  if (bucket === "watchlist_prioritas") return "#fbbf24";
-  return "#f87171";
-}
-
-function pillStyle(active: boolean) {
-  return {
-    fontFamily: mono,
-    fontSize: 10,
-    letterSpacing: "0.06em",
-    background: active ? "rgba(56,189,248,0.1)" : "rgba(255,255,255,0.02)",
-    color: active ? "#38BDF8" : "#6b7280",
-    border: active ? "1px solid rgba(56,189,248,0.40)" : "1px solid #1F2937",
+function DecisionChip({ bucket }: { bucket: string }) {
+  const map: Record<string, { label: string; color: string }> = {
+    siap_dipantau: { label: "SIAP PANTAU", color: "#4ADE80" },
+    watchlist_prioritas: { label: "WATCHLIST", color: "#FBBF24" },
+    hindari_dulu: { label: "HINDARI", color: "#F87171" },
   };
+  const { label, color } = map[bucket] ?? { label: bucket, color: "#71717A" };
+  return (
+    <span
+      style={{
+        fontFamily: mono,
+        fontSize: 7,
+        letterSpacing: "0.1em",
+        color,
+        fontWeight: 700,
+      }}
+    >
+      {label}
+    </span>
+  );
 }
 
-const disabledPillStyle = {
-  fontFamily: mono,
-  fontSize: 10,
-  background: "rgba(255,255,255,0.02)",
-  color: "#6b7280",
-  border: "1px solid #1F2937",
-};
-
-function MultiPills({
-  options, selected, onToggle,
+function FilterGroup({
+  label,
+  items,
+  onSelect,
+  activeValue,
+  activeValues,
 }: {
-  options: string[];
-  selected: Set<string>;
-  onToggle: (val: string) => void;
+  label: string;
+  items: string[];
+  onSelect: (v: string) => void;
+  activeValue?: string | null;
+  activeValues?: string[];
 }) {
+  const active = activeValues ?? (activeValue ? [activeValue] : []);
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((opt) => (
-        <button
-          key={opt}
-          onClick={() => onToggle(opt)}
-          className="px-3 py-1.5 rounded-md cursor-pointer transition-all duration-150"
-          style={pillStyle(selected.has(opt))}
-          data-testid={`screener-pill-${opt.toLowerCase().replace(/\s+/g, "-")}`}
-        >
-          {opt}
-        </button>
-      ))}
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <span
+        style={{
+          fontFamily: mono,
+          fontSize: 8,
+          color: T4,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          marginRight: 2,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}:
+      </span>
+      {items.map((item) => {
+        const isActive = active.includes(item);
+        return (
+          <button
+            key={item}
+            onClick={() => onSelect(item)}
+            style={{
+              fontFamily: mono,
+              fontSize: 9,
+              padding: "4px 9px",
+              borderRadius: 4,
+              cursor: "pointer",
+              background: isActive ? "rgba(79,195,247,0.1)" : "transparent",
+              border: isActive ? "1px solid rgba(79,195,247,0.25)" : `1px solid ${B1}`,
+              color: isActive ? SIGNAL : T4,
+              transition: "all 0.12s",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item}
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-function DisabledGroup({ label, options }: { label: string; options: string[] }) {
-  return (
-    <div className="mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: mono, color: "#6b7280" }}>
-          {label}
-        </p>
-        <span
-          className="px-2 py-0.5 rounded-sm"
-          style={{
-            fontFamily: mono, fontSize: 9,
-            background: "rgba(56,189,248,0.06)",
-            color: "rgba(56,189,248,0.4)",
-            border: "1px solid rgba(56,189,248,0.15)",
-          }}
-          data-testid={`badge-live-idx-${label.toLowerCase().replace(/\s+/g, "-")}`}
-        >
-          Live IDX
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-1.5 opacity-30 pointer-events-none">
-        {options.map((opt) => (
-          <span key={opt} className="px-3 py-1.5 rounded-md cursor-not-allowed" style={disabledPillStyle}>
-            {opt}
-          </span>
-        ))}
-      </div>
-      <p className="text-[9px] mt-1.5" style={{ fontFamily: mono, color: "rgba(255,255,255,0.08)" }}>
-        Tersedia dengan data IDX live
-      </p>
-    </div>
-  );
-}
+function StockCard({
+  stock,
+  inWatchlist,
+  onWatchlist,
+}: {
+  stock: StockData & { _v2: ReturnType<typeof deriveV2> };
+  inWatchlist: boolean;
+  onWatchlist: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const accent = bucketAccent(stock.homepageBucket);
+  const sColor = scoreColor(stock.readinessScore ?? 0);
 
-function StockLogo({ symbol }: { symbol: string }) {
-  const [failed, setFailed] = useState(false);
-  const src = `https://assets.stockbit.com/logos/companies/${symbol}.png`;
   return (
     <div
-      className="w-8 h-8 rounded-md flex-shrink-0 flex items-center justify-center overflow-hidden"
-      style={{ background: "#1e1e1e", border: "1px solid rgba(255,255,255,0.06)" }}
+      onClick={() => (window.location.href = `/stock/${stock.symbol}`)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? S3 : S1,
+        border: `1px solid ${hovered ? B2 : B1}`,
+        borderTop: `2px solid ${accent}`,
+        borderRadius: 10,
+        padding: "16px 18px",
+        cursor: "pointer",
+        transition: "all 0.15s",
+        position: "relative",
+      }}
+      data-testid={`screener-row-${stock.symbol}`}
     >
-      {failed ? (
-        <span className="text-[10px] font-bold" style={{ fontFamily: mono, color: "#38BDF8" }}>
-          {symbol.slice(0, 2)}
-        </span>
-      ) : (
-        <img
-          src={src}
-          alt={symbol}
-          className="w-6 h-6 object-contain rounded-sm"
-          onError={() => setFailed(true)}
+      {/* Top row: symbol + watchlist */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginBottom: 12,
+        }}
+      >
+        <div>
+          <p
+            style={{
+              fontFamily: mono,
+              fontSize: 16,
+              fontWeight: 700,
+              color: T1,
+              marginBottom: 2,
+              margin: "0 0 2px 0",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {stock.symbol}
+          </p>
+          <p
+            style={{
+              fontFamily: inter,
+              fontSize: 11,
+              color: T3,
+              maxWidth: 160,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              margin: 0,
+            }}
+          >
+            {stock.name}
+          </p>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onWatchlist();
+          }}
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: 4,
+            cursor: "pointer",
+            flexShrink: 0,
+            background: inWatchlist ? "rgba(251,191,36,0.12)" : "transparent",
+            border: inWatchlist ? "1px solid rgba(251,191,36,0.3)" : `1px solid ${B1}`,
+            color: inWatchlist ? WARNING : T4,
+            fontSize: 11,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.12s",
+          }}
+          data-testid={`screener-star-${stock.symbol}`}
+        >
+          ★
+        </button>
+      </div>
+
+      {/* Score row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+        <MiniScoreRing score={stock.readinessScore ?? 0} size={44} />
+        <div>
+          <p
+            style={{
+              fontFamily: mono,
+              fontSize: 22,
+              fontWeight: 700,
+              color: sColor,
+              lineHeight: 1,
+              marginBottom: 3,
+              margin: "0 0 3px 0",
+            }}
+          >
+            {stock.computeError ? "—" : stock.readinessScore}
+          </p>
+          <DecisionChip bucket={stock.homepageBucket} />
+        </div>
+      </div>
+
+      {/* Score bar */}
+      <div
+        style={{
+          height: 2,
+          background: "rgba(255,255,255,0.06)",
+          borderRadius: 9999,
+          marginBottom: 10,
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${stock.readinessScore ?? 0}%`,
+            background: sColor,
+            borderRadius: 9999,
+            transition: "width 0.3s",
+          }}
         />
+      </div>
+
+      {/* Sector + price row */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontFamily: mono, fontSize: 9, color: T4, letterSpacing: "0.06em" }}>
+          {stock.sector ?? "—"}
+        </span>
+        <span
+          style={{
+            fontFamily: mono,
+            fontSize: 10,
+            color:
+              parseFloat(stock.changePercent) > 0
+                ? POSITIVE
+                : parseFloat(stock.changePercent) < 0
+                  ? DANGER
+                  : T3,
+          }}
+        >
+          {parseFloat(stock.changePercent) > 0
+            ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
+            : parseFloat(stock.changePercent) < 0
+              ? `▼ ${parseFloat(stock.changePercent).toFixed(2)}%`
+              : "— 0.00%"}
+        </span>
+      </div>
+
+      {/* Hover tooltip — AI sentence */}
+      {hovered && stock.aiSentence && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: "calc(100% + 8px)",
+            left: 0,
+            right: 0,
+            zIndex: 20,
+            background: "#1a1a1a",
+            border: `1px solid ${B2}`,
+            borderRadius: 8,
+            padding: "10px 14px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
+          }}
+        >
+          <p style={{ fontFamily: inter, fontSize: 11, color: T2, lineHeight: 1.55, margin: 0 }}>
+            {stock.aiSentence}
+          </p>
+        </div>
       )}
     </div>
   );
 }
 
-function CycleLabel({ position }: { position: string | null }) {
-  if (!position) return <span style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}>—</span>;
-  const map: Record<string, { label: string; color: string }> = {
-    ENTRY_WINDOW: { label: "▶ Entry Window", color: "#34d399" },
-    KONFIRMASI_MULAI: { label: "◎ Konfirmasi", color: "#38bdf8" },
-    TERLALU_DINI: { label: "○ Terlalu Dini", color: "#94a3b8" },
-    WASPADAI_DISTRIBUSI: { label: "▼ Waspada Distribusi", color: "#fbbf24" },
-  };
-  const entry = map[position] || { label: position, color: "#6b7280" };
-  return <span className="text-[11px]" style={{ fontFamily: mono, color: entry.color }}>{entry.label}</span>;
-}
-
-function FlowLabel({ bias }: { bias: string | null }) {
-  if (!bias) return <span style={{ fontFamily: mono, fontSize: 11, color: "#6b7280" }}>—</span>;
-  if (bias === "Akumulasi") return <span className="text-[11px]" style={{ fontFamily: mono, color: "#34d399" }}>↑ Akumulasi</span>;
-  if (bias === "Distribusi") return <span className="text-[11px]" style={{ fontFamily: mono, color: "#f87171" }}>↓ Distribusi</span>;
-  return <span className="text-[11px]" style={{ fontFamily: mono, color: "#6b7280" }}>→ Netral</span>;
-}
+// ─── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ScreenerPage() {
-  const [rezimFilter, setRezimFilter] = useState<Set<string>>(new Set(["Semua"]));
-  const [siklusFilter, setSiklusFilter] = useState<Set<string>>(new Set(["Semua"]));
+  // Filter state
+  const [rezimFilter, setRezimFilter] = useState<Set<string>>(new Set());
+  const [siklusFilter, setSiklusFilter] = useState<Set<string>>(new Set());
   const [minScore, setMinScore] = useState(0);
-  const [sektorFilter, setSektorFilter] = useState<Set<string>>(new Set(["Semua"]));
-  const [flowFilter, setFlowFilter] = useState<Set<string>>(new Set(["Semua"]));
+  const [sektorFilter, setSektorFilter] = useState<Set<string>>(new Set());
+  const [flowFilter, setFlowFilter] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("score_desc");
   const [optimisticOverrides, setOptimisticOverrides] = useState<Record<string, boolean>>({});
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
+  // API calls
   const { data: stocks, isLoading } = useQuery<StockData[]>({ queryKey: ["/api/stocks"] });
   const { data: watchlistData } = useQuery<WatchlistItem[]>({ queryKey: ["/api/watchlist"] });
 
+  // watchlistedSymbols with optimistic overrides
   const watchlistedSymbols = useMemo(() => {
     const base = new Set(watchlistData?.map((w) => w.symbol) ?? []);
     for (const [sym, added] of Object.entries(optimisticOverrides)) {
@@ -201,431 +465,471 @@ export default function ScreenerPage() {
     return base;
   }, [watchlistData, optimisticOverrides]);
 
-  const toggleWatchlist = useCallback(async (symbol: string) => {
-    const isStarred = watchlistedSymbols.has(symbol);
-    setOptimisticOverrides((prev) => ({ ...prev, [symbol]: !isStarred }));
-    try {
-      if (isStarred) await apiRequest("DELETE", `/api/watchlist/${symbol}`);
-      else await apiRequest("POST", `/api/watchlist/${symbol}`);
-      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
-    } catch {
-      setOptimisticOverrides((prev) => ({ ...prev, [symbol]: isStarred }));
-    }
-  }, [watchlistedSymbols]);
+  // toggleWatchlist with rollback
+  const toggleWatchlist = useCallback(
+    async (symbol: string) => {
+      const isStarred = watchlistedSymbols.has(symbol);
+      setOptimisticOverrides((prev) => ({ ...prev, [symbol]: !isStarred }));
+      try {
+        if (isStarred) await apiRequest("DELETE", `/api/watchlist/${symbol}`);
+        else await apiRequest("POST", `/api/watchlist/${symbol}`);
+        queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      } catch {
+        setOptimisticOverrides((prev) => ({ ...prev, [symbol]: isStarred }));
+      }
+    },
+    [watchlistedSymbols],
+  );
 
-  const sectors = useMemo(() => {
-    if (!stocks) return [];
-    const unique = new Set(stocks.map((s) => s.sector).filter(Boolean) as string[]);
-    return Array.from(unique).sort();
-  }, [stocks]);
-
-  function toggleMulti(current: Set<string>, value: string, setter: (s: Set<string>) => void) {
-    if (value === "Semua") { setter(new Set(["Semua"])); return; }
-    const next = new Set(current);
-    next.delete("Semua");
-    if (next.has(value)) next.delete(value);
-    else next.add(value);
-    if (next.size === 0) next.add("Semua");
-    setter(next);
-  }
-
+  // Filtering + sorting logic
   const filtered = useMemo(() => {
     if (!stocks) return [];
     let list = stocks.map((s) => ({ ...s, _v2: deriveV2(s) }));
 
-    if (!rezimFilter.has("Semua")) {
+    if (rezimFilter.size > 0) {
       list = list.filter((s) => {
         const r = s.marketRegime?.toLowerCase() || "";
         const fb = s._v2.flowBias;
-        for (const sel of rezimFilter) {
+        for (const sel of Array.from(rezimFilter)) {
           if (sel === "Akumulasi" && (r.includes("akumulasi") || fb === "Akumulasi")) return true;
-          if (sel === "Transisi" && (r.includes("transisi") || r.includes("fading"))) return true;
           if (sel === "Distribusi" && (r.includes("distribusi") || fb === "Distribusi")) return true;
-          if (sel === "Volatile" && r.includes("volatile")) return true;
+          if (sel === "Spekulatif" && r.includes("spekulatif")) return true;
+          if (sel === "Fading" && (r.includes("fading") || r.includes("transisi"))) return true;
+          if (sel === "Tidak Diketahui" && !r) return true;
         }
         return false;
       });
     }
 
-    if (!siklusFilter.has("Semua")) {
-      const cycleMap: Record<string, string> = {
-        "Terlalu Dini": "TERLALU_DINI",
-        "Konfirmasi Mulai": "KONFIRMASI_MULAI",
-        "Entry Window": "ENTRY_WINDOW",
-        "Waspadai Distribusi": "WASPADAI_DISTRIBUSI",
-      };
+    if (siklusFilter.size > 0) {
       list = list.filter((s) => {
         if (!s._v2.cyclePosition) return false;
-        for (const sel of siklusFilter) {
-          if (cycleMap[sel] === s._v2.cyclePosition) return true;
+        for (const sel of Array.from(siklusFilter)) {
+          if (sel === s._v2.cyclePosition) return true;
         }
         return false;
       });
     }
 
-    if (minScore > 0) list = list.filter((s) => s.readinessScore >= minScore);
-    if (!sektorFilter.has("Semua")) list = list.filter((s) => s.sector && sektorFilter.has(s.sector));
-    if (!flowFilter.has("Semua")) list = list.filter((s) => s._v2.flowBias && flowFilter.has(s._v2.flowBias));
+    if (minScore > 0) list = list.filter((s) => (s.readinessScore ?? 0) >= minScore);
+    if (sektorFilter.size > 0) list = list.filter((s) => s.sector && sektorFilter.has(s.sector));
+    if (flowFilter.size > 0) list = list.filter((s) => s._v2.flowBias && flowFilter.has(s._v2.flowBias));
 
     list.sort((a, b) => {
-      if (sortKey === "score_desc") return b.readinessScore - a.readinessScore;
-      if (sortKey === "score_asc") return a.readinessScore - b.readinessScore;
+      if (sortKey === "score_desc") return (b.readinessScore ?? -1) - (a.readinessScore ?? -1);
+      if (sortKey === "score_asc") return (a.readinessScore ?? -1) - (b.readinessScore ?? -1);
       if (sortKey === "name_az") return a.symbol.localeCompare(b.symbol);
-      if (sortKey === "change_desc") return parseFloat(b.changePercent || "0") - parseFloat(a.changePercent || "0");
+      if (sortKey === "change_desc")
+        return parseFloat(b.changePercent || "0") - parseFloat(a.changePercent || "0");
       return 0;
     });
 
     return list;
   }, [stocks, rezimFilter, siklusFilter, minScore, sektorFilter, flowFilter, sortKey]);
 
-  function resetFilters() {
-    setRezimFilter(new Set(["Semua"]));
-    setSiklusFilter(new Set(["Semua"]));
-    setMinScore(0);
-    setSektorFilter(new Set(["Semua"]));
-    setFlowFilter(new Set(["Semua"]));
-    setSortKey("score_desc");
+  // Preset logic
+  function applyPreset(preset: Preset) {
+    if (activePreset === preset.id) {
+      clearAllFilters();
+      return;
+    }
+    setActivePreset(preset.id);
+    setMinScore(preset.minScore);
+    setRezimFilter(new Set(preset.rezimFilter));
+    setSiklusFilter(new Set(preset.siklusFilter));
+    setFlowFilter(new Set(preset.flowFilter));
+    setSektorFilter(new Set(preset.sektorFilter));
   }
 
-  const totalStocks = stocks?.length ?? 0;
+  function clearAllFilters() {
+    setMinScore(0);
+    setRezimFilter(new Set());
+    setSiklusFilter(new Set());
+    setFlowFilter(new Set());
+    setSektorFilter(new Set());
+    setActivePreset(null);
+  }
+
+  // Active chips derived from filter state
+  const activeChips = useMemo(() => {
+    const chips: { id: string; label: string; color: string }[] = [];
+    if (minScore > 0) chips.push({ id: "score", label: `Skor ≥ ${minScore}`, color: scoreColor(minScore) });
+    for (const s of Array.from(siklusFilter)) {
+      const labels: Record<string, string> = {
+        ENTRY_WINDOW: "Entry Window",
+        KONFIRMASI_MULAI: "Konfirmasi",
+        TERLALU_DINI: "Terlalu Dini",
+        WASPADAI_DISTRIBUSI: "Waspada Distribusi",
+      };
+      chips.push({ id: `siklus_${s}`, label: `Siklus: ${labels[s] ?? s}`, color: SIGNAL });
+    }
+    for (const f of Array.from(flowFilter))
+      chips.push({
+        id: `flow_${f}`,
+        label: `Aliran: ${f}`,
+        color: f === "Akumulasi" ? POSITIVE : f === "Distribusi" ? DANGER : T3,
+      });
+    for (const r of Array.from(rezimFilter))
+      chips.push({ id: `rezim_${r}`, label: `Rezim: ${r}`, color: T2 });
+    for (const sec of Array.from(sektorFilter))
+      chips.push({ id: `sektor_${sec}`, label: `Sektor: ${sec}`, color: "#A78BFA" });
+    return chips;
+  }, [minScore, siklusFilter, flowFilter, rezimFilter, sektorFilter]);
+
+  function removeChip(id: string) {
+    if (id === "score") { setMinScore(0); return; }
+    if (id.startsWith("siklus_")) {
+      const k = id.replace("siklus_", "");
+      setSiklusFilter((prev) => { const n = new Set(prev); n.delete(k); return n; });
+      return;
+    }
+    if (id.startsWith("flow_")) {
+      const k = id.replace("flow_", "");
+      setFlowFilter((prev) => { const n = new Set(prev); n.delete(k); return n; });
+      return;
+    }
+    if (id.startsWith("rezim_")) {
+      const k = id.replace("rezim_", "");
+      setRezimFilter((prev) => { const n = new Set(prev); n.delete(k); return n; });
+      return;
+    }
+    if (id.startsWith("sektor_")) {
+      const k = id.replace("sektor_", "");
+      setSektorFilter((prev) => { const n = new Set(prev); n.delete(k); return n; });
+      return;
+    }
+    setActivePreset(null);
+  }
 
   return (
-    <div className="px-6 py-6 min-h-screen" style={{ background: "#0f0f0f" }}>
-      {/* SECTION A — Header */}
-      <div className="mb-5">
-        <p
-          className="text-[10px] tracking-[0.25em] uppercase mb-1.5"
-          style={{ fontFamily: mono, color: "#38BDF8" }}
-          data-testid="screener-label"
-        >
-          SCREENER
-        </p>
-        <h1 className="text-2xl font-bold text-white" style={{ fontFamily: sora }} data-testid="screener-title">
-          Filter Saham IDX
-        </h1>
-        <p className="text-sm mt-1" style={{ fontFamily: mono, color: "#6b7280" }}>
-          Tentukan kriteria — BART menampilkan saham yang cocok
-        </p>
-      </div>
+    <div style={{ minHeight: "100vh", background: S0, paddingBottom: 80 }}>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 mt-6">
-        {/* LEFT — Filter Panel */}
+      {/* ── HEADER + QUERY BAR ─────────────────────────────────────────────── */}
+      <div style={{ padding: "24px 32px 0", maxWidth: 1400, margin: "0 auto" }}>
+
+        {/* Title row */}
         <div
-          className="h-fit lg:sticky lg:top-6 p-4 rounded-md"
-          style={{ background: "#161616", border: "1px solid rgba(255,255,255,0.03)" }}
-          data-testid="screener-filter-panel"
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: 16,
+            marginBottom: 20,
+          }}
         >
-          <p className="text-sm font-bold text-white mb-4" style={{ fontFamily: sora }}>
-            Filter Kriteria
-          </p>
-
-          <div className="mb-4">
-            <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
-              REZIM PASAR
-            </p>
-            <MultiPills
-              options={["Semua", "Akumulasi", "Transisi", "Distribusi", "Volatile"]}
-              selected={rezimFilter}
-              onToggle={(v) => toggleMulti(rezimFilter, v, setRezimFilter)}
-            />
-          </div>
-
-          <div className="mb-4">
-            <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
-              POSISI SIKLUS
-            </p>
-            <MultiPills
-              options={["Semua", "Terlalu Dini", "Konfirmasi Mulai", "Entry Window", "Waspadai Distribusi"]}
-              selected={siklusFilter}
-              onToggle={(v) => toggleMulti(siklusFilter, v, setSiklusFilter)}
-            />
-          </div>
-
-          <div className="mb-4">
-            <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
-              SKOR MINIMUM
-            </p>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={minScore}
-              onChange={(e) => setMinScore(Number(e.target.value))}
-              className="w-full cursor-pointer accent-[#38BDF8]"
-              data-testid="screener-slider-score"
-            />
-            <div className="flex justify-between mt-1">
-              <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>Min: {minScore}</span>
-              <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>Maks: 100</span>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
-              SEKTOR
-            </p>
-            <MultiPills
-              options={["Semua", ...sectors]}
-              selected={sektorFilter}
-              onToggle={(v) => toggleMulti(sektorFilter, v, setSektorFilter)}
-            />
-          </div>
-
-          <div className="mb-4">
-            <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: mono, color: "#6b7280" }}>
-              ALIRAN DANA
-            </p>
-            <MultiPills
-              options={["Semua", "Akumulasi", "Netral", "Distribusi"]}
-              selected={flowFilter}
-              onToggle={(v) => toggleMulti(flowFilter, v, setFlowFilter)}
-            />
-          </div>
-
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.03)" }} className="my-4" />
-
-          <DisabledGroup label="LIKUIDITAS" options={["Semua", ">50B/hari", ">200B/hari", ">500B/hari"]} />
-          <DisabledGroup label="VOLUME ANOMALI" options={["Semua", ">1.5× Rata-rata", ">2× Rata-rata", ">3× Rata-rata"]} />
-          <DisabledGroup label="KAPITALISASI PASAR" options={["Semua", "Small Cap", "Mid Cap", "Large Cap"]} />
-
-          <div className="mt-4 flex flex-col gap-2">
-            <button
-              onClick={resetFilters}
-              className="w-full py-2 rounded-md transition-all"
+          <div>
+            <p
               style={{
-                fontFamily: mono, fontSize: 10,
-                background: "rgba(255,255,255,0.02)",
-                color: "#6b7280",
-                border: "1px solid #1F2937",
+                fontFamily: mono,
+                fontSize: 9,
+                letterSpacing: "0.2em",
+                color: T4,
+                textTransform: "uppercase",
+                marginBottom: 6,
+                margin: "0 0 6px 0",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
+              data-testid="screener-label"
+            >
+              SCREENER · IDX
+            </p>
+            <h1
+              style={{
+                fontFamily: inter,
+                fontSize: 20,
+                fontWeight: 600,
+                color: T1,
+                letterSpacing: "-0.02em",
+                margin: 0,
+              }}
+              data-testid="screener-title"
+            >
+              Pemilihan Saham
+            </h1>
+          </div>
+          <span
+            style={{
+              fontFamily: mono,
+              fontSize: 13,
+              color: POSITIVE,
+              marginLeft: "auto",
+            }}
+          >
+            {filtered.length} saham cocok
+          </span>
+        </div>
+
+        {/* PRESET QUERIES */}
+        <div style={{ marginBottom: 16 }}>
+          <p
+            style={{
+              fontFamily: mono,
+              fontSize: 8,
+              letterSpacing: "0.14em",
+              color: T4,
+              textTransform: "uppercase",
+              marginBottom: 8,
+              margin: "0 0 8px 0",
+            }}
+          >
+            KUERI TERSIMPAN
+          </p>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => applyPreset(preset)}
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  letterSpacing: "0.06em",
+                  padding: "6px 14px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  background:
+                    activePreset === preset.id ? "rgba(79,195,247,0.12)" : S1,
+                  border:
+                    activePreset === preset.id
+                      ? "1px solid rgba(79,195,247,0.3)"
+                      : `1px solid ${B1}`,
+                  color: activePreset === preset.id ? SIGNAL : T3,
+                  transition: "all 0.15s",
+                }}
+                title={preset.description}
+              >
+                {preset.label}
+              </button>
+            ))}
+            <button
+              onClick={clearAllFilters}
+              style={{
+                fontFamily: mono,
+                fontSize: 9,
+                padding: "6px 14px",
+                borderRadius: 6,
+                cursor: "pointer",
+                background: "transparent",
+                border: `1px solid ${B1}`,
+                color: T4,
+              }}
               data-testid="screener-reset"
             >
-              Reset Filter
+              Reset ×
             </button>
-            <p className="text-center text-[10px] mt-1" style={{ fontFamily: mono, color: "#6b7280" }}>
-              {filtered.length} saham ditemukan dari {totalStocks} saham
-            </p>
           </div>
         </div>
 
-        {/* RIGHT — Results */}
-        <div>
-          {/* Sort bar */}
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
-              Diurutkan berdasarkan:
+        {/* ACTIVE FILTER CHIPS */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
+            background: S1,
+            border: `1px solid ${B1}`,
+            borderRadius: 8,
+            padding: "10px 14px",
+            marginBottom: 16,
+            minHeight: 48,
+          }}
+          data-testid="screener-filter-panel"
+        >
+          {activeChips.length === 0 && (
+            <span style={{ fontFamily: mono, fontSize: 10, color: T4 }}>
+              Semua saham · pilih kueri atau tambah filter di bawah
             </span>
-            <div className="flex gap-1.5">
-              {([
-                { key: "score_desc" as SortKey, label: "Skor ↓" },
-                { key: "score_asc" as SortKey, label: "Skor ↑" },
-                { key: "name_az" as SortKey, label: "Nama A–Z" },
-                { key: "change_desc" as SortKey, label: "Perubahan ↓" },
-              ]).map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => setSortKey(s.key)}
-                  className="px-3 py-1.5 rounded-md cursor-pointer transition-all duration-150"
-                  style={pillStyle(sortKey === s.key)}
-                  data-testid={`screener-sort-${s.key}`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
+          {activeChips.map((chip) => (
+            <span
+              key={chip.id}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontFamily: mono,
+                fontSize: 10,
+                letterSpacing: "0.04em",
+                padding: "4px 10px",
+                borderRadius: 4,
+                background: chip.color + "18",
+                border: `1px solid ${chip.color}40`,
+                color: chip.color,
+              }}
+            >
+              {chip.label}
+              <button
+                onClick={() => removeChip(chip.id)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: chip.color,
+                  cursor: "pointer",
+                  padding: 0,
+                  lineHeight: 1,
+                  fontSize: 11,
+                }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
 
-          {/* Table */}
-          <div className="w-full overflow-x-auto">
-            <table className="w-full min-w-[860px]">
-              <thead>
-                <tr style={{ background: "#0d0d0d", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                  {["SAHAM", "SEKTOR", "HARGA", "SKOR", "SIKLUS", "ALIRAN", "AKSI"].map((h) => (
-                    <th
-                      key={h}
-                      className="text-left px-4 py-3"
-                      style={{
-                        fontFamily: mono,
-                        fontSize: 9,
-                        letterSpacing: "0.12em",
-                        color: "#6B7280",
-                        textTransform: "uppercase" as const,
-                        fontWeight: 400,
-                        background: "#0d0d0d",
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} style={{ background: "#161616", borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                      {Array.from({ length: 7 }).map((_, j) => (
-                        <td key={j} className="px-4 py-3">
-                          <div className="h-4 w-16 rounded bg-[#222] animate-pulse" />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : filtered.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-16 text-center">
-                      <p
-                        className="text-sm mb-3"
-                        style={{ fontFamily: mono, color: "rgba(255,255,255,0.12)", letterSpacing: "0.15em" }}
-                      >
-                        [ TIDAK ADA HASIL ]
-                      </p>
-                      <p className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
-                        Coba ubah atau reset kriteria filter
-                      </p>
-                    </td>
-                  </tr>
-                ) : (
-                  filtered.map((stock) => {
-                    const v2 = stock._v2;
-                    const accent = bucketAccent(stock.homepageBucket);
-                    return (
-                      <tr
-                        key={stock.symbol}
-                        className="transition-colors duration-100 hover:bg-[#1a1a1a]"
-                        style={{
-                          background: "#161616",
-                          borderBottom: "1px solid rgba(255,255,255,0.03)",
-                          borderLeft: `2px solid ${accent}`,
-                        }}
-                        data-testid={`screener-row-${stock.symbol}`}
-                      >
-                        {/* SAHAM */}
-                        <td className="px-4 py-3 w-48">
-                          <div className="flex items-center gap-3 py-1">
-                            <StockLogo symbol={stock.symbol} />
-                            <div className="flex flex-col gap-0.5">
-                              <p className="text-base font-bold text-white" style={{ fontFamily: sora }}>
-                                {stock.symbol}
-                              </p>
-                              <p className="text-[11px] truncate" style={{ fontFamily: mono, color: "#6b7280", maxWidth: 160 }}>
-                                {stock.name}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
+        {/* FILTER QUICK-ADD ROW */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+          {/* Score filter */}
+          <FilterGroup
+            label="Skor >"
+            items={["30", "45", "60", "75"]}
+            onSelect={(v) => setMinScore(minScore === parseInt(v) ? 0 : parseInt(v))}
+            activeValue={minScore > 0 ? String(minScore) : null}
+          />
 
-                        {/* SEKTOR */}
-                        <td className="px-4 py-3 w-28">
-                          <span className="text-[10px]" style={{ fontFamily: mono, color: "#6b7280" }}>
-                            {stock.sector || "—"}
-                          </span>
-                        </td>
+          {/* Siklus filter */}
+          <FilterGroup
+            label="Siklus"
+            items={["Entry Window", "Konfirmasi", "Terlalu Dini", "Waspada"]}
+            onSelect={(v) => {
+              const map: Record<string, string> = {
+                "Entry Window": "ENTRY_WINDOW",
+                "Konfirmasi": "KONFIRMASI_MULAI",
+                "Terlalu Dini": "TERLALU_DINI",
+                "Waspada": "WASPADAI_DISTRIBUSI",
+              };
+              setSiklusFilter((prev) => {
+                const n = new Set(prev);
+                n.has(map[v]) ? n.delete(map[v]) : n.add(map[v]);
+                return n;
+              });
+            }}
+            activeValues={Array.from(siklusFilter).map(
+              (k) =>
+                Object.entries({
+                  "Entry Window": "ENTRY_WINDOW",
+                  "Konfirmasi": "KONFIRMASI_MULAI",
+                  "Terlalu Dini": "TERLALU_DINI",
+                  "Waspada": "WASPADAI_DISTRIBUSI",
+                }).find(([, val]) => val === k)?.[0] ?? k,
+            )}
+          />
 
-                        {/* HARGA */}
-                        <td className="px-4 py-3 w-28">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-sm font-medium text-white" style={{ fontFamily: mono }}>
-                              Rp {parseFloat(String(stock.price).replace(/[^0-9.-]/g, "") || "0").toLocaleString("id-ID")}
-                            </span>
-                            <span
-                              className={`text-xs font-medium ${
-                                parseFloat(stock.changePercent) > 0
-                                  ? "text-emerald-400"
-                                  : parseFloat(stock.changePercent) < 0
-                                    ? "text-red-400"
-                                    : "text-[#6b7280]"
-                              }`}
-                              style={{ fontFamily: mono }}
-                            >
-                              {parseFloat(stock.changePercent) > 0
-                                ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
-                                : parseFloat(stock.changePercent) < 0
-                                  ? `▼ ${parseFloat(stock.changePercent).toFixed(2)}%`
-                                  : `— 0.00%`}
-                            </span>
-                          </div>
-                        </td>
+          {/* Aliran filter */}
+          <FilterGroup
+            label="Aliran"
+            items={["Akumulasi", "Distribusi", "Netral"]}
+            onSelect={(v) =>
+              setFlowFilter((prev) => {
+                const n = new Set(prev);
+                n.has(v) ? n.delete(v) : n.add(v);
+                return n;
+              })
+            }
+            activeValues={Array.from(flowFilter)}
+          />
 
-                        {/* SKOR */}
-                        <td className="px-4 py-3 w-20">
-                          <div className="flex flex-col gap-1.5">
-                            <span className="text-lg font-bold" style={{ fontFamily: mono, color: scoreColor(stock.readinessScore) }}>
-                              {stock.readinessScore}
-                            </span>
-                            <div style={{ height: 3, width: 48, background: "rgba(255,255,255,0.06)", borderRadius: 9999 }}>
-                              <div style={{
-                                height: "100%",
-                                width: `${stock.readinessScore}%`,
-                                background: scoreColor(stock.readinessScore),
-                                borderRadius: 9999,
-                              }} />
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* SIKLUS */}
-                        <td className="px-4 py-3 w-40">
-                          <CycleLabel position={v2.cyclePosition} />
-                        </td>
-
-                        {/* ALIRAN */}
-                        <td className="px-4 py-3 w-28">
-                          <FlowLabel bias={v2.flowBias} />
-                        </td>
-
-                        {/* AKSI */}
-                        <td className="px-4 py-3 w-32 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); toggleWatchlist(stock.symbol); }}
-                              className={`p-1.5 rounded-sm border transition-all duration-150 ${
-                                watchlistedSymbols.has(stock.symbol)
-                                  ? "border-amber-500/40 bg-amber-500/10 hover:border-amber-500/60 hover:bg-amber-500/20"
-                                  : "border-[#ffffff10] bg-transparent hover:border-amber-500/30"
-                              }`}
-                              data-testid={`screener-star-${stock.symbol}`}
-                            >
-                              <Star
-                                size={14}
-                                className={
-                                  watchlistedSymbols.has(stock.symbol)
-                                    ? "fill-amber-400 text-amber-400"
-                                    : "text-[#ffffff30] hover:text-amber-400/60"
-                                }
-                              />
-                            </button>
-                            <Link href={`/stock/${stock.symbol}`}>
-                              <button
-                                className="text-[10px] px-3 py-1.5 rounded-sm transition-all"
-                                style={{
-                                  fontFamily: mono,
-                                  background: "rgba(56,189,248,0.1)",
-                                  color: "#38BDF8",
-                                  border: "1px solid rgba(56,189,248,0.2)",
-                                }}
-                                data-testid={`screener-detail-${stock.symbol}`}
-                              >
-                                ANALISIS →
-                              </button>
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+          {/* Sort buttons */}
+          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{
+                fontFamily: mono,
+                fontSize: 9,
+                color: T4,
+                letterSpacing: "0.1em",
+              }}
+            >
+              URUT
+            </span>
+            {(["score_desc", "score_asc", "name_az", "change_desc"] as const).map((sk) => (
+              <button
+                key={sk}
+                onClick={() => setSortKey(sk)}
+                style={{
+                  fontFamily: mono,
+                  fontSize: 9,
+                  padding: "5px 10px",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  background:
+                    sortKey === sk ? "rgba(79,195,247,0.1)" : "transparent",
+                  border:
+                    sortKey === sk
+                      ? "1px solid rgba(79,195,247,0.3)"
+                      : `1px solid ${B1}`,
+                  color: sortKey === sk ? SIGNAL : T3,
+                }}
+                data-testid={`screener-sort-${sk}`}
+              >
+                {sk === "score_desc"
+                  ? "Skor ↓"
+                  : sk === "score_asc"
+                    ? "Skor ↑"
+                    : sk === "name_az"
+                      ? "A–Z"
+                      : "Perubahan ↓"}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <p className="mt-8 text-center" style={{ fontFamily: mono, fontSize: 10, color: "rgba(255,255,255,0.12)" }}>
-        Filter likuiditas, volume, dan kapitalisasi akan aktif setelah integrasi data IDX live · PT Berkat Digital Investasi
-      </p>
+      {/* ── CARD GRID RESULTS ──────────────────────────────────────────────── */}
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 32px 40px" }}>
+        {isLoading ? (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              gap: 12,
+            }}
+          >
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  height: 180,
+                  background: S1,
+                  borderRadius: 10,
+                  border: `1px solid ${B1}`,
+                }}
+              />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "80px 32px" }}>
+            <p
+              style={{
+                fontFamily: mono,
+                fontSize: 10,
+                color: T4,
+                letterSpacing: "0.15em",
+                marginBottom: 8,
+                margin: "0 0 8px 0",
+              }}
+            >
+              [ TIDAK ADA HASIL ]
+            </p>
+            <p style={{ fontFamily: inter, fontSize: 13, color: T4, margin: 0 }}>
+              Coba reset filter atau ubah parameter
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {filtered.map((stock) => (
+              <StockCard
+                key={stock.symbol}
+                stock={stock}
+                inWatchlist={watchlistedSymbols.has(stock.symbol)}
+                onWatchlist={() => toggleWatchlist(stock.symbol)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

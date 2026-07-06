@@ -1,0 +1,14 @@
+{
+  "symbol": "BMRI",
+  "date": "2026-05-19",
+  "description": "BMRI mild accumulation — moderate institutional buying, some profit-taking",
+  "netFlow": 84600000000,
+  "price": 5275,
+  "brokers": [
+    { "code": "BK",   "name": "PT Mandiri Sekuritas",   "netBuy": "68.4B IDR",  "netSell": null,        "volumePercent": "10.2%", "avgBuy": "5,280", "avgSell": "5,270" },
+    { "code": "RHB",  "name": "PT RHB Securities",      "netBuy": "42.1B IDR",  "netSell": null,        "volumePercent": "7.8%",  "avgBuy": "5,275", "avgSell": "5,265" },
+    { "code": "CIMB", "name": "PT CIMB Securities",     "netBuy": "31.5B IDR",  "netSell": null,        "volumePercent": "6.1%",  "avgBuy": "5,278", "avgSell": "5,268" },
+    { "code": "YP",   "name": "PT eTrading Securities", "netBuy": null,         "netSell": "32.7B IDR", "volumePercent": "11.4%", "avgBuy": "5,282", "avgSell": "5,272" },
+    { "code": "DH",   "name": "PT Sinarmas Sekuritas",  "netBuy": null,         "netSell": "24.7B IDR", "volumePercent": "8.3%",  "avgBuy": "5,285", "avgSell": "5,275" }
+  ]
+}

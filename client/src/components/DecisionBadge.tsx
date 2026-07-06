@@ -7,19 +7,19 @@ interface DecisionBadgeProps {
 const CONFIG: Record<string, { label: string; icon: string; bg: string; text: string; border: string }> = {
   WATCHLIST_PRIORITAS: {
     label: "Watchlist Prioritas", icon: "★",
-    bg: "rgba(251,191,36,0.12)", text: "#FBBF24", border: "rgba(251,191,36,0.40)",
+    bg: "rgba(245,158,11,0.10)", text: "#F59E0B", border: "rgba(245,158,11,0.30)",
   },
   SIAP_DIPANTAU: {
     label: "Siap Entry", icon: "✓",
-    bg: "rgba(52,211,153,0.12)", text: "#34D399", border: "rgba(52,211,153,0.40)",
+    bg: "rgba(16,185,129,0.10)", text: "#10B981", border: "rgba(16,185,129,0.30)",
   },
   HINDARI_DULU: {
     label: "Hindari Dulu", icon: "✕",
-    bg: "rgba(248,113,113,0.12)", text: "#F87171", border: "rgba(248,113,113,0.40)",
+    bg: "rgba(239,68,68,0.10)", text: "#EF4444", border: "rgba(239,68,68,0.30)",
   },
   NETRAL: {
     label: "Netral", icon: "○",
-    bg: "rgba(107,114,128,0.12)", text: "#9CA3AF", border: "rgba(107,114,128,0.40)",
+    bg: "rgba(113,113,122,0.10)", text: "#71717A", border: "rgba(113,113,122,0.30)",
   },
 };
 
@@ -29,7 +29,7 @@ const SIZES = {
   lg: { fontSize: 13, px: 14, py: 7, gap: 7 },
 };
 
-const mono = "'IBM Plex Mono', monospace";
+const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 
 export function DecisionBadge({ decision, size = "md", showIcon = true }: DecisionBadgeProps) {
   const cfg = CONFIG[decision] ?? CONFIG.NETRAL;

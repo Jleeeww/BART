@@ -12,6 +12,8 @@ import RadarPage from "@/pages/RadarPage";
 import WatchlistPage from "@/pages/WatchlistPage";
 import ScreenerPage from "@/pages/ScreenerPage";
 import PasarPage from "@/pages/PasarPage";
+import BeritaPage from "@/pages/BeritaPage";
+import AdminSeed from "@/pages/AdminSeed";
 import { SimulationProvider } from "@/contexts/SimulationContext";
 import { SimulationBanner } from "@/components/SimulationBanner";
 import { Sidebar } from "@/components/Sidebar";
@@ -25,6 +27,8 @@ function Router() {
       <Route path="/watchlist" component={WatchlistPage} />
       <Route path="/screener" component={ScreenerPage} />
       <Route path="/pasar" component={PasarPage} />
+      <Route path="/berita" component={BeritaPage} />
+      <Route path="/admin/seed" component={AdminSeed} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -50,7 +54,7 @@ function AppLayout() {
   const mainMargin = isDesktop ? (collapsed ? 56 : 200) : 0;
 
   return (
-    <div className="flex min-h-screen" style={{ background: "#0f0f0f" }}>
+    <div className="flex min-h-screen" style={{ background: "#000000" }}>
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
       <div
         className="md:hidden fixed top-0 left-0 right-0 z-50 h-12 bg-[#0a0a0a] border-b border-[#ffffff08] flex items-center justify-between px-4"
@@ -59,7 +63,7 @@ function AppLayout() {
         <Link href="/">
           <span
             className="text-base font-bold cursor-pointer"
-            style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#38BDF8" }}
+            style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#4FC3F7" }}
           >
             BART
           </span>
