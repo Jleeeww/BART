@@ -4,20 +4,20 @@ import { useQuery } from "@tanstack/react-query";
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 const inter = "'Inter', system-ui, sans-serif";
-const S0 = "#000000";
-const S1 = "#0a0a0a";
-const S2 = "#0f0f0f";
-const S3 = "#141414";
-const B1 = "rgba(255,255,255,0.06)";
+const S0 = "var(--surface-0)";
+const S1 = "var(--surface-1)";
+const S2 = "var(--surface-2)";
+const S3 = "var(--surface-3)";
+const B1 = "var(--border-2)";
 const B2 = "rgba(255,255,255,0.10)";
-const T1 = "#F4F4F5";
-const T2 = "#A1A1AA";
-const T3 = "#71717A";
-const T4 = "#3F3F46";
-const SIGNAL = "#4FC3F7";
-const POSITIVE = "#4ADE80";
-const WARNING = "#FBBF24";
-const DANGER = "#F87171";
+const T1 = "var(--text-1)";
+const T2 = "var(--text-2)";
+const T3 = "var(--text-3)";
+const T4 = "var(--text-4)";
+const SIGNAL = "var(--signal)";
+const POSITIVE = "var(--positive)";
+const WARNING = "var(--warning)";
+const DANGER = "var(--danger)";
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 interface StockData {
@@ -195,7 +195,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
     <p
       style={{
         fontFamily: mono,
-        fontSize: 9,
+        fontSize: 12,
         letterSpacing: "0.18em",
         color: T4,
         textTransform: "uppercase" as const,
@@ -246,7 +246,7 @@ function HeaderBar({ sessionStatus }: { sessionStatus: ReturnType<typeof getIDXS
           <p
             style={{
               fontFamily: mono,
-              fontSize: 9,
+              fontSize: 12,
               letterSpacing: "0.2em",
               color: T4,
               textTransform: "uppercase" as const,
@@ -283,7 +283,7 @@ function HeaderBar({ sessionStatus }: { sessionStatus: ReturnType<typeof getIDXS
                 flexShrink: 0,
               }}
             />
-            <span style={{ fontFamily: mono, fontSize: 10, color: dotColor }}>
+            <span style={{ fontFamily: mono, fontSize: 12, color: dotColor }}>
               {sessionStatus.label}
             </span>
           </div>
@@ -309,7 +309,7 @@ function HeaderBar({ sessionStatus }: { sessionStatus: ReturnType<typeof getIDXS
                 flexShrink: 0,
               }}
             />
-            <span style={{ fontFamily: mono, fontSize: 9, color: SIGNAL, letterSpacing: "0.12em" }}>
+            <span style={{ fontFamily: mono, fontSize: 12, color: SIGNAL, letterSpacing: "0.12em" }}>
               LIVE
             </span>
           </div>
@@ -366,27 +366,27 @@ function CommodityTicker({ items }: { items: TickerItem[] }) {
               }}
             >
               {/* Label */}
-              <span style={{ fontFamily: mono, fontSize: 9, color: T4, letterSpacing: "0.1em", flexShrink: 0 }}>
+              <span style={{ fontFamily: mono, fontSize: 12, color: T4, letterSpacing: "0.1em", flexShrink: 0 }}>
                 {item.label}
               </span>
 
               {/* Divider pip */}
-              <span style={{ color: B2, fontSize: 10 }}>|</span>
+              <span style={{ color: B2, fontSize: 12 }}>|</span>
 
               {/* Price */}
-              <span style={{ fontFamily: mono, fontSize: 11, color: T1, fontWeight: 600, flexShrink: 0 }}>
+              <span style={{ fontFamily: mono, fontSize: 13, color: T1, fontWeight: 600, flexShrink: 0 }}>
                 {item.price}
               </span>
 
               {/* Change % */}
-              <span style={{ fontFamily: mono, fontSize: 10, color: changeColor, flexShrink: 0 }}>
+              <span style={{ fontFamily: mono, fontSize: 12, color: changeColor, flexShrink: 0 }}>
                 {item.change5d == null
                   ? "—"
                   : `${item.change5d >= 0 ? "+" : ""}${item.change5d.toFixed(2)}%`}
               </span>
 
               {/* Trend arrow */}
-              <span style={{ fontFamily: mono, fontSize: 10, color: changeColor, flexShrink: 0 }}>
+              <span style={{ fontFamily: mono, fontSize: 12, color: changeColor, flexShrink: 0 }}>
                 {trendArrow}
               </span>
 
@@ -395,7 +395,7 @@ function CommodityTicker({ items }: { items: TickerItem[] }) {
                 <span
                   style={{
                     fontFamily: mono,
-                    fontSize: 8,
+                    fontSize: 13,
                     color: T4,
                     background: "rgba(63,63,70,0.4)",
                     border: `1px solid ${T4}`,
@@ -446,8 +446,8 @@ function SectorScatterPlot({ sectors, hoveredSector, onHover, hotSectors }: Scat
       <div style={{ position: "relative" as const, width: W, height: H }}>
         <svg width={W} height={H} style={{ display: "block" }}>
           {/* Quadrant divider lines */}
-          <line x1={170} y1={40} x2={170} y2={300} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
-          <line x1={40} y1={170} x2={300} y2={170} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />
+          <line x1={170} y1={40} x2={170} y2={300} stroke="var(--border-1)" strokeWidth={1} />
+          <line x1={40} y1={170} x2={300} y2={170} stroke="var(--border-1)" strokeWidth={1} />
 
           {/* Quadrant labels */}
           {/* Top-right: MEMIMPIN */}
@@ -554,17 +554,17 @@ function SectorScatterPlot({ sectors, hoveredSector, onHover, hotSectors }: Scat
               pointerEvents: "none" as const,
             }}
           >
-            <p style={{ fontFamily: mono, fontSize: 9, color: T4, margin: "0 0 4px", letterSpacing: "0.1em", textTransform: "uppercase" as const }}>
+            <p style={{ fontFamily: mono, fontSize: 12, color: T4, margin: "0 0 4px", letterSpacing: "0.1em", textTransform: "uppercase" as const }}>
               {sectorShortName(hoveredObj.sector)}
             </p>
-            <p style={{ fontFamily: inter, fontSize: 11, color: T1, fontWeight: 600, margin: "0 0 8px" }}>
+            <p style={{ fontFamily: inter, fontSize: 13, color: T1, fontWeight: 600, margin: "0 0 8px" }}>
               {hoveredObj.displayName}
             </p>
             <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
               <span
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
+                  fontSize: 12,
                   color:
                     hoveredObj.direction === "MASUK"
                       ? POSITIVE
@@ -576,7 +576,7 @@ function SectorScatterPlot({ sectors, hoveredSector, onHover, hotSectors }: Scat
                       ? "rgba(74,222,128,0.1)"
                       : hoveredObj.direction === "KELUAR"
                       ? "rgba(248,113,113,0.1)"
-                      : "rgba(255,255,255,0.04)",
+                      : "var(--border-1)",
                   border: `1px solid ${
                     hoveredObj.direction === "MASUK"
                       ? "rgba(74,222,128,0.2)"
@@ -590,15 +590,15 @@ function SectorScatterPlot({ sectors, hoveredSector, onHover, hotSectors }: Scat
               >
                 {hoveredObj.direction}
               </span>
-              <span style={{ fontFamily: mono, fontSize: 10, color: T1, fontWeight: 700 }}>
+              <span style={{ fontFamily: mono, fontSize: 12, color: T1, fontWeight: 700 }}>
                 {hoveredObj.rotationScore}
               </span>
             </div>
             {hoveredObj.topStocks.length > 0 && (
               <div>
-                <p style={{ fontFamily: mono, fontSize: 8, color: T4, margin: "0 0 4px", letterSpacing: "0.08em" }}>TOP STOCKS</p>
+                <p style={{ fontFamily: mono, fontSize: 13, color: T4, margin: "0 0 4px", letterSpacing: "0.08em" }}>TOP STOCKS</p>
                 {hoveredObj.topStocks.slice(0, 3).map((ts) => (
-                  <p key={ts.symbol} style={{ fontFamily: mono, fontSize: 9, color: T2, margin: "2px 0" }}>
+                  <p key={ts.symbol} style={{ fontFamily: mono, fontSize: 12, color: T2, margin: "2px 0" }}>
                     {ts.symbol} <span style={{ color: T4 }}>{ts.readinessScore}</span>
                   </p>
                 ))}
@@ -626,7 +626,7 @@ function SectorScatterPlot({ sectors, hoveredSector, onHover, hotSectors }: Scat
                 flexShrink: 0,
               }}
             />
-            <span style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.08em" }}>
+            <span style={{ fontFamily: mono, fontSize: 13, color: T4, letterSpacing: "0.08em" }}>
               {leg.label}
             </span>
           </div>
@@ -708,7 +708,7 @@ function MacroSignalsCard({ macroContext }: MacroSignalsCardProps) {
       {/* Signals list */}
       <div style={{ flex: 1 }}>
         {!macroContext ? (
-          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T4, letterSpacing: "0.1em" }}>
             [ MEMUAT... ]
           </p>
         ) : macroContext.signals?.length ? (
@@ -721,7 +721,7 @@ function MacroSignalsCard({ macroContext }: MacroSignalsCardProps) {
                   ? "rgba(74,222,128,0.08)"
                   : sig.effect === "NEGATIF"
                   ? "rgba(248,113,113,0.08)"
-                  : "rgba(255,255,255,0.03)";
+                  : "var(--border-1)";
               const effectBorder =
                 sig.effect === "POSITIF"
                   ? "rgba(74,222,128,0.2)"
@@ -745,7 +745,7 @@ function MacroSignalsCard({ macroContext }: MacroSignalsCardProps) {
                     <span
                       style={{
                         fontFamily: mono,
-                        fontSize: 8,
+                        fontSize: 13,
                         color: typeColor(sig.type),
                         background: typeBg(sig.type),
                         border: `1px solid ${typeBorder(sig.type)}`,
@@ -760,10 +760,10 @@ function MacroSignalsCard({ macroContext }: MacroSignalsCardProps) {
                     </span>
 
                     {/* Arrow */}
-                    <span style={{ fontFamily: mono, fontSize: 11, color: T4 }}>→</span>
+                    <span style={{ fontFamily: mono, fontSize: 13, color: T4 }}>→</span>
 
                     {/* Sector name */}
-                    <span style={{ fontFamily: mono, fontSize: 9, color: T2 }}>
+                    <span style={{ fontFamily: mono, fontSize: 12, color: T2 }}>
                       {SECTOR_MAP[sig.sector] ?? sig.sector}
                     </span>
 
@@ -771,7 +771,7 @@ function MacroSignalsCard({ macroContext }: MacroSignalsCardProps) {
                     <span
                       style={{
                         fontFamily: mono,
-                        fontSize: 8,
+                        fontSize: 13,
                         color: effectColor,
                         background: effectBg,
                         border: `1px solid ${effectBorder}`,
@@ -785,13 +785,13 @@ function MacroSignalsCard({ macroContext }: MacroSignalsCardProps) {
                     </span>
 
                     {/* Strength */}
-                    <span style={{ fontFamily: mono, fontSize: 8, color: T4, marginLeft: "auto" }}>
+                    <span style={{ fontFamily: mono, fontSize: 13, color: T4, marginLeft: "auto" }}>
                       {sig.strength}
                     </span>
                   </div>
 
                   {/* Description */}
-                  <p style={{ fontFamily: inter, fontSize: 11, color: T3, margin: 0, lineHeight: 1.55 }}>
+                  <p style={{ fontFamily: inter, fontSize: 13, color: T3, margin: 0, lineHeight: 1.55 }}>
                     {sig.description}
                   </p>
                 </div>
@@ -799,7 +799,7 @@ function MacroSignalsCard({ macroContext }: MacroSignalsCardProps) {
             })}
           </div>
         ) : (
-          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T4, letterSpacing: "0.1em" }}>
             [ TIDAK ADA SINYAL AKTIF ]
           </p>
         )}
@@ -831,7 +831,7 @@ function MacroSignalsCard({ macroContext }: MacroSignalsCardProps) {
               {sentimentLabel}
             </p>
             {macroContext.sentimentReason && (
-              <p style={{ fontFamily: inter, fontSize: 11, color: T3, margin: 0, lineHeight: 1.5 }}>
+              <p style={{ fontFamily: inter, fontSize: 13, color: T3, margin: 0, lineHeight: 1.5 }}>
                 {macroContext.sentimentReason}
               </p>
             )}
@@ -890,7 +890,7 @@ function AltDataCard({ altData }: AltDataCardProps) {
             marginBottom: 14,
           }}
         >
-          <p style={{ fontFamily: mono, fontSize: 9, color: WARNING, margin: 0 }}>
+          <p style={{ fontFamily: mono, fontSize: 12, color: WARNING, margin: 0 }}>
             Sumber data degraded: {altData.degradedSources.join(", ")}
           </p>
         </div>
@@ -898,29 +898,29 @@ function AltDataCard({ altData }: AltDataCardProps) {
 
       {/* ── Commodities sub-section ── */}
       <div style={{ marginBottom: 16 }}>
-        <p style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.14em", textTransform: "uppercase" as const, margin: "0 0 10px" }}>
+        <p style={{ fontFamily: mono, fontSize: 13, color: T4, letterSpacing: "0.14em", textTransform: "uppercase" as const, margin: "0 0 10px" }}>
           KOMODITAS
         </p>
 
         {!altData ? (
-          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>[ MEMUAT... ]</p>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T4, letterSpacing: "0.1em" }}>[ MEMUAT... ]</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 10 }}>
             {/* Coal HBA1 */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <p style={{ fontFamily: mono, fontSize: 9, color: T4, margin: "0 0 2px", letterSpacing: "0.08em" }}>BATUBARA HBA1</p>
+                <p style={{ fontFamily: mono, fontSize: 12, color: T4, margin: "0 0 2px", letterSpacing: "0.08em" }}>BATUBARA HBA1</p>
                 <p style={{ fontFamily: mono, fontSize: 15, fontWeight: 700, color: T1, margin: 0 }}>
                   {altData.coal.hba1USD != null ? `$${altData.coal.hba1USD}` : "—"}
                 </p>
-                <p style={{ fontFamily: mono, fontSize: 8, color: T4, margin: "2px 0 0" }}>USD/ton</p>
+                <p style={{ fontFamily: mono, fontSize: 13, color: T4, margin: "2px 0 0" }}>USD/ton</p>
               </div>
               <div style={{ textAlign: "right" as const }}>
                 {altData.coal.trend && (
                   <span
                     style={{
                       fontFamily: mono,
-                      fontSize: 9,
+                      fontSize: 12,
                       color:
                         altData.coal.trend === "NAIK"
                           ? POSITIVE
@@ -937,7 +937,7 @@ function AltDataCard({ altData }: AltDataCardProps) {
                 <span
                   style={{
                     fontFamily: mono,
-                    fontSize: 8,
+                    fontSize: 13,
                     color: altData.coal.source?.includes("FALLBACK") ? T4 : POSITIVE,
                     background: altData.coal.source?.includes("FALLBACK") ? "rgba(63,63,70,0.3)" : "rgba(74,222,128,0.07)",
                     border: `1px solid ${altData.coal.source?.includes("FALLBACK") ? T4 : "rgba(74,222,128,0.2)"}`,
@@ -955,11 +955,11 @@ function AltDataCard({ altData }: AltDataCardProps) {
             {/* CPO */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <p style={{ fontFamily: mono, fontSize: 9, color: T4, margin: "0 0 2px", letterSpacing: "0.08em" }}>CPO SAWIT</p>
+                <p style={{ fontFamily: mono, fontSize: 12, color: T4, margin: "0 0 2px", letterSpacing: "0.08em" }}>CPO SAWIT</p>
                 <p style={{ fontFamily: mono, fontSize: 15, fontWeight: 700, color: T1, margin: 0 }}>
                   {altData.cpo.priceUSD != null ? `$${altData.cpo.priceUSD}` : altData.cpo.priceIDR != null ? altData.cpo.priceIDR.toLocaleString("id-ID") : "—"}
                 </p>
-                <p style={{ fontFamily: mono, fontSize: 8, color: T4, margin: "2px 0 0" }}>
+                <p style={{ fontFamily: mono, fontSize: 13, color: T4, margin: "2px 0 0" }}>
                   {altData.cpo.priceUSD != null ? "USD/MT" : "IDR/kg"}
                 </p>
               </div>
@@ -968,7 +968,7 @@ function AltDataCard({ altData }: AltDataCardProps) {
                   <span
                     style={{
                       fontFamily: mono,
-                      fontSize: 9,
+                      fontSize: 12,
                       color:
                         altData.cpo.trend === "NAIK"
                           ? POSITIVE
@@ -985,7 +985,7 @@ function AltDataCard({ altData }: AltDataCardProps) {
                 <span
                   style={{
                     fontFamily: mono,
-                    fontSize: 8,
+                    fontSize: 13,
                     color: altData.cpo.source?.includes("FALLBACK") ? T4 : POSITIVE,
                     background: altData.cpo.source?.includes("FALLBACK") ? "rgba(63,63,70,0.3)" : "rgba(74,222,128,0.07)",
                     border: `1px solid ${altData.cpo.source?.includes("FALLBACK") ? T4 : "rgba(74,222,128,0.2)"}`,
@@ -1005,14 +1005,14 @@ function AltDataCard({ altData }: AltDataCardProps) {
 
       {/* ── Weather sub-section ── */}
       <div>
-        <p style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.14em", textTransform: "uppercase" as const, margin: "0 0 10px" }}>
+        <p style={{ fontFamily: mono, fontSize: 13, color: T4, letterSpacing: "0.14em", textTransform: "uppercase" as const, margin: "0 0 10px" }}>
           CUACA REGIONAL
         </p>
 
         {!altData ? (
-          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>[ MEMUAT... ]</p>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T4, letterSpacing: "0.1em" }}>[ MEMUAT... ]</p>
         ) : altData.weather.length === 0 ? (
-          <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>[ MEMUAT... ]</p>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T4, letterSpacing: "0.1em" }}>[ MEMUAT... ]</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" as const, gap: 0 }}>
             {altData.weather.slice(0, 4).map((w, i, arr) => (
@@ -1028,11 +1028,11 @@ function AltDataCard({ altData }: AltDataCardProps) {
                 }}
               >
                 <div>
-                  <p style={{ fontFamily: inter, fontSize: 11, color: T2, margin: "0 0 2px" }}>
+                  <p style={{ fontFamily: inter, fontSize: 13, color: T2, margin: "0 0 2px" }}>
                     {w.regionName}
                   </p>
                   {w.temperature !== null && (
-                    <p style={{ fontFamily: mono, fontSize: 9, color: T4, margin: 0 }}>
+                    <p style={{ fontFamily: mono, fontSize: 12, color: T4, margin: 0 }}>
                       {w.temperature}°C
                     </p>
                   )}
@@ -1042,7 +1042,7 @@ function AltDataCard({ altData }: AltDataCardProps) {
                   <span
                     style={{
                       fontFamily: mono,
-                      fontSize: 9,
+                      fontSize: 12,
                       color: weatherColors(w.rainfallMm),
                       fontWeight: 600,
                     }}
@@ -1118,14 +1118,14 @@ function SectorDetailPanel({ sectorData, hoveredSector, onSelectSector }: Sector
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                  <p style={{ fontFamily: inter, fontSize: 11, fontWeight: 600, color: T1, margin: 0, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>
+                  <p style={{ fontFamily: inter, fontSize: 13, fontWeight: 600, color: T1, margin: 0, whiteSpace: "nowrap" as const, overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>
                     {s.displayName}
                   </p>
                   {isHot && (
                     <span
                       style={{
                         fontFamily: mono,
-                        fontSize: 7,
+                        fontSize: 12,
                         color: WARNING,
                         background: "rgba(251,191,36,0.1)",
                         border: `1px solid rgba(251,191,36,0.2)`,
@@ -1144,16 +1144,16 @@ function SectorDetailPanel({ sectorData, hoveredSector, onSelectSector }: Sector
                   <span style={{ fontFamily: mono, fontSize: 16, fontWeight: 700, color: scoreColor, lineHeight: 1 }}>
                     {s.rotationScore}
                   </span>
-                  <span style={{ fontFamily: mono, fontSize: 9, color: T4 }}>
+                  <span style={{ fontFamily: mono, fontSize: 12, color: T4 }}>
                     {s.momentum === "NAIK" ? "↑" : s.momentum === "TURUN" ? "↓" : "→"}
                   </span>
                 </div>
 
                 <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
-                  <span style={{ fontFamily: mono, fontSize: 8, color: POSITIVE }}>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: POSITIVE }}>
                     ↑{s.akumulasiCount} akum
                   </span>
-                  <span style={{ fontFamily: mono, fontSize: 8, color: DANGER }}>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: DANGER }}>
                     ↓{s.distribusiCount} dist
                   </span>
                 </div>
@@ -1165,7 +1165,7 @@ function SectorDetailPanel({ sectorData, hoveredSector, onSelectSector }: Sector
                         key={ts.symbol}
                         style={{
                           fontFamily: mono,
-                          fontSize: 8,
+                          fontSize: 13,
                           color: T4,
                           background: B1,
                           borderRadius: 3,
@@ -1186,11 +1186,11 @@ function SectorDetailPanel({ sectorData, hoveredSector, onSelectSector }: Sector
         <div style={{ display: "flex", gap: 20, marginTop: 10, alignItems: "center" }}>
           {sectorData.dominantTheme && (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.08em" }}>TEMA</span>
+              <span style={{ fontFamily: mono, fontSize: 13, color: T4, letterSpacing: "0.08em" }}>TEMA</span>
               <span
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
+                  fontSize: 12,
                   color: SIGNAL,
                   background: "rgba(79,195,247,0.06)",
                   border: `1px solid rgba(79,195,247,0.15)`,
@@ -1203,11 +1203,11 @@ function SectorDetailPanel({ sectorData, hoveredSector, onSelectSector }: Sector
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontFamily: mono, fontSize: 8, color: T4, letterSpacing: "0.08em" }}>ROTASI</span>
+            <span style={{ fontFamily: mono, fontSize: 13, color: T4, letterSpacing: "0.08em" }}>ROTASI</span>
             <span
               style={{
                 fontFamily: mono,
-                fontSize: 9,
+                fontSize: 12,
                 color:
                   sectorData.rotationStrength === "KUAT"
                     ? POSITIVE
@@ -1220,7 +1220,7 @@ function SectorDetailPanel({ sectorData, hoveredSector, onSelectSector }: Sector
             </span>
           </div>
           {sectorData.computedAt && (
-            <span style={{ fontFamily: mono, fontSize: 8, color: T4, marginLeft: "auto" }}>
+            <span style={{ fontFamily: mono, fontSize: 13, color: T4, marginLeft: "auto" }}>
               {formatTimestamp(sectorData.computedAt)}
               {sectorData.isStale && (
                 <span style={{ color: WARNING, marginLeft: 6 }}>· STALE</span>
@@ -1363,7 +1363,7 @@ export default function PasarPage() {
               }}
             >
               <Eyebrow>MATRIKS ROTASI SEKTOR</Eyebrow>
-              <p style={{ fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.1em" }}>
+              <p style={{ fontFamily: mono, fontSize: 12, color: T4, letterSpacing: "0.1em" }}>
                 [ MEMUAT... ]
               </p>
             </div>
@@ -1409,7 +1409,7 @@ export default function PasarPage() {
         <p
           style={{
             fontFamily: mono,
-            fontSize: 9,
+            fontSize: 12,
             color: T4,
             textAlign: "center" as const,
             letterSpacing: "0.06em",

@@ -6,31 +6,31 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 const inter = "'Inter', system-ui, sans-serif";
 
-const S0 = "#000000";
-const S1 = "#0a0a0a";
-const S2 = "#0f0f0f";
-const S3 = "#141414";
-const S4 = "#1a1a1a";
+const S0 = "var(--surface-0)";
+const S1 = "var(--surface-1)";
+const S2 = "var(--surface-2)";
+const S3 = "var(--surface-3)";
+const S4 = "var(--surface-4)";
 
-const B1 = "rgba(255,255,255,0.06)";
+const B1 = "var(--border-2)";
 const B2 = "rgba(255,255,255,0.10)";
 
-const T1 = "#F4F4F5";
-const T2 = "#A1A1AA";
-const T3 = "#71717A";
-const T4 = "#3F3F46";
+const T1 = "var(--text-1)";
+const T2 = "var(--text-2)";
+const T3 = "var(--text-3)";
+const T4 = "var(--text-4)";
 
-const SIGNAL   = "#4FC3F7";
-const POSITIVE = "#4ADE80";
-const WARNING  = "#FBBF24";
-const DANGER   = "#F87171";
+const SIGNAL   = "var(--signal)";
+const POSITIVE = "var(--positive)";
+const WARNING  = "var(--warning)";
+const DANGER   = "var(--danger)";
 
 function scoreColor(s: number): string {
-  return s >= 60 ? "#4ADE80" : s >= 45 ? "#4FC3F7" : s >= 30 ? "#FBBF24" : "#F87171";
+  return s >= 60 ? "var(--positive)" : s >= 45 ? "var(--signal)" : s >= 30 ? "var(--warning)" : "var(--danger)";
 }
 
 function bucketAccent(b: string): string {
-  return b === "siap_dipantau" ? "#4ADE80" : b === "watchlist_prioritas" ? "#FBBF24" : "#F87171";
+  return b === "siap_dipantau" ? "var(--positive)" : b === "watchlist_prioritas" ? "var(--warning)" : "var(--danger)";
 }
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ function StockLogo({ symbol }: { symbol: string }) {
       overflow: "hidden", background: "#111111", border: `1px solid ${B1}`,
     }}>
       {failed ? (
-        <span style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, color: SIGNAL }}>
+        <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, color: SIGNAL }}>
           {symbol.slice(0, 2)}
         </span>
       ) : (
@@ -118,22 +118,22 @@ function StockLogo({ symbol }: { symbol: string }) {
 }
 
 function CycleLabel({ position }: { position: string | null }) {
-  if (!position) return <span style={{ fontFamily: mono, fontSize: 10, color: T4 }}>—</span>;
+  if (!position) return <span style={{ fontFamily: mono, fontSize: 12, color: T4 }}>—</span>;
   const map: Record<string, { label: string; color: string }> = {
-    ENTRY_WINDOW:        { label: "▶ Entry Window",  color: "#4ADE80" },
-    KONFIRMASI_MULAI:    { label: "◎ Konfirmasi",    color: "#4FC3F7" },
-    TERLALU_DINI:        { label: "○ Terlalu Dini",  color: "#71717A" },
-    WASPADAI_DISTRIBUSI: { label: "▼ Distribusi",    color: "#FBBF24" },
+    ENTRY_WINDOW:        { label: "▶ Entry Window",  color: "var(--positive)" },
+    KONFIRMASI_MULAI:    { label: "◎ Konfirmasi",    color: "var(--signal)" },
+    TERLALU_DINI:        { label: "○ Terlalu Dini",  color: "var(--text-3)" },
+    WASPADAI_DISTRIBUSI: { label: "▼ Distribusi",    color: "var(--warning)" },
   };
-  const e = map[position] || { label: position, color: "#71717A" };
-  return <span style={{ fontFamily: mono, fontSize: 10, color: e.color }}>{e.label}</span>;
+  const e = map[position] || { label: position, color: "var(--text-3)" };
+  return <span style={{ fontFamily: mono, fontSize: 12, color: e.color }}>{e.label}</span>;
 }
 
 function FlowLabel({ bias }: { bias: string | null }) {
-  if (!bias)               return <span style={{ fontFamily: mono, fontSize: 10, color: T4 }}>—</span>;
-  if (bias === "Akumulasi")  return <span style={{ fontFamily: mono, fontSize: 10, color: "#4ADE80" }}>↑ Akumulasi</span>;
-  if (bias === "Distribusi") return <span style={{ fontFamily: mono, fontSize: 10, color: "#F87171" }}>↓ Distribusi</span>;
-  return <span style={{ fontFamily: mono, fontSize: 10, color: "#71717A" }}>→ Netral</span>;
+  if (!bias)               return <span style={{ fontFamily: mono, fontSize: 12, color: T4 }}>—</span>;
+  if (bias === "Akumulasi")  return <span style={{ fontFamily: mono, fontSize: 12, color: "var(--positive)" }}>↑ Akumulasi</span>;
+  if (bias === "Distribusi") return <span style={{ fontFamily: mono, fontSize: 12, color: "var(--danger)" }}>↓ Distribusi</span>;
+  return <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)" }}>→ Netral</span>;
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -242,7 +242,7 @@ export default function RadarPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
           <div>
             <p style={{
-              fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: T4,
+              fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: T4,
               textTransform: "uppercase", marginBottom: 4,
             }}>
               RADAR INSTITUSIONAL · IDX
@@ -264,7 +264,7 @@ export default function RadarPage() {
                   key={pill.key}
                   onClick={() => setFilter(pill.key)}
                   style={{
-                    fontFamily: mono, fontSize: 9, letterSpacing: "0.08em",
+                    fontFamily: mono, fontSize: 12, letterSpacing: "0.08em",
                     textTransform: "uppercase",
                     padding: "5px 12px", borderRadius: 6, cursor: "pointer",
                     background: active ? "rgba(79,195,247,0.1)" : "transparent",
@@ -282,7 +282,7 @@ export default function RadarPage() {
               <button
                 onClick={() => setSelectedSector(null)}
                 style={{
-                  fontFamily: mono, fontSize: 9, padding: "5px 12px", borderRadius: 6,
+                  fontFamily: mono, fontSize: 12, padding: "5px 12px", borderRadius: 6,
                   cursor: "pointer",
                   background: "rgba(167,139,250,0.1)",
                   border: "1px solid rgba(167,139,250,0.3)",
@@ -299,7 +299,7 @@ export default function RadarPage() {
         {stocks && stocks.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <p style={{
-              fontFamily: mono, fontSize: 8, letterSpacing: "0.16em", color: T4,
+              fontFamily: mono, fontSize: 13, letterSpacing: "0.16em", color: T4,
               textTransform: "uppercase", marginBottom: 10,
             }}>
               PETA SEKTOR · klik untuk filter
@@ -336,12 +336,12 @@ export default function RadarPage() {
                         alignItems: "flex-start", marginBottom: 8,
                       }}>
                         <p style={{
-                          fontFamily: inter, fontSize: 11, fontWeight: 600,
+                          fontFamily: inter, fontSize: 13, fontWeight: 600,
                           color: T1, lineHeight: 1.3,
                         }}>
                           {sector}
                         </p>
-                        <span style={{ fontFamily: mono, fontSize: 9, color: T4 }}>
+                        <span style={{ fontFamily: mono, fontSize: 12, color: T4 }}>
                           {data.stocks.length}
                         </span>
                       </div>
@@ -352,7 +352,7 @@ export default function RadarPage() {
                         {data.avgScore}
                       </p>
                       <div style={{
-                        height: 2, background: "rgba(255,255,255,0.08)",
+                        height: 2, background: "var(--border-2)",
                         borderRadius: 9999, marginBottom: 5,
                       }}>
                         <div style={{
@@ -360,7 +360,7 @@ export default function RadarPage() {
                           background: color, borderRadius: 9999,
                         }} />
                       </div>
-                      <p style={{ fontFamily: mono, fontSize: 8, color: T4 }}>
+                      <p style={{ fontFamily: mono, fontSize: 13, color: T4 }}>
                         {data.topCount}/{data.stocks.length} ≥ 50
                         {data.distribution > 0 && (
                           <span style={{ color: DANGER, marginLeft: 6 }}>
@@ -381,18 +381,18 @@ export default function RadarPage() {
           padding: "10px 14px", background: S1,
           border: `1px solid ${B1}`, borderRadius: 8, marginBottom: 16,
         }}>
-          <span style={{ fontFamily: mono, fontSize: 10, color: T3 }}>
+          <span style={{ fontFamily: mono, fontSize: 12, color: T3 }}>
             {visibleStocks.length} saham
             {selectedSector ? ` di ${selectedSector}` : ""}
           </span>
           <span style={{ width: 1, height: 14, background: B1 }} />
-          <span style={{ fontFamily: mono, fontSize: 10, color: POSITIVE }}>
+          <span style={{ fontFamily: mono, fontSize: 12, color: POSITIVE }}>
             {visibleStocks.filter(s => s.homepageBucket === "siap_dipantau").length} Akumulasi
           </span>
-          <span style={{ fontFamily: mono, fontSize: 10, color: WARNING }}>
+          <span style={{ fontFamily: mono, fontSize: 12, color: WARNING }}>
             {visibleStocks.filter(s => s.homepageBucket === "watchlist_prioritas").length} Dipantau
           </span>
-          <span style={{ fontFamily: mono, fontSize: 10, color: DANGER }}>
+          <span style={{ fontFamily: mono, fontSize: 12, color: DANGER }}>
             {visibleStocks.filter(s => s.homepageBucket === "hindari_dulu").length} Distribusi
           </span>
         </div>
@@ -410,7 +410,7 @@ export default function RadarPage() {
         ) : visibleStocks.length === 0 ? (
           <div style={{ padding: "60px 0", textAlign: "center" }}>
             <p style={{
-              fontFamily: mono, fontSize: 10, color: T4, letterSpacing: "0.12em",
+              fontFamily: mono, fontSize: 12, color: T4, letterSpacing: "0.12em",
             }}>
               [ TIDAK ADA SAHAM TERDETEKSI ]
             </p>
@@ -425,7 +425,7 @@ export default function RadarPage() {
             }}>
               {["SAHAM", "SEKTOR", "HARGA", "SKOR", "SIKLUS", "ALIRAN", "AKSI"].map((h, i) => (
                 <div key={h} style={{
-                  fontFamily: mono, fontSize: 8, letterSpacing: "0.14em", color: T4,
+                  fontFamily: mono, fontSize: 13, letterSpacing: "0.14em", color: T4,
                   textTransform: "uppercase", padding: "0 16px",
                   textAlign: i >= 6 ? "right" : "left",
                 }}>
@@ -447,7 +447,7 @@ export default function RadarPage() {
                     display: "grid",
                     gridTemplateColumns: "2fr 1fr 1fr 100px 160px 110px 130px",
                     background: S1,
-                    borderBottom: "1px solid rgba(255,255,255,0.03)",
+                    borderBottom: "1px solid var(--border-1)",
                     borderLeft: `2px solid ${accent}`,
                     cursor: "pointer",
                     transition: "background 0.1s",
@@ -467,7 +467,7 @@ export default function RadarPage() {
                         {stock.symbol}
                       </p>
                       <p style={{
-                        fontFamily: inter, fontSize: 10, color: T3,
+                        fontFamily: inter, fontSize: 12, color: T3,
                         maxWidth: 150, overflow: "hidden",
                         textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
@@ -477,7 +477,7 @@ export default function RadarPage() {
                         <span
                           style={{
                             display: "inline-block", marginTop: 2,
-                            fontFamily: mono, fontSize: 7, letterSpacing: "0.06em",
+                            fontFamily: mono, fontSize: 12, letterSpacing: "0.06em",
                             padding: "1px 5px", borderRadius: 3,
                             color: distWarn.alertLevel === "BAHAYA_DISTRIBUSI" ? DANGER : WARNING,
                             background: distWarn.alertLevel === "BAHAYA_DISTRIBUSI"
@@ -501,7 +501,7 @@ export default function RadarPage() {
 
                   {/* SEKTOR */}
                   <div style={{ padding: "10px 16px", display: "flex", alignItems: "center" }}>
-                    <span style={{ fontFamily: mono, fontSize: 9, color: T4 }}>
+                    <span style={{ fontFamily: mono, fontSize: 12, color: T4 }}>
                       {stock.sector ?? "—"}
                     </span>
                   </div>
@@ -518,7 +518,7 @@ export default function RadarPage() {
                       {parseFloat(String(stock.price).replace(/[^0-9.-]/g, "") || "0").toLocaleString("id-ID")}
                     </p>
                     <p style={{
-                      fontFamily: mono, fontSize: 9,
+                      fontFamily: mono, fontSize: 12,
                       color: parseFloat(stock.changePercent) > 0
                         ? POSITIVE
                         : parseFloat(stock.changePercent) < 0
@@ -546,7 +546,7 @@ export default function RadarPage() {
                     </p>
                     <div style={{
                       width: 44, height: 2,
-                      background: "rgba(255,255,255,0.06)", borderRadius: 9999,
+                      background: "var(--border-2)", borderRadius: 9999,
                     }}>
                       <div style={{
                         height: "100%",
@@ -584,7 +584,7 @@ export default function RadarPage() {
                           ? "rgba(251,191,36,0.1)"
                           : "transparent",
                         color: watchlistedSymbols.has(stock.symbol) ? WARNING : T4,
-                        fontSize: 11,
+                        fontSize: 13,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         transition: "all 0.12s",
                       }}
@@ -595,7 +595,7 @@ export default function RadarPage() {
                     <button
                       onClick={e => { e.stopPropagation(); window.location.href = `/stock/${stock.symbol}`; }}
                       style={{
-                        fontFamily: mono, fontSize: 8, letterSpacing: "0.08em",
+                        fontFamily: mono, fontSize: 13, letterSpacing: "0.08em",
                         padding: "4px 10px", borderRadius: 4, cursor: "pointer",
                         background: "rgba(79,195,247,0.08)",
                         border: "1px solid rgba(79,195,247,0.2)",

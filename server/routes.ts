@@ -18,6 +18,7 @@ import { registerSimulationRoutes } from "./routes/simulation";
 import { registerPipelineRoutes } from "./routes/pipeline";
 import { registerStocksRoutes } from "./routes/stocks";
 import { registerAiRoutes } from "./routes/ai";
+import { registerIdxDataRoutes } from "./routes/idxData";
 
 // ========================================
 // UNIFIED BRAIN ENGINE
@@ -665,6 +666,9 @@ export async function registerRoutes(
   // ── Insider + Management routes ──────────────────────────────────────────────
   registerInsiderRoutes(app);
   registerManagementRoutes(app);
+
+  // ── IDX official market-data routes ──────────────────────────────────────────
+  registerIdxDataRoutes(app);
 
   // ── Admin routes ─────────────────────────────────────────────────────────────
   registerAdminRoutes(app);

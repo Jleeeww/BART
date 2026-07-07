@@ -1,3 +1,4 @@
+import { IDXMarketPanel } from "@/components/IDXMarketPanel";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -50,34 +51,34 @@ export default function Homepage() {
   // Derived values
   const sentimentValue =
     newsStats.criticalAlerts > 2
-      ? { label: "RISK OFF", color: "#F87171" }
+      ? { label: "RISK OFF", color: "var(--danger)" }
       : newsStats.criticalAlerts > 0
-      ? { label: "WASPADA", color: "#FBBF24" }
-      : { label: "RISK ON", color: "#4ADE80" };
+      ? { label: "WASPADA", color: "var(--warning)" }
+      : { label: "RISK ON", color: "var(--positive)" };
 
   function accentColor(bucket: string) {
-    if (bucket === "siap_dipantau") return "#4ADE80";
-    if (bucket === "watchlist_prioritas") return "#FBBF24";
-    return "#F87171";
+    if (bucket === "siap_dipantau") return "var(--positive)";
+    if (bucket === "watchlist_prioritas") return "var(--warning)";
+    return "var(--danger)";
   }
 
   function scoreColor(score: number | null) {
-    if (score === null) return "#3F3F46";
-    if (score >= 60) return "#4ADE80";
-    if (score >= 40) return "#FBBF24";
-    return "#F87171";
+    if (score === null) return "var(--text-4)";
+    if (score >= 60) return "var(--positive)";
+    if (score >= 40) return "var(--warning)";
+    return "var(--danger)";
   }
 
   const stats = [
     { value: "6", label: "Layer Intelijen" },
-    { value: "v3.0", label: "Engine Bandarmologi", color: "#4FC3F7" },
+    { value: "v3.0", label: "Engine Bandarmologi", color: "var(--signal)" },
     { value: "IDX", label: "Seluruh Pasar" },
   ];
 
   const howItWorks = [
     {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4FC3F7" strokeWidth="1.5">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--signal)" strokeWidth="1.5">
           <path d="M1 3h6M1 8h9M1 13h6M13 8l2-5M13 8l2 5" />
         </svg>
       ),
@@ -86,7 +87,7 @@ export default function Homepage() {
     },
     {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4FC3F7" strokeWidth="1.5">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--signal)" strokeWidth="1.5">
           <rect x="1" y="2" width="14" height="3" rx="1" />
           <rect x="1" y="6.5" width="14" height="3" rx="1" />
           <rect x="1" y="11" width="14" height="3" rx="1" />
@@ -97,10 +98,10 @@ export default function Homepage() {
     },
     {
       icon: (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4FC3F7" strokeWidth="1.5">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--signal)" strokeWidth="1.5">
           <circle cx="8" cy="8" r="6" />
           <path d="M8 8L11 5" />
-          <circle cx="8" cy="8" r="1" fill="#4FC3F7" />
+          <circle cx="8" cy="8" r="1" fill="var(--signal)" />
         </svg>
       ),
       title: "Skor Kesiapan Trading",
@@ -126,7 +127,7 @@ export default function Homepage() {
         }
       `}</style>
 
-      <div style={{ background: "#000000", minHeight: "100vh" }}>
+      <div style={{ background: "var(--surface-0)", minHeight: "100vh" }}>
 
         {/* ─── ZONE A: Hero ─── */}
         <section
@@ -136,7 +137,7 @@ export default function Homepage() {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            background: "#000000",
+            background: "var(--surface-0)",
             padding: "0 32px",
             textAlign: "center",
             position: "relative",
@@ -146,9 +147,9 @@ export default function Homepage() {
           <p
             style={{
               fontFamily: mono,
-              fontSize: 11,
+              fontSize: 13,
               letterSpacing: "0.3em",
-              color: "#4FC3F7",
+              color: "var(--signal)",
               textTransform: "uppercase",
               marginBottom: 32,
             }}
@@ -169,8 +170,8 @@ export default function Homepage() {
               marginBottom: 20,
             }}
           >
-            <div style={{ color: "#F4F4F5" }}>Baca pasar IDX</div>
-            <div style={{ color: "#4FC3F7" }}>seperti institusi.</div>
+            <div style={{ color: "var(--text-1)" }}>Baca pasar IDX</div>
+            <div style={{ color: "var(--signal)" }}>seperti institusi.</div>
           </div>
 
           {/* Subline */}
@@ -178,7 +179,7 @@ export default function Homepage() {
             style={{
               fontFamily: inter,
               fontSize: 16,
-              color: "#71717A",
+              color: "var(--text-3)",
               maxWidth: 480,
               margin: "0 auto",
               lineHeight: 1.65,
@@ -203,8 +204,8 @@ export default function Homepage() {
               onMouseEnter={() => setPrimaryHover(true)}
               onMouseLeave={() => setPrimaryHover(false)}
               style={{
-                background: primaryHover ? "rgba(79,195,247,0.85)" : "#4FC3F7",
-                color: "#000000",
+                background: primaryHover ? "rgba(79,195,247,0.85)" : "var(--signal)",
+                color: "var(--surface-0)",
                 padding: "12px 28px",
                 borderRadius: 8,
                 border: "none",
@@ -224,11 +225,11 @@ export default function Homepage() {
               onMouseLeave={() => setSecondaryHover(false)}
               style={{
                 background: "transparent",
-                color: secondaryHover ? "#F4F4F5" : "#71717A",
+                color: secondaryHover ? "var(--text-1)" : "var(--text-3)",
                 padding: "12px 24px",
                 border: secondaryHover
                   ? "1px solid rgba(255,255,255,0.25)"
-                  : "1px solid rgba(255,255,255,0.1)",
+                  : "1px solid var(--border-2)",
                 borderRadius: 8,
                 fontFamily: mono,
                 fontSize: 12,
@@ -261,7 +262,7 @@ export default function Homepage() {
                       fontFamily: mono,
                       fontSize: 22,
                       fontWeight: 700,
-                      color: stat.color ?? "#F4F4F5",
+                      color: stat.color ?? "var(--text-1)",
                       marginBottom: 4,
                     }}
                   >
@@ -270,17 +271,17 @@ export default function Homepage() {
                   <p
                     style={{
                       fontFamily: mono,
-                      fontSize: 9,
+                      fontSize: 12,
                       letterSpacing: "0.15em",
                       textTransform: "uppercase",
-                      color: "#3F3F46",
+                      color: "var(--text-4)",
                     }}
                   >
                     {stat.label}
                   </p>
                 </div>
                 {i < stats.length - 1 && (
-                  <div style={{ width: 1, height: 32, background: "rgba(255,255,255,0.06)" }} />
+                  <div style={{ width: 1, height: 32, background: "var(--border-2)" }} />
                 )}
               </div>
             ))}
@@ -290,9 +291,9 @@ export default function Homepage() {
         {/* ─── ZONE B: Live Ticker Strip ─── */}
         <div
           style={{
-            background: "#0a0a0a",
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
+            background: "var(--surface-1)",
+            borderTop: "1px solid var(--border-2)",
+            borderBottom: "1px solid var(--border-2)",
             overflow: "hidden",
             padding: "12px 0",
           }}
@@ -301,8 +302,8 @@ export default function Homepage() {
             <p
               style={{
                 fontFamily: mono,
-                fontSize: 10,
-                color: "#3F3F46",
+                fontSize: 12,
+                color: "var(--text-4)",
                 textAlign: "center",
                 padding: "12px 32px",
               }}
@@ -327,8 +328,8 @@ export default function Homepage() {
                       gap: 10,
                       padding: "6px 14px",
                       borderRadius: 6,
-                      background: "#131313",
-                      border: "1px solid rgba(255,255,255,0.05)",
+                      background: "var(--surface-3)",
+                      border: "1px solid var(--border-1)",
                       borderLeft: `2px solid ${accent}`,
                       cursor: "pointer",
                       flexShrink: 0,
@@ -341,7 +342,7 @@ export default function Homepage() {
                           fontFamily: mono,
                           fontSize: 12,
                           fontWeight: 600,
-                          color: "#F4F4F5",
+                          color: "var(--text-1)",
                           marginBottom: 2,
                         }}
                       >
@@ -350,8 +351,8 @@ export default function Homepage() {
                       <p
                         style={{
                           fontFamily: mono,
-                          fontSize: 10,
-                          color: cp >= 0 ? "#4ADE80" : "#F87171",
+                          fontSize: 12,
+                          color: cp >= 0 ? "var(--positive)" : "var(--danger)",
                         }}
                       >
                         {cp >= 0 ? `+${cp.toFixed(2)}%` : `${cp.toFixed(2)}%`}
@@ -379,11 +380,11 @@ export default function Homepage() {
         {/* ─── MACRO REGIME BANNER ─── */}
         {(() => {
           const regimeMap: Record<string, { label: string; color: string }> = {
-            CAPITAL_INFLOW:    { label: "KAPITAL MASUK",    color: "#4ADE80" },
-            NEUTRAL:           { label: "NETRAL",           color: "#71717A" },
-            CAPITAL_OUTFLOW:   { label: "KAPITAL KELUAR",   color: "#FBBF24" },
-            CAPITAL_FLIGHT:    { label: "PELARIAN MODAL",   color: "#F87171" },
-            INSUFFICIENT_DATA: { label: "DATA BELUM CUKUP", color: "#3F3F46" },
+            CAPITAL_INFLOW:    { label: "KAPITAL MASUK",    color: "var(--positive)" },
+            NEUTRAL:           { label: "NETRAL",           color: "var(--text-3)" },
+            CAPITAL_OUTFLOW:   { label: "KAPITAL KELUAR",   color: "var(--warning)" },
+            CAPITAL_FLIGHT:    { label: "PELARIAN MODAL",   color: "var(--danger)" },
+            INSUFFICIENT_DATA: { label: "DATA BELUM CUKUP", color: "var(--text-4)" },
           };
           const regime = macroRegime?.regime ?? "INSUFFICIENT_DATA";
           const { label, color } = regimeMap[regime] ?? regimeMap.INSUFFICIENT_DATA;
@@ -392,8 +393,8 @@ export default function Homepage() {
 
           return (
             <div style={{
-              background: "#080808",
-              borderTop: "1px solid rgba(255,255,255,0.04)",
+              background: "var(--surface-1)",
+              borderTop: "1px solid var(--border-1)",
               borderBottom: `1px solid ${color}22`,
               padding: "14px 32px",
             }}>
@@ -401,21 +402,21 @@ export default function Homepage() {
                 {/* Badge */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: color, boxShadow: `0 0 6px ${color}88` }} />
-                  <span style={{ fontFamily: mono, fontSize: 10, letterSpacing: "0.15em", color, fontWeight: 700 }}>
+                  <span style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.15em", color, fontWeight: 700 }}>
                     REZIM MAKRO
                   </span>
                   <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, color, marginLeft: 4 }}>
                     {label}
                   </span>
                   {multiplier !== 1.0 && (
-                    <span style={{ fontFamily: mono, fontSize: 9, color: "#52525B", marginLeft: 4 }}>
+                    <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", marginLeft: 4 }}>
                       ×{multiplier.toFixed(2)} bando
                     </span>
                   )}
                 </div>
 
                 {/* Note */}
-                <p style={{ fontFamily: mono, fontSize: 10, color: "#52525B", lineHeight: 1.6, flex: 1, minWidth: 200 }}>
+                <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, flex: 1, minWidth: 200 }}>
                   {note}
                 </p>
               </div>
@@ -424,13 +425,13 @@ export default function Homepage() {
         })()}
 
         {/* ─── ZONE C: Status Pasar ─── */}
-        <section style={{ padding: "48px 32px", background: "#000000" }}>
+        <section style={{ padding: "48px 32px", background: "var(--surface-0)" }}>
           <p
             style={{
               fontFamily: mono,
-              fontSize: 9,
+              fontSize: 12,
               letterSpacing: "0.2em",
-              color: "#3F3F46",
+              color: "var(--text-4)",
               textTransform: "uppercase",
               marginBottom: 24,
               textAlign: "center",
@@ -452,8 +453,8 @@ export default function Homepage() {
             {/* Card 1: Sentimen Pasar */}
             <div
               style={{
-                background: "#0a0a0a",
-                border: "1px solid rgba(255,255,255,0.05)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-1)",
                 borderRadius: 10,
                 padding: "20px 22px",
               }}
@@ -461,9 +462,9 @@ export default function Homepage() {
               <p
                 style={{
                   fontFamily: mono,
-                  fontSize: 8,
+                  fontSize: 13,
                   letterSpacing: "0.15em",
-                  color: "#3F3F46",
+                  color: "var(--text-4)",
                   textTransform: "uppercase",
                   marginBottom: 10,
                 }}
@@ -483,8 +484,8 @@ export default function Homepage() {
               <p
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
-                  color: "#3F3F46",
+                  fontSize: 12,
+                  color: "var(--text-4)",
                   marginTop: 6,
                 }}
               >
@@ -495,8 +496,8 @@ export default function Homepage() {
             {/* Card 2: Sektor Hari Ini */}
             <div
               style={{
-                background: "#0a0a0a",
-                border: "1px solid rgba(255,255,255,0.05)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-1)",
                 borderRadius: 10,
                 padding: "20px 22px",
               }}
@@ -504,9 +505,9 @@ export default function Homepage() {
               <p
                 style={{
                   fontFamily: mono,
-                  fontSize: 8,
+                  fontSize: 13,
                   letterSpacing: "0.15em",
-                  color: "#3F3F46",
+                  color: "var(--text-4)",
                   textTransform: "uppercase",
                   marginBottom: 10,
                 }}
@@ -518,7 +519,7 @@ export default function Homepage() {
                   fontFamily: mono,
                   fontSize: 16,
                   fontWeight: 700,
-                  color: "#4FC3F7",
+                  color: "var(--signal)",
                 }}
               >
                 {topSector ? `${topSector} ↑` : "—"}
@@ -526,8 +527,8 @@ export default function Homepage() {
               <p
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
-                  color: "#3F3F46",
+                  fontSize: 12,
+                  color: "var(--text-4)",
                   marginTop: 6,
                 }}
               >
@@ -538,8 +539,8 @@ export default function Homepage() {
             {/* Card 3: Pipeline Berita */}
             <div
               style={{
-                background: "#0a0a0a",
-                border: "1px solid rgba(255,255,255,0.05)",
+                background: "var(--surface-1)",
+                border: "1px solid var(--border-1)",
                 borderRadius: 10,
                 padding: "20px 22px",
               }}
@@ -547,9 +548,9 @@ export default function Homepage() {
               <p
                 style={{
                   fontFamily: mono,
-                  fontSize: 8,
+                  fontSize: 13,
                   letterSpacing: "0.15em",
-                  color: "#3F3F46",
+                  color: "var(--text-4)",
                   textTransform: "uppercase",
                   marginBottom: 10,
                 }}
@@ -562,7 +563,7 @@ export default function Homepage() {
                     width: 6,
                     height: 6,
                     borderRadius: "50%",
-                    background: "#4ADE80",
+                    background: "var(--positive)",
                     boxShadow: "0 0 5px rgba(74,222,128,0.6)",
                     animation: "blink 1.2s ease-in-out infinite",
                     flexShrink: 0,
@@ -573,7 +574,7 @@ export default function Homepage() {
                     fontFamily: mono,
                     fontSize: 20,
                     fontWeight: 700,
-                    color: "#4ADE80",
+                    color: "var(--positive)",
                   }}
                 >
                   AKTIF
@@ -582,8 +583,8 @@ export default function Homepage() {
               <p
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
-                  color: "#3F3F46",
+                  fontSize: 12,
+                  color: "var(--text-4)",
                   marginTop: 6,
                 }}
               >
@@ -593,21 +594,30 @@ export default function Homepage() {
           </div>
         </section>
 
+        {/* ─── ZONE C2: Data Pasar Resmi IDX ─── */}
+        <section style={{ padding: "0 32px 48px", background: "var(--surface-0)" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-1)", marginBottom: 4 }}>Data Pasar — Resmi IDX</h2>
+            <p style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 20 }}>Indeks, pergerakan harian, dan dividen langsung dari Bursa Efek Indonesia.</p>
+            <IDXMarketPanel />
+          </div>
+        </section>
+
         {/* ─── ZONE D: How It Works ─── */}
         <section
           style={{
             padding: "64px 32px",
-            background: "#0a0a0a",
-            borderTop: "1px solid rgba(255,255,255,0.04)",
+            background: "var(--surface-1)",
+            borderTop: "1px solid var(--border-1)",
           }}
         >
           <p
             style={{
               fontFamily: mono,
-              fontSize: 9,
+              fontSize: 12,
               letterSpacing: "0.3em",
               textTransform: "uppercase",
-              color: "#4FC3F7",
+              color: "var(--signal)",
               textAlign: "center",
               marginBottom: 12,
               opacity: 0.8,
@@ -620,7 +630,7 @@ export default function Homepage() {
               fontFamily: inter,
               fontSize: 22,
               fontWeight: 600,
-              color: "#F4F4F5",
+              color: "var(--text-1)",
               textAlign: "center",
               marginBottom: 48,
               letterSpacing: "-0.02em",
@@ -645,8 +655,8 @@ export default function Homepage() {
                 style={{
                   padding: 24,
                   borderRadius: 8,
-                  background: "#131313",
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  background: "var(--surface-3)",
+                  border: "1px solid var(--border-2)",
                 }}
               >
                 <div
@@ -669,7 +679,7 @@ export default function Homepage() {
                     fontFamily: inter,
                     fontSize: 15,
                     fontWeight: 600,
-                    color: "#F4F4F5",
+                    color: "var(--text-1)",
                     marginBottom: 10,
                   }}
                 >
@@ -678,8 +688,8 @@ export default function Homepage() {
                 <p
                   style={{
                     fontFamily: mono,
-                    fontSize: 11,
-                    color: "#71717A",
+                    fontSize: 13,
+                    color: "var(--text-3)",
                     lineHeight: 1.7,
                   }}
                 >
@@ -694,16 +704,16 @@ export default function Homepage() {
         <footer
           style={{
             padding: "32px",
-            background: "#000000",
-            borderTop: "1px solid rgba(255,255,255,0.04)",
+            background: "var(--surface-0)",
+            borderTop: "1px solid var(--border-1)",
             textAlign: "center",
           }}
         >
           <p
             style={{
               fontFamily: mono,
-              fontSize: 10,
-              color: "#3F3F46",
+              fontSize: 12,
+              color: "var(--text-4)",
               letterSpacing: "0.06em",
               marginBottom: 12,
             }}
@@ -724,16 +734,16 @@ export default function Homepage() {
                 onClick={() => {}}
                 onMouseEnter={(e) => {
                   setLinkHover(i);
-                  (e.currentTarget as HTMLElement).style.color = "#71717A";
+                  (e.currentTarget as HTMLElement).style.color = "var(--text-3)";
                 }}
                 onMouseLeave={(e) => {
                   setLinkHover(null);
-                  (e.currentTarget as HTMLElement).style.color = "#27272A";
+                  (e.currentTarget as HTMLElement).style.color = "var(--text-4)";
                 }}
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
-                  color: linkHover === i ? "#71717A" : "#27272A",
+                  fontSize: 12,
+                  color: linkHover === i ? "var(--text-3)" : "var(--text-4)",
                   cursor: "pointer",
                   letterSpacing: "0.06em",
                 }}

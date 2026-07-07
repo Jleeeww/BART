@@ -8,9 +8,9 @@ interface ScoreRingProps {
 
 function scoreColor(score: number): string {
   if (score >= 70) return "#10B981";
-  if (score >= 50) return "#38BDF8";
-  if (score >= 40) return "#F59E0B";
-  return "#EF4444";
+  if (score >= 50) return "var(--signal)";
+  if (score >= 40) return "var(--warning)";
+  return "var(--danger)";
 }
 
 const VIEWBOX = 200;
@@ -52,7 +52,7 @@ export function ScoreRing({ score, size = 120, showLabel = true }: ScoreRingProp
       <circle
         cx={CX} cy={CY} r={R}
         fill="none"
-        stroke="rgba(255,255,255,0.06)"
+        stroke="var(--border-2)"
         strokeWidth="3"
       />
 
@@ -85,7 +85,7 @@ export function ScoreRing({ score, size = 120, showLabel = true }: ScoreRingProp
         fontFamily="'JetBrains Mono', 'IBM Plex Mono', monospace"
         fontSize="48"
         fontWeight="600"
-        fill="#F4F4F5"
+        fill="var(--text-1)"
         letterSpacing="-0.03em"
       >
         {clamped}
@@ -99,7 +99,7 @@ export function ScoreRing({ score, size = 120, showLabel = true }: ScoreRingProp
           fontFamily="'JetBrains Mono', 'IBM Plex Mono', monospace"
           fontSize="11"
           fontWeight="500"
-          fill="#71717A"
+          fill="var(--text-3)"
           letterSpacing="0.08em"
         >
           / 100

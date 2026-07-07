@@ -29,9 +29,9 @@ const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 const inter = "'Inter', system-ui, sans-serif";
 
 function directionColor(dir?: string): string {
-  if (dir === "POSITIF") return "#4ADE80";
-  if (dir === "NEGATIF") return "#F87171";
-  return "#71717A";
+  if (dir === "POSITIF") return "var(--positive)";
+  if (dir === "NEGATIF") return "var(--danger)";
+  return "var(--text-3)";
 }
 
 function directionIcon(dir: string): string {
@@ -41,10 +41,10 @@ function directionIcon(dir: string): string {
 }
 
 function severityColor(sev: string): { fg: string; bg: string; border: string } {
-  if (sev === "CRITICAL") return { fg: "#F87171", bg: "rgba(248,113,113,0.1)", border: "rgba(248,113,113,0.25)" };
-  if (sev === "HIGH")     return { fg: "#FBBF24", bg: "rgba(251,191,36,0.1)",  border: "rgba(251,191,36,0.25)" };
-  if (sev === "MEDIUM")   return { fg: "#4FC3F7", bg: "rgba(79,195,247,0.1)",  border: "rgba(79,195,247,0.25)" };
-  return                         { fg: "#71717A", bg: "rgba(113,113,122,0.08)", border: "rgba(113,113,122,0.2)" };
+  if (sev === "CRITICAL") return { fg: "var(--danger)", bg: "rgba(248,113,113,0.1)", border: "rgba(248,113,113,0.25)" };
+  if (sev === "HIGH")     return { fg: "var(--warning)", bg: "rgba(251,191,36,0.1)",  border: "rgba(251,191,36,0.25)" };
+  if (sev === "MEDIUM")   return { fg: "var(--signal)", bg: "rgba(79,195,247,0.1)",  border: "rgba(79,195,247,0.25)" };
+  return                         { fg: "var(--text-3)", bg: "rgba(113,113,122,0.08)", border: "rgba(113,113,122,0.2)" };
 }
 
 function formatDate(iso: string): string {
@@ -76,15 +76,15 @@ export function NewsArticleCard({
   const cardContent = (
     <div
       style={{
-        background: isUnanalyzed ? "#080808" : "#0a0a0a",
-        border: "1px solid rgba(255,255,255,0.05)",
+        background: isUnanalyzed ? "var(--surface-1)" : "var(--surface-1)",
+        border: "1px solid var(--border-1)",
         borderRadius: 8,
         padding: "14px 16px",
         opacity: isUnanalyzed ? 0.6 : 1,
         transition: url ? "border-color 0.1s" : undefined,
       }}
       onMouseEnter={url ? (e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(79,195,247,0.2)"; } : undefined}
-      onMouseLeave={url ? (e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.05)"; } : undefined}
+      onMouseLeave={url ? (e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border-1)"; } : undefined}
     >
       {/* Header row: source · date · badges */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
@@ -96,13 +96,13 @@ export function NewsArticleCard({
               background: dColor, boxShadow: `0 0 4px ${dColor}60`,
             }} />
           )}
-          <span style={{ fontFamily: mono, fontSize: 9, color: "#71717A", letterSpacing: "0.04em" }}>
+          <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", letterSpacing: "0.04em" }}>
             {source}
           </span>
           {/* Severity badge */}
           {sevStyle && severity && (
             <span style={{
-              fontFamily: mono, fontSize: 8, fontWeight: 700,
+              fontFamily: mono, fontSize: 13, fontWeight: 700,
               letterSpacing: "0.08em", color: sevStyle.fg,
               background: sevStyle.bg, border: `1px solid ${sevStyle.border}`,
               borderRadius: 3, padding: "1px 6px",
@@ -113,7 +113,7 @@ export function NewsArticleCard({
           {/* Direction badge */}
           {direction && direction !== "NETRAL" && (
             <span style={{
-              fontFamily: mono, fontSize: 8, fontWeight: 600,
+              fontFamily: mono, fontSize: 13, fontWeight: 600,
               color: dColor, background: `${dColor}12`,
               border: `1px solid ${dColor}30`,
               borderRadius: 3, padding: "1px 6px",
@@ -124,15 +124,15 @@ export function NewsArticleCard({
           {/* Unanalyzed badge */}
           {isUnanalyzed && (
             <span style={{
-              fontFamily: mono, fontSize: 8, color: "#3F3F46",
-              background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+              fontFamily: mono, fontSize: 13, color: "var(--text-4)",
+              background: "var(--border-1)", border: "1px solid var(--border-2)",
               borderRadius: 3, padding: "1px 6px",
             }}>
               Belum dianalisis
             </span>
           )}
         </div>
-        <span style={{ fontFamily: mono, fontSize: 9, color: "#3F3F46", flexShrink: 0 }}>
+        <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)", flexShrink: 0 }}>
           {formatDate(publishedAt)}
         </span>
       </div>
@@ -140,7 +140,7 @@ export function NewsArticleCard({
       {/* Title */}
       <p style={{
         fontFamily: inter, fontSize: 13, fontWeight: 500,
-        color: "#F4F4F5", lineHeight: 1.5,
+        color: "var(--text-1)", lineHeight: 1.5,
         marginBottom: (summary || mechanism) ? 8 : 0,
       }}>
         {title}
@@ -149,7 +149,7 @@ export function NewsArticleCard({
       {/* Mechanism / trader implication */}
       {mechanism && (
         <p style={{
-          fontFamily: inter, fontSize: 12, color: "#A1A1AA",
+          fontFamily: inter, fontSize: 12, color: "var(--text-2)",
           lineHeight: 1.55, marginBottom: 8,
           display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
           overflow: "hidden",
@@ -161,7 +161,7 @@ export function NewsArticleCard({
       {/* Fallback summary if no mechanism */}
       {!mechanism && summary && (
         <p style={{
-          fontFamily: inter, fontSize: 12, color: "#71717A",
+          fontFamily: inter, fontSize: 12, color: "var(--text-3)",
           lineHeight: 1.55, marginBottom: 8,
           display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
           overflow: "hidden",
@@ -180,7 +180,7 @@ export function NewsArticleCard({
                 key={s.symbol}
                 onClick={onSymbolClick ? (e) => { e.preventDefault(); e.stopPropagation(); onSymbolClick(s.symbol); } : undefined}
                 style={{
-                  fontFamily: mono, fontSize: 8, fontWeight: 700,
+                  fontFamily: mono, fontSize: 13, fontWeight: 700,
                   color: sColor, background: `${sColor}12`,
                   border: `1px solid ${sColor}30`,
                   borderRadius: 3, padding: "2px 6px",
@@ -188,7 +188,7 @@ export function NewsArticleCard({
                   display: "flex", alignItems: "center", gap: 3,
                 }}
               >
-                <span style={{ fontSize: 7 }}>{directionIcon(s.direction)}</span>
+                <span style={{ fontSize: 12 }}>{directionIcon(s.direction)}</span>
                 {s.symbol}
               </button>
             );
@@ -203,9 +203,9 @@ export function NewsArticleCard({
             <span
               key={sec.name}
               style={{
-                fontFamily: mono, fontSize: 8, color: "#71717A",
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                fontFamily: mono, fontSize: 13, color: "var(--text-3)",
+                background: "var(--border-1)",
+                border: "1px solid var(--border-2)",
                 borderRadius: 3, padding: "2px 6px",
               }}
             >
@@ -219,7 +219,7 @@ export function NewsArticleCard({
       {url && (
         <div style={{ marginTop: 8 }}>
           <span style={{
-            fontFamily: mono, fontSize: 9, color: "#4FC3F7",
+            fontFamily: mono, fontSize: 12, color: "var(--signal)",
             letterSpacing: "0.04em",
           }}>
             Baca artikel asli ↗

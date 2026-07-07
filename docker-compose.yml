@@ -1,0 +1,29 @@
+# Local Postgres for BART development.
+#   Start:  pnpm run db:up      (or: docker compose up -d)
+#   Stop:   pnpm run db:down
+#   Data persists in the named volume `bart-pgdata`.
+#
+# Image = pgvector/pgvector:pg16 → Postgres 16 WITH the `vector` extension,
+# required by the rag_documents table (vector(1536) column).
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: bart-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bart
+      POSTGRES_PASSWORD: bart
+      POSTGRES_DB: bart
+    ports:
+      - "5432:5432"
+    volumes:
+      - bart-pgdata:/var/lib/postgresql/data
+      - ./docker/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bart -d bart"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  bart-pgdata:

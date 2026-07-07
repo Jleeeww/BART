@@ -24,18 +24,18 @@ const LAYERS = [
 ];
 
 function barColor(score: number | null): string {
-  if (score === null) return "rgba(255,255,255,0.06)";
+  if (score === null) return "var(--border-2)";
   if (score >= 70) return "#10B981";
-  if (score >= 50) return "#38BDF8";
-  if (score >= 40) return "#F59E0B";
-  return "#EF4444";
+  if (score >= 50) return "var(--signal)";
+  if (score >= 40) return "var(--warning)";
+  return "var(--danger)";
 }
 
 function confColor(c: number): string {
   if (c >= 70) return "#10B981";
-  if (c >= 50) return "#38BDF8";
-  if (c >= 40) return "#F59E0B";
-  return "#EF4444";
+  if (c >= 50) return "var(--signal)";
+  if (c >= 40) return "var(--warning)";
+  return "var(--danger)";
 }
 
 const STATUS_MAP: Record<string, [string, string, string, string]> = {
@@ -76,8 +76,8 @@ export function LayerBreakdown({
 
   return (
     <div style={{
-      background: "#0d0d0d",
-      border: "1px solid rgba(255,255,255,0.06)",
+      background: "var(--surface-2)",
+      border: "1px solid var(--border-2)",
       borderRadius: 12,
       overflow: "hidden",
     }}>
@@ -91,21 +91,21 @@ export function LayerBreakdown({
         onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
       >
-        <span style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", textTransform: "uppercase", color: "#71717A" }}>
+        <span style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--text-3)" }}>
           ANALISIS 6 LAYER
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontFamily: mono, fontSize: 9, color: cc }}>
+          <span style={{ fontFamily: mono, fontSize: 12, color: cc }}>
             Keyakinan {confidence}% · {activeCount}/6 aktif
           </span>
           {collapsed
-            ? <ChevronDown size={14} color="#71717A" />
-            : <ChevronUp size={14} color="#71717A" />}
+            ? <ChevronDown size={14} color="var(--text-3)" />
+            : <ChevronUp size={14} color="var(--text-3)" />}
         </div>
       </button>
 
       {!collapsed && (
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.04)", padding: "8px 20px 20px" }}>
+        <div style={{ borderTop: "1px solid var(--border-1)", padding: "8px 20px 20px" }}>
           {LAYERS.map((layer) => {
             const score = scores[layer.key];
             const color = barColor(score);
@@ -116,19 +116,19 @@ export function LayerBreakdown({
               <div key={layer.key} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
                 {/* Layer name */}
                 <div style={{ width: 112, flexShrink: 0 }}>
-                  <span style={{ fontFamily: mono, fontSize: 10, color: "#A1A1AA" }}>{layer.label}</span>
+                  <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-2)" }}>{layer.label}</span>
                 </div>
                 {/* Weight badge */}
                 <span style={{
-                  fontFamily: mono, fontSize: 8, color: "#3F3F46",
-                  background: "rgba(255,255,255,0.03)", borderRadius: 3,
+                  fontFamily: mono, fontSize: 13, color: "var(--text-4)",
+                  background: "var(--border-1)", borderRadius: 3,
                   padding: "1px 5px", flexShrink: 0, width: 28, textAlign: "center",
                 }}>
                   {layer.weight}%
                 </span>
                 {/* Progress bar */}
                 <div style={{
-                  flex: 1, height: 3, background: "rgba(255,255,255,0.05)",
+                  flex: 1, height: 3, background: "var(--border-1)",
                   borderRadius: 9999, overflow: "hidden",
                 }}>
                   <div style={{
@@ -142,14 +142,14 @@ export function LayerBreakdown({
                 <div style={{
                   width: 30, flexShrink: 0, textAlign: "right",
                   fontFamily: mono, fontSize: 12, fontWeight: 600,
-                  color: isNull ? "#3F3F46" : color,
+                  color: isNull ? "var(--text-4)" : color,
                 }}>
                   {score !== null ? score : "—"}
                 </div>
                 {/* Status badge */}
                 {status && (
                   <span style={{
-                    fontFamily: mono, fontSize: 8,
+                    fontFamily: mono, fontSize: 13,
                     color, background: `${color}14`,
                     border: `1px solid ${color}28`,
                     borderRadius: 4, padding: "1px 6px", flexShrink: 0,
@@ -158,7 +158,7 @@ export function LayerBreakdown({
                   </span>
                 )}
                 {isNull && !status && (
-                  <span style={{ fontFamily: mono, fontSize: 8, color: "#3F3F46", flexShrink: 0 }}>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: "var(--text-4)", flexShrink: 0 }}>
                     Memuat...
                   </span>
                 )}

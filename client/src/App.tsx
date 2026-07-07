@@ -15,6 +15,7 @@ import PasarPage from "@/pages/PasarPage";
 import BeritaPage from "@/pages/BeritaPage";
 import AdminSeed from "@/pages/AdminSeed";
 import { SimulationProvider } from "@/contexts/SimulationContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import { SimulationBanner } from "@/components/SimulationBanner";
 import { Sidebar } from "@/components/Sidebar";
 
@@ -54,21 +55,22 @@ function AppLayout() {
   const mainMargin = isDesktop ? (collapsed ? 56 : 200) : 0;
 
   return (
-    <div className="flex min-h-screen" style={{ background: "#000000" }}>
+    <div className="flex min-h-screen" style={{ background: "var(--surface-0)" }}>
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
       <div
-        className="md:hidden fixed top-0 left-0 right-0 z-50 h-12 bg-[#0a0a0a] border-b border-[#ffffff08] flex items-center justify-between px-4"
+        className="md:hidden fixed top-0 left-0 right-0 z-50 h-12 flex items-center justify-between px-4 border-b"
+        style={{ background: "var(--surface-1)", borderColor: "var(--border-2)" }}
         data-testid="mobile-top-bar"
       >
         <Link href="/">
           <span
             className="text-base font-bold cursor-pointer"
-            style={{ fontFamily: "'IBM Plex Mono', monospace", color: "#4FC3F7" }}
+            style={{ fontFamily: "'IBM Plex Mono', monospace", color: "var(--signal)" }}
           >
             BART
           </span>
         </Link>
-        <button className="text-[#6b7280]" data-testid="mobile-menu-button">
+        <button style={{ color: "var(--text-3)" }} data-testid="mobile-menu-button">
           <Menu size={20} />
         </button>
       </div>
@@ -85,13 +87,15 @@ function AppLayout() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <SimulationProvider>
-          <SimulationBanner />
-          <Toaster />
-          <AppLayout />
-        </SimulationProvider>
-      </TooltipProvider>
+      <ThemeProvider>
+        <TooltipProvider>
+          <SimulationProvider>
+            <SimulationBanner />
+            <Toaster />
+            <AppLayout />
+          </SimulationProvider>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

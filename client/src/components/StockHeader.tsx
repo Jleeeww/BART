@@ -23,7 +23,7 @@ export function StockHeader({ stock }: StockHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 pb-6 border-b border-border/50">
       <div className="flex items-start gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-[#1e1e1e] flex items-center justify-center overflow-hidden shadow-sm border border-[#ffffff10]">
+        <div className="w-16 h-16 rounded-2xl bg-[var(--surface-4)] flex items-center justify-center overflow-hidden shadow-sm border border-[var(--border-2)]">
           <img
             src={`https://assets.stockbit.com/logos/companies/${stock.symbol}.png`}
             alt={stock.symbol}
@@ -35,7 +35,7 @@ export function StockHeader({ stock }: StockHeaderProps) {
           />
           <div
             style={{ display: 'none' }}
-            className="flex items-center justify-center text-[#38BDF8] font-bold text-2xl"
+            className="flex items-center justify-center text-[var(--signal)] font-bold text-2xl"
           >
             {stock.symbol.substring(0, 2)}
           </div>
@@ -55,17 +55,17 @@ export function StockHeader({ stock }: StockHeaderProps) {
           {/* IDX Index Tags and Stock Tags */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {idxIndices.map((index) => (
-              <Badge key={index} variant="secondary" className="text-[10px] font-bold uppercase tracking-wider" data-testid={`badge-index-${index}`}>
+              <Badge key={index} variant="secondary" className="text-[12px] font-bold uppercase tracking-wider" data-testid={`badge-index-${index}`}>
                 {index}
               </Badge>
             ))}
             {stock.sectorBadge && (
-              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-wider bg-primary/5 border-primary/20 text-primary" data-testid="badge-sector">
+              <Badge variant="outline" className="text-[12px] font-bold uppercase tracking-wider bg-primary/5 border-primary/20 text-primary" data-testid="badge-sector">
                 {stock.sectorBadge}
               </Badge>
             )}
             {stockTags.map((tag) => (
-              <Badge key={tag} variant="outline" className="text-[10px] font-medium" data-testid={`badge-tag-${tag}`}>
+              <Badge key={tag} variant="outline" className="text-[12px] font-medium" data-testid={`badge-tag-${tag}`}>
                 {tag}
               </Badge>
             ))}

@@ -4,10 +4,10 @@ import { NewsArticleCard } from "@/components/v3/NewsArticleCard";
 
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 const inter = "'Inter', system-ui, sans-serif";
-const S0 = "#000000"; const S1 = "#0a0a0a"; const S2 = "#0f0f0f"; const S3 = "#141414";
-const B1 = "rgba(255,255,255,0.06)";
-const T1 = "#F4F4F5"; const T2 = "#A1A1AA"; const T3 = "#71717A"; const T4 = "#3F3F46";
-const SIGNAL = "#4FC3F7"; const POSITIVE = "#4ADE80"; const WARNING = "#FBBF24"; const DANGER = "#F87171";
+const S0 = "var(--surface-0)"; const S1 = "var(--surface-1)"; const S2 = "var(--surface-2)"; const S3 = "var(--surface-3)";
+const B1 = "var(--border-2)";
+const T1 = "var(--text-1)"; const T2 = "var(--text-2)"; const T3 = "var(--text-3)"; const T4 = "var(--text-4)";
+const SIGNAL = "var(--signal)"; const POSITIVE = "var(--positive)"; const WARNING = "var(--warning)"; const DANGER = "var(--danger)";
 
 type Filter = "semua" | "hari_ini" | "critical" | "high";
 type ViewMode = "stream" | "dampak" | "sektor";
@@ -192,7 +192,7 @@ export default function BeritaPage() {
       {[...Array(6)].map((_, i) => (
         <div key={i} style={{
           height: 90, background: S1,
-          border: "1px solid rgba(255,255,255,0.04)",
+          border: "1px solid var(--border-1)",
           borderRadius: 8,
         }} />
       ))}
@@ -202,13 +202,13 @@ export default function BeritaPage() {
   // --- Empty state ---
   const emptyState = (
     <div style={{
-      background: S1, border: "1px solid rgba(255,255,255,0.05)",
+      background: S1, border: "1px solid var(--border-1)",
       borderRadius: 10, padding: "48px 32px", textAlign: "center",
     }}>
-      <p style={{ fontFamily: mono, fontSize: 11, color: T4, marginBottom: 8 }}>
+      <p style={{ fontFamily: mono, fontSize: 13, color: T4, marginBottom: 8 }}>
         {emptyMessage().title}
       </p>
-      <p style={{ fontFamily: inter, fontSize: 12, color: "#27272A", lineHeight: 1.6 }}>
+      <p style={{ fontFamily: inter, fontSize: 12, color: "var(--text-4)", lineHeight: 1.6 }}>
         {emptyMessage().sub}
       </p>
     </div>
@@ -240,7 +240,7 @@ export default function BeritaPage() {
   // --- Right rail section heading ---
   const railHeading = (label: string) => (
     <p style={{
-      fontFamily: mono, fontSize: 8, letterSpacing: "0.14em",
+      fontFamily: mono, fontSize: 13, letterSpacing: "0.14em",
       color: T4, textTransform: "uppercase", marginBottom: 10,
     }}>
       {label}
@@ -257,9 +257,9 @@ export default function BeritaPage() {
       <div>
         {railHeading("Entitas Terdampak")}
         {loading ? (
-          <p style={{ fontFamily: mono, fontSize: 9, color: T4 }}>[ MEMUAT... ]</p>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T4 }}>[ MEMUAT... ]</p>
         ) : topSymbols.length === 0 ? (
-          <p style={{ fontFamily: mono, fontSize: 9, color: T4 }}>[ TIDAK ADA DATA ]</p>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T4 }}>[ TIDAK ADA DATA ]</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {topSymbols.map(({ symbol, count, direction }) => {
@@ -270,31 +270,31 @@ export default function BeritaPage() {
                   onClick={() => setLocation(`/stock/${symbol}`)}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: "var(--border-1)",
+                    border: "1px solid var(--border-2)",
                     borderRadius: 6, padding: "6px 10px",
                     cursor: "pointer", width: "100%",
                     transition: "border-color 0.1s",
                   }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = `${dColor}40`; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-2)"; }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={{
                       width: 4, height: 4, borderRadius: "50%",
                       background: dColor, boxShadow: `0 0 4px ${dColor}60`,
                     }} />
-                    <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 700, color: T1 }}>
+                    <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, color: T1 }}>
                       {symbol}
                     </span>
-                    <span style={{ fontFamily: mono, fontSize: 8, color: dColor }}>
+                    <span style={{ fontFamily: mono, fontSize: 13, color: dColor }}>
                       {direction}
                     </span>
                   </div>
                   <span style={{
-                    fontFamily: mono, fontSize: 8, color: T4,
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.08)",
+                    fontFamily: mono, fontSize: 13, color: T4,
+                    background: "var(--border-1)",
+                    border: "1px solid var(--border-2)",
                     borderRadius: 4, padding: "1px 5px",
                   }}>
                     {count}
@@ -310,9 +310,9 @@ export default function BeritaPage() {
       <div>
         {railHeading("Sektor Terdampak")}
         {loading ? (
-          <p style={{ fontFamily: mono, fontSize: 9, color: T4 }}>[ MEMUAT... ]</p>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T4 }}>[ MEMUAT... ]</p>
         ) : topSectors.length === 0 ? (
-          <p style={{ fontFamily: mono, fontSize: 9, color: T4 }}>[ TIDAK ADA DATA ]</p>
+          <p style={{ fontFamily: mono, fontSize: 12, color: T4 }}>[ TIDAK ADA DATA ]</p>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
             {topSectors.map(({ name, count }) => (
@@ -320,16 +320,16 @@ export default function BeritaPage() {
                 key={name}
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 5,
-                  fontFamily: mono, fontSize: 8, color: T3,
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  fontFamily: mono, fontSize: 13, color: T3,
+                  background: "var(--border-1)",
+                  border: "1px solid var(--border-2)",
                   borderRadius: 4, padding: "3px 8px",
                 }}
               >
                 {name}
                 <span style={{
-                  fontFamily: mono, fontSize: 7, color: T4,
-                  background: "rgba(255,255,255,0.06)",
+                  fontFamily: mono, fontSize: 12, color: T4,
+                  background: "var(--border-2)",
                   borderRadius: 3, padding: "1px 4px",
                 }}>
                   {count}
@@ -347,13 +347,13 @@ export default function BeritaPage() {
     <div>
       {sectorFilter && (
         <div style={{ marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontFamily: mono, fontSize: 9, color: T3 }}>
+          <span style={{ fontFamily: mono, fontSize: 12, color: T3 }}>
             Filter aktif: <span style={{ color: SIGNAL }}>{sectorFilter}</span>
           </span>
           <button
             onClick={() => setSectorFilter(null)}
             style={{
-              fontFamily: mono, fontSize: 8, color: DANGER,
+              fontFamily: mono, fontSize: 13, color: DANGER,
               background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)",
               borderRadius: 4, padding: "2px 8px", cursor: "pointer",
             }}
@@ -368,17 +368,17 @@ export default function BeritaPage() {
           {[...Array(6)].map((_, i) => (
             <div key={i} style={{
               height: 110, background: S1,
-              border: "1px solid rgba(255,255,255,0.04)",
+              border: "1px solid var(--border-1)",
               borderRadius: 8,
             }} />
           ))}
         </div>
       ) : sectorMatrix.length === 0 ? (
         <div style={{
-          background: S1, border: "1px solid rgba(255,255,255,0.05)",
+          background: S1, border: "1px solid var(--border-1)",
           borderRadius: 10, padding: "48px 32px", textAlign: "center",
         }}>
-          <p style={{ fontFamily: mono, fontSize: 11, color: T4 }}>
+          <p style={{ fontFamily: mono, fontSize: 13, color: T4 }}>
             [ TIDAK ADA DATA SEKTOR ]
           </p>
         </div>
@@ -405,14 +405,14 @@ export default function BeritaPage() {
                 }}
                 style={{
                   background: S1,
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  border: "1px solid var(--border-2)",
                   borderRadius: 8, padding: "14px 16px",
                   cursor: "pointer", textAlign: "left",
                   transition: "border-color 0.1s",
                   display: "flex", flexDirection: "column", gap: 10,
                 }}
                 onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = `${dColor}40`; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.06)"; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-2)"; }}
               >
                 {/* Sector name + direction */}
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
@@ -420,7 +420,7 @@ export default function BeritaPage() {
                     {name}
                   </span>
                   <span style={{
-                    fontFamily: mono, fontSize: 8, color: dColor,
+                    fontFamily: mono, fontSize: 13, color: dColor,
                     background: `${dColor}12`, border: `1px solid ${dColor}30`,
                     borderRadius: 3, padding: "2px 6px", flexShrink: 0,
                   }}>
@@ -431,7 +431,7 @@ export default function BeritaPage() {
                 {/* Mini bar */}
                 <div style={{
                   display: "flex", height: 4, borderRadius: 2, overflow: "hidden",
-                  background: "rgba(255,255,255,0.04)",
+                  background: "var(--border-1)",
                 }}>
                   {posW > 0 && (
                     <div style={{ width: `${posW}%`, background: POSITIVE, opacity: 0.8 }} />
@@ -446,21 +446,21 @@ export default function BeritaPage() {
 
                 {/* Stats row */}
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontFamily: mono, fontSize: 8, color: T4 }}>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: T4 }}>
                     {articles.length} artikel
                   </span>
                   {positive > 0 && (
-                    <span style={{ fontFamily: mono, fontSize: 8, color: POSITIVE }}>
+                    <span style={{ fontFamily: mono, fontSize: 13, color: POSITIVE }}>
                       +{positive}
                     </span>
                   )}
                   {negative > 0 && (
-                    <span style={{ fontFamily: mono, fontSize: 8, color: DANGER }}>
+                    <span style={{ fontFamily: mono, fontSize: 13, color: DANGER }}>
                       -{negative}
                     </span>
                   )}
                   {neutral > 0 && (
-                    <span style={{ fontFamily: mono, fontSize: 8, color: T4 }}>
+                    <span style={{ fontFamily: mono, fontSize: 13, color: T4 }}>
                       {neutral}N
                     </span>
                   )}
@@ -477,7 +477,7 @@ export default function BeritaPage() {
     <div style={{ minHeight: "100vh", background: S0, paddingBottom: 60 }}>
       {/* Zone A — Sticky Header */}
       <div style={{
-        borderBottom: "1px solid rgba(255,255,255,0.04)",
+        borderBottom: "1px solid var(--border-1)",
         padding: "28px 32px 0",
         background: S0,
         position: "sticky", top: 0, zIndex: 10,
@@ -487,7 +487,7 @@ export default function BeritaPage() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
             <div>
               <p style={{
-                fontFamily: mono, fontSize: 9, letterSpacing: "0.14em",
+                fontFamily: mono, fontSize: 12, letterSpacing: "0.14em",
                 color: T4, marginBottom: 6, textTransform: "uppercase",
               }}>
                 MARKET INTELLIGENCE
@@ -504,9 +504,9 @@ export default function BeritaPage() {
                 width: 5, height: 5, borderRadius: "50%",
                 background: POSITIVE, boxShadow: "0 0 5px rgba(74,222,128,0.6)",
               }} />
-              <span style={{ fontFamily: mono, fontSize: 9, color: POSITIVE, letterSpacing: "0.08em" }}>LIVE</span>
+              <span style={{ fontFamily: mono, fontSize: 12, color: POSITIVE, letterSpacing: "0.08em" }}>LIVE</span>
               {data?.stats && (
-                <span style={{ fontFamily: mono, fontSize: 9, color: T4, marginLeft: 8 }}>
+                <span style={{ fontFamily: mono, fontSize: 12, color: T4, marginLeft: 8 }}>
                   {data.total} artikel · {criticalCount} kritis · {highCount} penting
                 </span>
               )}
@@ -522,10 +522,10 @@ export default function BeritaPage() {
                   key={pill.id}
                   onClick={() => setFilter(pill.id)}
                   style={{
-                    fontFamily: mono, fontSize: 9, letterSpacing: "0.1em",
+                    fontFamily: mono, fontSize: 12, letterSpacing: "0.1em",
                     padding: "5px 12px", borderRadius: 9999, cursor: "pointer",
-                    background: active ? "rgba(79,195,247,0.12)" : "rgba(255,255,255,0.03)",
-                    border: active ? "1px solid rgba(79,195,247,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                    background: active ? "rgba(79,195,247,0.12)" : "var(--border-1)",
+                    border: active ? "1px solid rgba(79,195,247,0.3)" : "1px solid var(--border-2)",
                     color: active ? SIGNAL : T3,
                     transition: "all 0.1s",
                     textTransform: "uppercase",
@@ -549,7 +549,7 @@ export default function BeritaPage() {
                     if (vm.id !== "stream") setSectorFilter(null);
                   }}
                   style={{
-                    fontFamily: mono, fontSize: 9, letterSpacing: "0.12em",
+                    fontFamily: mono, fontSize: 12, letterSpacing: "0.12em",
                     padding: "8px 14px", cursor: "pointer",
                     background: "transparent", border: "none",
                     borderBottom: active ? `2px solid ${SIGNAL}` : "2px solid transparent",
@@ -577,13 +577,13 @@ export default function BeritaPage() {
           <div>
             {sectorFilter && (
               <div style={{ marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontFamily: mono, fontSize: 9, color: T3 }}>
+                <span style={{ fontFamily: mono, fontSize: 12, color: T3 }}>
                   Filter sektor: <span style={{ color: SIGNAL }}>{sectorFilter}</span>
                 </span>
                 <button
                   onClick={() => setSectorFilter(null)}
                   style={{
-                    fontFamily: mono, fontSize: 8, color: DANGER,
+                    fontFamily: mono, fontSize: 13, color: DANGER,
                     background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.2)",
                     borderRadius: 4, padding: "2px 8px", cursor: "pointer",
                   }}
@@ -612,17 +612,17 @@ export default function BeritaPage() {
                         {/* Group header */}
                         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                           <span style={{
-                            fontFamily: mono, fontSize: 9, fontWeight: 700,
+                            fontFamily: mono, fontSize: 12, fontWeight: 700,
                             letterSpacing: "0.1em", color: sevStyle.fg,
                             background: sevStyle.bg, border: `1px solid ${sevStyle.border}`,
                             borderRadius: 4, padding: "3px 8px",
                           }}>
                             {sev}
                           </span>
-                          <span style={{ fontFamily: mono, fontSize: 9, color: T4 }}>
+                          <span style={{ fontFamily: mono, fontSize: 12, color: T4 }}>
                             — {items.length} artikel
                           </span>
-                          <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.04)" }} />
+                          <div style={{ flex: 1, height: 1, background: "var(--border-1)" }} />
                         </div>
                         {articleList(items)}
                       </div>

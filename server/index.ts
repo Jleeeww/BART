@@ -140,6 +140,45 @@ app.use((req, res, next) => {
         .then(({ ensureRagSchema }) => ensureRagSchema())
         .catch(err => console.warn('[startup] RAG schema init error:', err));
 
+      // OHLCV price ingestion — Yahoo (.JK) → session_history, dataSource='YAHOO'.
+      // Hourly during IDX market hours (so today's forming candle updates), plus
+      // one run ~20s after boot so prices are fresh immediately in dev.
+      const runOHLCVIngest = async () => {
+        const { ingestOHLCVBatch } = await import('./engine/ohlcvIngester');
+        const { HOMEPAGE_UNIVERSE } = await import('./engine/lq45Universe');
+        const { invalidateRadarCache } = await import('./engine/radarEngine');
+        const r = await ingestOHLCVBatch(HOMEPAGE_UNIVERSE, 40);
+        invalidateRadarCache();
+        log(`[ohlcvIngest] ok=${r.ok}/${r.total} bars=${r.totalBars} failed=${r.failed.length}`, 'ohlcvIngest');
+      };
+      const isIDXHoursWIB = (): boolean => {
+        const wib = new Date(Date.now() + 7 * 3600 * 1000); // shift to WIB, read as UTC
+        const day = wib.getUTCDay();   // 0=Sun … 6=Sat
+        const hour = wib.getUTCHours();
+        return day >= 1 && day <= 5 && hour >= 9 && hour < 16;
+      };
+      setTimeout(() => {
+        runOHLCVIngest().catch((err) => log(`[ohlcvIngest] startup error: ${err}`, 'ohlcvIngest'));
+      }, 20000);
+      setInterval(() => {
+        if (isIDXHoursWIB()) {
+          runOHLCVIngest().catch((err) => log(`[ohlcvIngest] error: ${err}`, 'ohlcvIngest'));
+        }
+      }, 60 * 60 * 1000);
+      log('OHLCV ingestion scheduled (hourly during IDX market hours + startup)', 'ohlcvIngest');
+
+      // IDX fundamentals refresh — price + PER/ROE into stocks table, daily
+      // 17:15 WIB (post-close) + one run 40s after boot.
+      const runFundamentals = async () => {
+        const { updateStocksFromIDX } = await import('./engine/idxFundamentalsIngester');
+        const r = await updateStocksFromIDX();
+        log(`[idxFundamentals] updated=${r.updated} price=${r.priceUpdated} ratio=${r.ratioUpdated}`, 'idxFundamentals');
+      };
+      setTimeout(() => {
+        runFundamentals().catch((err) => log(`[idxFundamentals] startup error: ${err}`, 'idxFundamentals'));
+      }, 40000);
+      scheduleDaily(17, 15, 7, runFundamentals, 'idxFundamentals');
+
       // Macro flow fetch — 06:00 WIB (23:00 UTC prev day, post-US close) and 16:30 WIB (09:30 UTC, post-IDX close)
       const runMacroFlow = async () => {
         const { getMacroFlowSnapshot, persistMacroFlowSnapshot } = await import('./engine/macroFlowFetcher');

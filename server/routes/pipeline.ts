@@ -41,6 +41,36 @@ export function registerPipelineRoutes(app: Express): void {
     }
   });
 
+  // Manually trigger OHLCV ingestion (dev/on-demand). Body: { symbols?, rangeDays? }.
+  // Defaults to the homepage universe. Pulls live from Yahoo → session_history.
+  app.post('/api/ingest/ohlcv', async (req, res) => {
+    try {
+      const { ingestOHLCVBatch } = await import('../engine/ohlcvIngester');
+      const { HOMEPAGE_UNIVERSE } = await import('../engine/lq45Universe');
+      const symbols: string[] = Array.isArray(req.body?.symbols) && req.body.symbols.length
+        ? req.body.symbols.map((s: string) => String(s).toUpperCase())
+        : HOMEPAGE_UNIVERSE;
+      const rangeDays = Number(req.body?.rangeDays) || 40;
+      const result = await ingestOHLCVBatch(symbols, rangeDays);
+      const { invalidateRadarCache } = await import('../engine/radarEngine');
+      invalidateRadarCache();
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // Manually refresh stocks table price + ratios from official IDX data.
+  app.post('/api/ingest/fundamentals', async (_req, res) => {
+    try {
+      const { updateStocksFromIDX } = await import('../engine/idxFundamentalsIngester');
+      const result = await updateStocksFromIDX();
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   app.get('/api/monitor/scores', async (req, res) => {
     try {
       const { getLastDistribution } = await import('../engine/scoreMonitor');
