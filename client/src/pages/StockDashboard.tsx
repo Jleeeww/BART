@@ -155,6 +155,10 @@ export default function StockDashboard() {
   const [mgmtLoading, setMgmtLoading] = useState(true);
   const [ratioLoading, setRatioLoading] = useState(true);
   const [annLoading, setAnnLoading] = useState(true);
+  const [valLoading, setValLoading] = useState(true);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [newsFeed, setNewsFeed] = useState<any[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
 
   const TAB_IDS = ["overview", "flow", "financials", "news", "risk", "insider", "valuation"] as const;
 
@@ -292,18 +296,29 @@ export default function StockDashboard() {
 
   useEffect(() => {
     if (!stock) return;
+    setValuationData(null); setValLoading(true);
     fetch(`/api/valuation/${stock.symbol}`)
       .then(r => { if (!r.ok) throw new Error('Valuation fetch failed'); return r.json(); })
       .then(data => { if (data.error) throw new Error(data.error); setValuationData(data); })
-      .catch(err => { console.error(err); setValuationData(null); });
+      .catch(err => { console.error(err); setValuationData(null); })
+      .finally(() => setValLoading(false));
   }, [stock]);
 
   useEffect(() => {
     if (!stock) return;
+    setNewsData(null); setNewsLoading(true);
     fetch(`/api/news/${stock.symbol}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data && Array.isArray(data.impacts)) setNewsData(data); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setNewsLoading(false));
+    // Default berita: real RSS news with images (no AI needed)
+    setNewsFeed([]); setFeedLoading(true);
+    fetch(`/api/news/feed?symbol=${stock.symbol}&company=${encodeURIComponent(stock.name ?? '')}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && Array.isArray(data.articles)) setNewsFeed(data.articles); })
+      .catch(() => {})
+      .finally(() => setFeedLoading(false));
   }, [stock]);
 
   useEffect(() => {
@@ -1453,6 +1468,56 @@ export default function StockDashboard() {
 
                   {/* News Tab */}
                   <TabsContent value="news" className="mt-0 focus-visible:outline-none space-y-6">
+                    {/* Default: real market news with images (no AI needed) */}
+                    <div>
+                      <h3 className="text-base font-bold text-foreground flex items-center gap-2 mb-4">
+                        <Newspaper className="w-4 h-4 text-signal" /> Berita Pasar Terkini
+                      </h3>
+                      {feedLoading && newsFeed.length === 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <Card key={i} className="overflow-hidden border-border/50 bg-card">
+                              <Skeleton className="h-40 w-full" />
+                              <div className="p-4">
+                                <Skeleton className="h-3 w-24 mb-2" />
+                                <Skeleton className="h-4 w-full mb-1.5" />
+                                <Skeleton className="h-4 w-2/3" />
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : newsFeed.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {newsFeed.slice(0, 12).map((n: any, i: number) => (
+                            <a key={i} href={n.url || undefined} target="_blank" rel="noopener noreferrer"
+                              className="group block rounded-lg border border-border/50 bg-card overflow-hidden hover:border-signal/50 transition-colors">
+                              {n.imageUrl ? (
+                                <div className="h-40 w-full overflow-hidden bg-surface-2">
+                                  <img src={n.imageUrl} alt="" loading="lazy"
+                                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
+                                </div>
+                              ) : null}
+                              <div className="p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs font-semibold text-signal">{n.source}</span>
+                                  <span className="text-xs text-text-4" style={{ fontVariantNumeric: "tabular-nums" }}>
+                                    {n.publishedAt ? new Date(n.publishedAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : ""}
+                                  </span>
+                                </div>
+                                <p className="text-sm font-semibold text-foreground leading-snug mb-1.5 line-clamp-2">{n.title}</p>
+                                <p className="text-xs text-text-3 leading-relaxed line-clamp-2">{n.summary}</p>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <Card className="p-6 border-border/50 bg-card text-center">
+                          <p className="text-sm text-text-3">Belum ada berita pasar tersedia.</p>
+                        </Card>
+                      )}
+                    </div>
+
                     {annLoading && idxAnnouncements.length === 0 && (
                       <Card className="p-5 border-border/50 bg-card">
                         <Skeleton className="h-4 w-48 mb-4" />
@@ -1515,7 +1580,20 @@ export default function StockDashboard() {
 
                     {/* SECTION 1: Analyzed News Impacts */}
                     {/* Analyzed impacts — filtered by symbol/sector only */}
-                    {newsData?.impacts?.length > 0 ? (
+                    {newsLoading && !newsData ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <Card key={i} className="p-4 border-border/50 bg-card">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Skeleton className="h-3 w-16" />
+                              <Skeleton className="h-3 w-24" />
+                            </div>
+                            <Skeleton className="h-4 w-3/4 mb-2" />
+                            <Skeleton className="h-3 w-full" />
+                          </Card>
+                        ))}
+                      </div>
+                    ) : newsData?.impacts?.length > 0 ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         {newsData.impacts.map((impact: any, idx: number) => (
                           <NewsArticleCard
@@ -2152,7 +2230,21 @@ export default function StockDashboard() {
                   {/* Valuasi Tab */}
                   <TabsContent value="valuation" className="mt-0 focus-visible:outline-none">
                     <div className="p-4 space-y-4">
-                      {valuationData ? (() => {
+                      {valLoading && !valuationData ? (
+                        <div className="space-y-4">
+                          <Card className="p-5 border-border/50 bg-card">
+                            <Skeleton className="h-4 w-40 mb-4" />
+                            <div className="grid grid-cols-2 gap-3">
+                              {Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="rounded-md border border-border/40 bg-surface-2 p-3">
+                                  <Skeleton className="h-2.5 w-16 mb-2" />
+                                  <Skeleton className="h-6 w-20" />
+                                </div>
+                              ))}
+                            </div>
+                          </Card>
+                        </div>
+                      ) : valuationData ? (() => {
                         const v = valuationData.valuation?.valuation;
                         const q = valuationData.valuation?.quality;
                         const bench = valuationData.sectorBenchmark;

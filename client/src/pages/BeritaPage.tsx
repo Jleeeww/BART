@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useLocation } from "wouter";
+import { NewsGrid } from "@/components/NewsGrid";
 import { NewsArticleCard } from "@/components/v3/NewsArticleCard";
 
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
@@ -563,6 +564,11 @@ export default function BeritaPage() {
             })}
           </div>
         </div>
+      </div>
+
+      {/* Zone B0 — Real market news grid (with images, no AI) */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "20px 32px 0" }}>
+        <NewsGrid limit={12} />
       </div>
 
       {/* Zone B — Main content */}
