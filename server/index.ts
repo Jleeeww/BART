@@ -179,6 +179,22 @@ app.use((req, res, next) => {
       }, 40000);
       scheduleDaily(17, 15, 7, runFundamentals, 'idxFundamentals');
 
+      // Bandarmology (Stockbit broker net buy/sell) → session_history flow columns.
+      // Post-market 16:45 WIB + one run 70s after boot. No-ops if STOCKBIT_TOKEN is
+      // absent/expired (graceful). Sweep respects Stockbit rate limits.
+      const runBandarmology = async () => {
+        const { stockbitEnabled } = await import('./engine/stockbitClient');
+        if (!stockbitEnabled()) return;
+        const { ingestBandarmology } = await import('./engine/stockbitBandarmology');
+        const r = await ingestBandarmology();
+        if (r) log(`[bandarmology] updated=${r.updated} date=${r.date}`, 'bandarmology');
+        else log('[bandarmology] skipped (token missing/expired or sweep failed)', 'bandarmology');
+      };
+      setTimeout(() => {
+        runBandarmology().catch((err) => log(`[bandarmology] startup error: ${err}`, 'bandarmology'));
+      }, 70000);
+      scheduleDaily(16, 45, 7, runBandarmology, 'bandarmology');
+
       // Macro flow fetch — 06:00 WIB (23:00 UTC prev day, post-US close) and 16:30 WIB (09:30 UTC, post-IDX close)
       const runMacroFlow = async () => {
         const { getMacroFlowSnapshot, persistMacroFlowSnapshot } = await import('./engine/macroFlowFetcher');

@@ -159,6 +159,8 @@ export default function StockDashboard() {
   const [newsLoading, setNewsLoading] = useState(true);
   const [newsFeed, setNewsFeed] = useState<any[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
+  const [bandarData, setBandarData] = useState<any>(null);
+  const [bandarLoading, setBandarLoading] = useState(true);
 
   const TAB_IDS = ["overview", "flow", "financials", "news", "risk", "insider", "valuation"] as const;
 
@@ -319,6 +321,13 @@ export default function StockDashboard() {
       .then(data => { if (data && Array.isArray(data.articles)) setNewsFeed(data.articles); })
       .catch(() => {})
       .finally(() => setFeedLoading(false));
+    // Real bandarmology (Stockbit broker net buy/sell)
+    setBandarData(null); setBandarLoading(true);
+    fetch(`/api/bandarmology/${stock.symbol}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && data.symbol) setBandarData(data); })
+      .catch(() => {})
+      .finally(() => setBandarLoading(false));
   }, [stock]);
 
   useEffect(() => {
@@ -975,6 +984,67 @@ export default function StockDashboard() {
 
                   {/* Flow Tab */}
                   <TabsContent value="flow" className="mt-0 focus-visible:outline-none space-y-6">
+                    {bandarLoading && !bandarData && (
+                      <Card className="p-5 border-border/50 bg-card">
+                        <Skeleton className="h-4 w-48 mb-4" />
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                          {[0,1,2].map(i => <Skeleton key={i} className="h-14" />)}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          {[0,1].map(i => <Skeleton key={i} className="h-28" />)}
+                        </div>
+                      </Card>
+                    )}
+                    {bandarData && (() => {
+                      const b = (n: number) => `${n >= 0 ? "+" : ""}${(n / 1e9).toLocaleString("id-ID", { maximumFractionDigits: 1 })} M`;
+                      const fNet = bandarData.foreignNet ?? 0;
+                      return (
+                        <Card className="p-5 border-border/50 bg-card">
+                          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                              <Activity className="w-4 h-4 text-signal" /> Bandarmology — Broker Net (Stockbit)
+                            </h3>
+                            <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                              style={{ color: fNet >= 0 ? "var(--positive)" : "var(--danger)", background: fNet >= 0 ? "var(--signal-dim)" : "rgba(220,38,38,0.1)" }}>
+                              {fNet >= 0 ? "AKUMULASI ASING" : "DISTRIBUSI ASING"}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3 mb-5" style={{ fontVariantNumeric: "tabular-nums" }}>
+                            {[
+                              { label: "Net Asing", val: bandarData.foreignNet },
+                              { label: "Net Lokal", val: bandarData.localNet },
+                              { label: "Net Pemerintah", val: bandarData.govNet },
+                            ].map((m) => (
+                              <div key={m.label} className="rounded-md border border-border/40 bg-surface-2 px-3 py-2.5">
+                                <div className="text-xs text-text-3 uppercase tracking-wide mb-1">{m.label}</div>
+                                <div className="text-base font-semibold" style={{ color: (m.val ?? 0) >= 0 ? "var(--positive)" : "var(--danger)" }}>{b(m.val ?? 0)}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {[
+                              { title: "Top Broker Beli", rows: bandarData.topBuyers ?? [], pos: true },
+                              { title: "Top Broker Jual", rows: bandarData.topSellers ?? [], pos: false },
+                            ].map((col) => (
+                              <div key={col.title}>
+                                <p className="text-xs font-semibold text-text-3 uppercase tracking-wide mb-2">{col.title}</p>
+                                <div className="divide-y divide-border/40">
+                                  {col.rows.slice(0, 6).map((r: any, i: number) => (
+                                    <div key={i} className="flex items-center justify-between py-1.5" style={{ fontVariantNumeric: "tabular-nums" }}>
+                                      <span className="text-sm font-semibold text-foreground">{r.broker}</span>
+                                      <span className="text-xs text-text-4">{r.type === "FOREIGN" ? "Asing" : r.type === "GOVERNMENT" ? "Pemerintah" : "Lokal"}</span>
+                                      <span className="text-sm font-medium w-24 text-right" style={{ color: col.pos ? "var(--positive)" : "var(--danger)" }}>{b(r.value)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-xs text-text-4 mt-3">Sumber: Stockbit · {bandarData.brokerCount} broker · {bandarData.date}</p>
+                        </Card>
+                      );
+                    })()}
+
                     {/* SECTION 1: MARKET REGIME (CORE ENGINE) */}
                     {!aiLoading && aiData?.marketMode && (
                       <Card className={`p-6 border-2 shadow-md ${

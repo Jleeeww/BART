@@ -71,6 +71,30 @@ export function registerPipelineRoutes(app: Express): void {
     }
   });
 
+  // Per-stock bandarmology from Stockbit (broker net buy/sell, foreign/domestic).
+  app.get('/api/bandarmology/:symbol', async (req, res) => {
+    try {
+      const { getBandarmology } = await import('../engine/stockbitBandarmology');
+      const b = await getBandarmology(req.params.symbol);
+      if (!b) return res.status(404).json({ error: 'No bandarmology data', symbol: req.params.symbol });
+      res.json(b);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // Trigger the full broker sweep → ingest into session_history.
+  app.post('/api/ingest/bandarmology', async (_req, res) => {
+    try {
+      const { ingestBandarmology } = await import('../engine/stockbitBandarmology');
+      const result = await ingestBandarmology();
+      if (!result) return res.status(503).json({ error: 'Stockbit not configured (STOCKBIT_TOKEN)' });
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   app.get('/api/monitor/scores', async (req, res) => {
     try {
       const { getLastDistribution } = await import('../engine/scoreMonitor');
