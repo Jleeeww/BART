@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
 import { StatusCard } from "@/components/StatusCard";
+import { ScoreMeaning } from "@/components/ScoreMeaning";
+import { ThematicOverlay } from "@/components/ThematicOverlay";
 import { LayerBreakdown } from "@/components/LayerBreakdown";
 import { ScoreRing as ScoreRingV3 } from "@/components/v3/ScoreRing";
 import { BODMemberCard } from "@/components/v3/BODMemberCard";
@@ -570,6 +572,16 @@ export default function StockDashboard() {
                 }}
               />
             )}
+          </motion.div>
+
+          {/* SCORE-MEANING EDUCATION + IHSG-correlation disclaimer (macro hardening) */}
+          <motion.div variants={itemVariants}>
+            <ScoreMeaning score={readinessScore} />
+          </motion.div>
+
+          {/* THEMATIC OVERLAY — labeled "Interpretasi AI", pure overlay (never affects score) */}
+          <motion.div variants={itemVariants}>
+            <ThematicOverlay symbol={symbol} />
           </motion.div>
 
 

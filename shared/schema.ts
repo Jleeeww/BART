@@ -337,6 +337,7 @@ export const macroFlowHistory = pgTable('macro_flow_history', {
   ihsgForeign: numeric('ihsg_foreign'),
   indogbUst:   numeric('indogb_ust'),
   indoCds:     numeric('indo_cds'),
+  indoCdsSource: text('indo_cds_source'),   // PROXY | SCRAPE | null — provenance of indo_cds
   eidoVolume:  numeric('eido_volume'),
   eidoChange:  numeric('eido_change'),
   dataQuality: text('data_quality'),
@@ -369,3 +370,59 @@ export const scrapeLog = pgTable('scrape_log', {
 });
 
 export type ScrapeLog = typeof scrapeLog.$inferSelect;
+
+// ─── Runtime admin config (key-value) ───────────────────────────
+// Generic KV so new runtime toggles need no migration. Canonical keys:
+//   crisis_mode           { mode: 'AUTO' | 'FORCE_CRISIS' | 'FORCE_NORMAL' }
+//   suppression_override  { multiplier: number | null }
+//   scanner_enabled       { enabled: boolean }
+//   cost_caps             { news?: number, thematic?: number, global?: number }
+export const systemConfig = pgTable('system_config', {
+  key:       text('key').primaryKey(),
+  value:     jsonb('value').notNull(),
+  updatedBy: text('updated_by'),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export type SystemConfig = typeof systemConfig.$inferSelect;
+
+// ─── Thematic Event Scanner (Layer 8) — pure labeled overlay ─────
+// NEVER touches the deterministic score. Written only by the scanner.
+export const thematicScan = pgTable('thematic_scan', {
+  id:          serial('id').primaryKey(),
+  scanAt:      timestamp('scan_at').defaultNow(),
+  slot:        text('slot'),                       // AM | MIDDAY | MANUAL
+  status:      text('status').notNull(),           // OK | NO_CATALYST | SKIPPED_COST | ERROR
+  themes:      jsonb('themes'),
+  narrative:   text('narrative'),                  // Bahasa ID "Interpretasi AI" summary
+  eventCount:  integer('event_count'),
+  costUsd:     numeric('cost_usd'),
+  webSearches: integer('web_searches'),
+  model:       text('model'),
+}, (table) => ({
+  scanAtIdx: index('thematic_scan_scan_at_idx').on(table.scanAt),
+}));
+
+export const insertThematicScanSchema = createInsertSchema(thematicScan).omit({ id: true, scanAt: true });
+export type InsertThematicScan = z.infer<typeof insertThematicScanSchema>;
+export type ThematicScan = typeof thematicScan.$inferSelect;
+
+export const thematicStockFlags = pgTable('thematic_stock_flags', {
+  id:         serial('id').primaryKey(),
+  scanId:     integer('scan_id').notNull(),        // plain link (no FK, per codebase convention)
+  symbol:     text('symbol').notNull(),
+  theme:      text('theme'),
+  direction:  text('direction'),                   // POSITIF | NEGATIF | NETRAL
+  sector:     text('sector'),
+  rationale:  text('rationale'),                   // Bahasa ID
+  confidence: text('confidence').notNull().default('LOW'),  // TINGGI | SEDANG | RENDAH | LOW
+  sourceUrls: jsonb('source_urls'),
+  createdAt:  timestamp('created_at').defaultNow(),
+}, (table) => ({
+  scanSymbolIdx: index('thematic_stock_flags_scan_symbol_idx').on(table.scanId, table.symbol),
+  symbolIdx:     index('thematic_stock_flags_symbol_idx').on(table.symbol),
+}));
+
+export const insertThematicStockFlagSchema = createInsertSchema(thematicStockFlags).omit({ id: true, createdAt: true });
+export type InsertThematicStockFlag = z.infer<typeof insertThematicStockFlagSchema>;
+export type ThematicStockFlag = typeof thematicStockFlags.$inferSelect;

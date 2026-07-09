@@ -13,6 +13,8 @@ import WatchlistPage from "@/pages/WatchlistPage";
 import ScreenerPage from "@/pages/ScreenerPage";
 import PasarPage from "@/pages/PasarPage";
 import BeritaPage from "@/pages/BeritaPage";
+import TemaPasarPage from "@/pages/TemaPasarPage";
+import AdminConfigPage from "@/pages/AdminConfigPage";
 import AdminSeed from "@/pages/AdminSeed";
 import { SimulationProvider } from "@/contexts/SimulationContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -29,6 +31,8 @@ function Router() {
       <Route path="/screener" component={ScreenerPage} />
       <Route path="/pasar" component={PasarPage} />
       <Route path="/berita" component={BeritaPage} />
+      <Route path="/tema" component={TemaPasarPage} />
+      <Route path="/admin/config" component={AdminConfigPage} />
       <Route path="/admin/seed" component={AdminSeed} />
       <Route component={NotFound} />
     </Switch>

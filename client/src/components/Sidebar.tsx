@@ -7,6 +7,8 @@ import {
   SlidersHorizontal,
   BarChart2,
   Newspaper,
+  Sparkles,
+  SlidersVertical,
   Settings,
   Search,
   ChevronsLeft,
@@ -44,11 +46,13 @@ const NAV_SECTIONS: Section[] = [
     items: [
       { icon: BarChart2,  label: "Pasar",  route: "/pasar"  },
       { icon: Newspaper,  label: "Berita", route: "/berita", badge: "NEW" },
+      { icon: Sparkles,   label: "Tema Pasar", route: "/tema", badge: "AI" },
     ],
   },
   {
     label: "PRO",
     items: [
+      { icon: SlidersVertical, label: "Admin", route: "/admin/config" },
       { icon: Settings, label: "Pengaturan", route: "/pengaturan", locked: true },
     ],
   },

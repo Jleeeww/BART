@@ -232,6 +232,7 @@ export function registerStocksRoutes(app: Express): void {
             riskOverride:    readiness.gorenganResult.riskOverride,
             hardOverride:    readiness.hardOverride,
             macroHardCap:    readiness.macroHardCap,
+            macroRegime:     readiness.macroRegime ?? null,
             activeWeightSum: readiness.activeWeightSum,
             compositeV3Layers: readiness.layers,
             scrapeSource:    (stock as any).scrapeSource ?? null,

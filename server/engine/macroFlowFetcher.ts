@@ -3,6 +3,7 @@ export interface MacroFlowSnapshot {
   ihsgForeignNetFlow: number | null;
   indogbUstSpread:    number | null;
   indo5yCDS:          number | null;
+  indo5yCDSSource:    'SCRAPE' | 'PROXY' | null;
   eidoVolume:         number | null;
   eidoChange:         number | null;
   usdIdr:             number | null;
@@ -98,8 +99,47 @@ async function fetchUSDIDR(): Promise<number | null> {
   return fetchYahooSingleClose('USDIDR=X');
 }
 
-async function fetchIndoCDS(): Promise<null> {
-  return null;
+/**
+ * Best-effort real Indonesia 5Y CDS (basis points).
+ * No clean free API exists (Bloomberg/IHS/CMA are paid), so this scrapes a
+ * public page and is expected to fail sometimes → returns null, and the caller
+ * falls back to the spread-derived proxy. Any scraped value is sanity-clamped.
+ */
+async function fetchIndoCDS(): Promise<number | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(
+      'https://www.worldgovernmentbonds.com/cds-historical-data/indonesia/5-years/',
+      { signal: controller.signal, headers: { 'User-Agent': 'Mozilla/5.0' } }
+    );
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+    // Look for the current CDS value (label "CDS value" or a bps figure near "5 Years").
+    const m =
+      html.match(/CDS\s*value[^0-9]{0,40}([0-9]{2,4}(?:\.[0-9]+)?)/i) ||
+      html.match(/5\s*Years[\s\S]{0,120}?([0-9]{2,4}(?:\.[0-9]+)?)\s*(?:bps|<)/i);
+    if (!m) return null;
+    const bps = Number(m[1]);
+    if (!isFinite(bps) || bps < 20 || bps > 2000) return null; // sanity clamp
+    return Number(bps.toFixed(1));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Proxy Indonesia 5Y CDS from the already-fetched IndoGB10Y−UST10Y spread.
+ * Sovereign CDS and the local-currency risk spread move together; since the
+ * regime detector only uses the 20-day *delta* of CDS, a monotonic proxy is
+ * directionally sufficient to keep CAPITAL_FLIGHT detectable. Documented,
+ * clamped, never null when a spread exists.
+ */
+function cdsProxyFromSpread(spreadBps: number | null): number | null {
+  if (spreadBps === null || !isFinite(spreadBps)) return null;
+  const proxy = 0.6 * spreadBps + 20;
+  return Number(Math.max(20, Math.min(2000, proxy)).toFixed(1));
 }
 
 async function fetchEIDO(): Promise<{ change: number | null; volume: number | null }> {
@@ -128,7 +168,7 @@ export async function getMacroFlowSnapshot(): Promise<MacroFlowSnapshot> {
   const ihsgForeignNetFlow = foreignFlowResult.status === 'fulfilled' ? foreignFlowResult.value : null;
   const indoGB             = indoGBResult.status      === 'fulfilled' ? indoGBResult.value      : null;
   const ust10y             = ust10yResult.status       === 'fulfilled' ? ust10yResult.value       : null;
-  const indo5yCDS          = cdsResult.status          === 'fulfilled' ? cdsResult.value          : null;
+  const scrapedCDS         = cdsResult.status          === 'fulfilled' ? cdsResult.value          : null;
   const eido               = eidoResult.status         === 'fulfilled' ? eidoResult.value         : { change: null, volume: null };
   const usdIdr             = usdIdrResult.status       === 'fulfilled' ? usdIdrResult.value       : null;
 
@@ -137,6 +177,17 @@ export async function getMacroFlowSnapshot(): Promise<MacroFlowSnapshot> {
     indoGB !== null && ust10y !== null
       ? Number(((indoGB - ust10y) * 100).toFixed(2))
       : null;
+
+  // CDS: prefer a real scraped value; otherwise derive the spread-based proxy.
+  let indo5yCDS: number | null = scrapedCDS;
+  let indo5yCDSSource: MacroFlowSnapshot['indo5yCDSSource'] = scrapedCDS !== null ? 'SCRAPE' : null;
+  if (indo5yCDS === null) {
+    const proxy = cdsProxyFromSpread(indogbUstSpread);
+    if (proxy !== null) {
+      indo5yCDS = proxy;
+      indo5yCDSSource = 'PROXY';
+    }
+  }
 
   const eidoVolume = eido.volume;
   const eidoChange = eido.change;
@@ -153,6 +204,7 @@ export async function getMacroFlowSnapshot(): Promise<MacroFlowSnapshot> {
     ihsgForeignNetFlow,
     indogbUstSpread,
     indo5yCDS,
+    indo5yCDSSource,
     eidoVolume,
     eidoChange,
     usdIdr,
@@ -165,21 +217,23 @@ export async function persistMacroFlowSnapshot(snapshot: MacroFlowSnapshot): Pro
     const { pool } = await import('../db');
     await pool.query(
       `INSERT INTO macro_flow_history
-         (date, ihsg_foreign, indogb_ust, indo_cds, eido_volume, eido_change, data_quality)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (date, ihsg_foreign, indogb_ust, indo_cds, indo_cds_source, eido_volume, eido_change, data_quality)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (date) DO UPDATE SET
-         ihsg_foreign = EXCLUDED.ihsg_foreign,
-         indogb_ust   = EXCLUDED.indogb_ust,
-         indo_cds     = EXCLUDED.indo_cds,
-         eido_volume  = EXCLUDED.eido_volume,
-         eido_change  = EXCLUDED.eido_change,
-         data_quality = EXCLUDED.data_quality,
-         fetched_at   = NOW()`,
+         ihsg_foreign    = EXCLUDED.ihsg_foreign,
+         indogb_ust      = EXCLUDED.indogb_ust,
+         indo_cds        = EXCLUDED.indo_cds,
+         indo_cds_source = EXCLUDED.indo_cds_source,
+         eido_volume     = EXCLUDED.eido_volume,
+         eido_change     = EXCLUDED.eido_change,
+         data_quality    = EXCLUDED.data_quality,
+         fetched_at      = NOW()`,
       [
         snapshot.date,
         snapshot.ihsgForeignNetFlow,
         snapshot.indogbUstSpread,
         snapshot.indo5yCDS,
+        snapshot.indo5yCDSSource,
         snapshot.eidoVolume,
         snapshot.eidoChange,
         snapshot.dataQuality,

@@ -10,6 +10,7 @@ export default function Homepage() {
   const [stocks, setStocks] = useState<any[]>([]);
   const [newsStats, setNewsStats] = useState({ total: 0, criticalAlerts: 0, highAlerts: 0 });
   const [macroRegime, setMacroRegime] = useState<any>(null);
+  const [ihsg, setIhsg] = useState<{ value: number | null; percent: number | null } | null>(null);
 
   // Button hover states
   const [primaryHover, setPrimaryHover] = useState(false);
@@ -35,6 +36,13 @@ export default function Homepage() {
     fetch("/api/macro/regime")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d?.current) setMacroRegime(d.current); })
+      .catch(() => {});
+    fetch("/api/idx/indices")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const c = d?.indices?.find((i: any) => i.code === "COMPOSITE");
+        if (c) setIhsg({ value: c.value ?? null, percent: c.percent ?? null });
+      })
       .catch(() => {});
   }, []);
 
@@ -380,16 +388,19 @@ export default function Homepage() {
         {/* ─── MACRO REGIME BANNER ─── */}
         {(() => {
           const regimeMap: Record<string, { label: string; color: string }> = {
-            CAPITAL_INFLOW:    { label: "KAPITAL MASUK",    color: "var(--positive)" },
-            NEUTRAL:           { label: "NETRAL",           color: "var(--text-3)" },
-            CAPITAL_OUTFLOW:   { label: "KAPITAL KELUAR",   color: "var(--warning)" },
-            CAPITAL_FLIGHT:    { label: "PELARIAN MODAL",   color: "var(--danger)" },
-            INSUFFICIENT_DATA: { label: "DATA BELUM CUKUP", color: "var(--text-4)" },
+            CAPITAL_INFLOW:     { label: "KAPITAL MASUK",    color: "var(--positive)" },
+            NEUTRAL:            { label: "NETRAL",           color: "var(--text-3)" },
+            CAPITAL_OUTFLOW:    { label: "KAPITAL KELUAR",   color: "var(--warning)" },
+            CAPITAL_FLIGHT:     { label: "PELARIAN MODAL",   color: "var(--danger)" },
+            FAILSAFE_SUPPRESSED:{ label: "SUPRESI FAIL-SAFE", color: "var(--danger)" },
+            INSUFFICIENT_DATA:  { label: "DATA BELUM CUKUP", color: "var(--text-4)" },
           };
           const regime = macroRegime?.regime ?? "INSUFFICIENT_DATA";
           const { label, color } = regimeMap[regime] ?? regimeMap.INSUFFICIENT_DATA;
           const multiplier: number = macroRegime?.multiplier ?? 1.0;
           const note: string = macroRegime?.note ?? "Memuat data aliran modal...";
+          const suppressed = multiplier < 1.0;
+          const ihsgPct = ihsg?.percent;
 
           return (
             <div style={{
@@ -413,12 +424,25 @@ export default function Homepage() {
                       ×{multiplier.toFixed(2)} bando
                     </span>
                   )}
+                  {typeof ihsgPct === "number" && (
+                    <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, marginLeft: 8,
+                      color: ihsgPct < 0 ? "var(--danger)" : "var(--positive)" }}>
+                      IHSG {ihsgPct >= 0 ? "+" : ""}{ihsgPct.toFixed(2)}% hari ini
+                    </span>
+                  )}
                 </div>
 
-                {/* Note */}
-                <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, flex: 1, minWidth: 200 }}>
-                  {note}
-                </p>
+                {/* Note + suppression warning */}
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: 0 }}>
+                    {note}
+                  </p>
+                  {suppressed && (
+                    <p style={{ fontFamily: mono, fontSize: 12, color, fontWeight: 700, lineHeight: 1.6, marginTop: 4, marginBottom: 0 }}>
+                      ⚠ Seluruh skor disesuaikan ke bawah (×{multiplier.toFixed(2)}). Kondisi pasar berisiko — pertimbangkan posisi defensif. Skor mengukur aktivitas institusional, bukan arah pasar.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           );

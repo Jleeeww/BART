@@ -4,6 +4,77 @@ import { computeCompositeV3 } from "../engine/compositeEngineV3";
 import { computeM17 } from "../engine/bandarmologyExtensions";
 
 export function registerAdminRoutes(app: Express): void {
+  // Auth helper: if ADMIN_TOKEN/MANAGEMENT_TOKEN is set, require it; otherwise
+  // allow (dev convenience). Set a token before any public exposure.
+  const adminToken = () => process.env.ADMIN_TOKEN || process.env.MANAGEMENT_TOKEN || '';
+  const isAuthed = (req: any): boolean => {
+    const token = adminToken();
+    if (!token) return true; // dev: no token configured → open
+    return req.headers.authorization === `Bearer ${token}`;
+  };
+  const requireAdmin = (req: any, res: any): boolean => {
+    if (isAuthed(req)) return true;
+    res.status(401).json({ error: 'Unauthorized — admin token required' });
+    return false;
+  };
+
+  // Public: tells the login screen whether a token is required and whether the
+  // presented Bearer is valid. Reveals only booleans, never the token.
+  app.get('/api/admin/auth-status', (req, res) => {
+    res.status(200).json({ authRequired: !!adminToken(), authenticated: isAuthed(req) });
+  });
+
+  // ── Runtime config (crisis mode / suppression / scanner / cost caps) ──────────
+  // GET effective config + live regime + today's spend for the admin dashboard.
+  app.get('/api/admin/config', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const { getAllConfig } = await import('../engine/systemConfig');
+      const { getCachedMacroRegime } = await import('../engine/macroRegimeDetector');
+      const { getDailyCost, DAILY_CAPS } = await import('../engine/costTracker');
+      res.status(200).json({
+        config: await getAllConfig(),
+        effectiveRegime: getCachedMacroRegime(),
+        cost: getDailyCost(),
+        baseCaps: DAILY_CAPS,
+      });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // POST a single config key (allowlist-validated).
+  app.post('/api/admin/config', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const { key, value } = req.body as { key?: string; value?: unknown };
+      const { CONFIG_KEYS, setConfig } = await import('../engine/systemConfig');
+      const allowed = Object.values(CONFIG_KEYS) as string[];
+      if (!key || !allowed.includes(key)) {
+        return res.status(400).json({ error: `invalid key — allowed: ${allowed.join(', ')}` });
+      }
+      if (value === undefined || value === null || typeof value !== 'object') {
+        return res.status(400).json({ error: 'value must be a JSON object' });
+      }
+      await setConfig(key as any, value, 'admin-dashboard');
+      res.status(200).json({ ok: true, key, value });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // Manually trigger a thematic scan now.
+  app.post('/api/admin/scan/trigger', async (req, res) => {
+    if (!requireAdmin(req, res)) return;
+    try {
+      const { runThematicScan } = await import('../engine/thematicScanner');
+      const result = await runThematicScan('MANUAL');
+      res.status(200).json(result);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // POST /api/admin/seed-broker-data
   // Manually seeds broker data for a stock (demo mode — no live scraping needed).
   // Auth: Bearer MANAGEMENT_TOKEN

@@ -4,14 +4,20 @@ import {
   watchlist, 
   historicalSnapshots,
   simulationAuditLog,
-  type Stock, 
-  type InsertStock, 
-  type WatchlistItem, 
+  thematicScan,
+  thematicStockFlags,
+  type Stock,
+  type InsertStock,
+  type WatchlistItem,
   type InsertWatchlistItem,
   type HistoricalSnapshot,
   type InsertHistoricalSnapshot,
   type SimulationAuditLog,
-  type InsertSimulationAuditLog
+  type InsertSimulationAuditLog,
+  type ThematicScan,
+  type InsertThematicScan,
+  type ThematicStockFlag,
+  type InsertThematicStockFlag
 } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
 
@@ -29,6 +35,12 @@ export interface IStorage {
   createHistoricalSnapshot(snapshot: InsertHistoricalSnapshot): Promise<HistoricalSnapshot>;
   insertSimulationAuditLog(log: InsertSimulationAuditLog): Promise<SimulationAuditLog>;
   getSimulationAuditLogs(runId: string): Promise<SimulationAuditLog[]>;
+  // Thematic scanner (Layer 8 — overlay only)
+  createThematicScan(scan: InsertThematicScan): Promise<ThematicScan>;
+  insertThematicFlags(scanId: number, flags: InsertThematicStockFlag[]): Promise<void>;
+  getLatestThematicScan(): Promise<ThematicScan | undefined>;
+  getThematicFlagsForSymbol(symbol: string): Promise<ThematicStockFlag[]>;
+  getRecentThematicScans(limit: number): Promise<ThematicScan[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -96,6 +108,37 @@ export class DatabaseStorage implements IStorage {
       .from(simulationAuditLog)
       .where(eq(simulationAuditLog.runId, runId))
       .orderBy(desc(simulationAuditLog.createdAt));
+  }
+
+  // ── Thematic scanner (overlay only — never touches scoring) ─────
+  async createThematicScan(scan: InsertThematicScan): Promise<ThematicScan> {
+    const [created] = await db.insert(thematicScan).values(scan).returning();
+    return created;
+  }
+
+  async insertThematicFlags(scanId: number, flags: InsertThematicStockFlag[]): Promise<void> {
+    if (!flags.length) return;
+    await db.insert(thematicStockFlags).values(flags.map((f) => ({ ...f, scanId })));
+  }
+
+  async getLatestThematicScan(): Promise<ThematicScan | undefined> {
+    const [row] = await db.select().from(thematicScan).orderBy(desc(thematicScan.scanAt)).limit(1);
+    return row;
+  }
+
+  async getThematicFlagsForSymbol(symbol: string): Promise<ThematicStockFlag[]> {
+    const latest = await this.getLatestThematicScan();
+    if (!latest) return [];
+    return await db.select()
+      .from(thematicStockFlags)
+      .where(and(
+        eq(thematicStockFlags.scanId, latest.id),
+        eq(thematicStockFlags.symbol, symbol)
+      ));
+  }
+
+  async getRecentThematicScans(limit: number): Promise<ThematicScan[]> {
+    return await db.select().from(thematicScan).orderBy(desc(thematicScan.scanAt)).limit(limit);
   }
 }
 

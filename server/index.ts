@@ -124,6 +124,19 @@ app.use((req, res, next) => {
         .then(({ logStartupCostEstimate }) => logStartupCostEstimate())
         .catch(() => {});
 
+      // Runtime admin config — start the background refresh so getConfigSync
+      // (crisis mode / suppression / scanner / cost caps) is always warm.
+      import('./engine/systemConfig')
+        .then(({ startConfigRefresh }) => startConfigRefresh())
+        .catch(err => console.warn('[startup] systemConfig refresh error:', err));
+
+      // Warm the macro regime cache immediately so scoring never fails open on a
+      // cold boot (getCachedMacroRegime defaults to a conservative ×0.9 until this
+      // resolves; the full snapshot+regime run happens ~35s after boot, see below).
+      import('./engine/macroRegimeDetector')
+        .then(({ computeMacroRegime }) => computeMacroRegime().catch(() => {}))
+        .catch(() => {});
+
       // News pipeline — first run after 30s (let server warm up), then every 15min
       setTimeout(() => {
         import('./engine/newsFetcher')
@@ -221,6 +234,26 @@ app.use((req, res, next) => {
       };
       scheduleDaily(6, 0, 7, runMacroFlow, 'macroFlow_earlyAM');
       scheduleDaily(16, 30, 7, runMacroFlow, 'macroFlow_postMarket');
+      // One run ~35s after boot so the regime (incl. real/proxy CDS) is fresh in dev.
+      setTimeout(() => {
+        runMacroFlow().catch((err) => log(`[macroFlow] startup error: ${err}`, 'macroFlow'));
+      }, 35000);
+
+      // Thematic Event Scanner (Layer 8, overlay only) — twice daily ~07:00 & ~12:00 WIB.
+      // Both slots share the $1.50/day thematic cap + $5 global breaker, so if the
+      // AM run exhausts budget the midday run auto-skips (SKIPPED_COST).
+      const runThematicScanSlot = async (slot: 'AM' | 'MIDDAY') => {
+        const { isScannerEnabled } = await import('./engine/systemConfig');
+        if (!isScannerEnabled()) { log(`[thematic:${slot}] disabled by admin — skip`, 'thematic'); return; }
+        if (!process.env.ANTHROPIC_API_KEY) { log(`[thematic:${slot}] no ANTHROPIC_API_KEY — skip`, 'thematic'); return; }
+        const { isCapReached } = await import('./engine/costTracker');
+        if (isCapReached('thematic')) { log(`[thematic:${slot}] cost cap reached — skip`, 'thematic'); return; }
+        const { runThematicScan } = await import('./engine/thematicScanner');
+        const r = await runThematicScan(slot);
+        log(`[thematic:${slot}] status=${r.status} themes=${r.eventCount} flags=${r.flags.length} cost=$${r.costUsd.toFixed(4)}`, 'thematic');
+      };
+      scheduleDaily(7,  0, 7, () => runThematicScanSlot('AM'),     'thematic_AM');
+      scheduleDaily(12, 0, 7, () => runThematicScanSlot('MIDDAY'), 'thematic_midday');
 
       // Outcome tracker — daily at 17:00 WIB (10:00 UTC)
       scheduleDaily(17, 0, 7, async () => {

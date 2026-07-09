@@ -19,6 +19,7 @@ import { registerPipelineRoutes } from "./routes/pipeline";
 import { registerStocksRoutes } from "./routes/stocks";
 import { registerAiRoutes } from "./routes/ai";
 import { registerIdxDataRoutes } from "./routes/idxData";
+import { registerThematicRoutes } from "./routes/thematic";
 
 // ========================================
 // UNIFIED BRAIN ENGINE
@@ -669,6 +670,9 @@ export async function registerRoutes(
 
   // ── IDX official market-data routes ──────────────────────────────────────────
   registerIdxDataRoutes(app);
+
+  // ── Thematic scanner routes (Layer 8 — overlay only) ─────────────────────────
+  registerThematicRoutes(app);
 
   // ── Admin routes ─────────────────────────────────────────────────────────────
   registerAdminRoutes(app);
