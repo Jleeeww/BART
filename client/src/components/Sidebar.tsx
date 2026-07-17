@@ -15,8 +15,12 @@ import {
   ChevronsRight,
   Sun,
   Moon,
+  Lock,
+  LogOut,
+  Users,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 
@@ -29,7 +33,7 @@ type NavItem = {
   locked?: boolean;
   badge?: string;
 };
-type Section = { label: string; items: NavItem[] };
+type Section = { label: string; items: NavItem[]; adminOnly?: boolean };
 
 const NAV_SECTIONS: Section[] = [
   {
@@ -50,9 +54,16 @@ const NAV_SECTIONS: Section[] = [
     ],
   },
   {
+    label: "ADMIN",
+    adminOnly: true,
+    items: [
+      { icon: Users, label: "Pengguna", route: "/admin/users" },
+      { icon: SlidersVertical, label: "Konfigurasi", route: "/admin/config" },
+    ],
+  },
+  {
     label: "PRO",
     items: [
-      { icon: SlidersVertical, label: "Admin", route: "/admin/config" },
       { icon: Settings, label: "Pengaturan", route: "/pengaturan", locked: true },
     ],
   },
@@ -119,6 +130,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const marketOpen = useMarketStatus();
   const wibTime = useWibClock();
   const { theme, toggleTheme } = useTheme();
+  const { user, isUnlocked, logout } = useAuth();
+
+  const visibleSections = NAV_SECTIONS.filter(
+    (s) => !s.adminOnly || user?.role === "admin"
+  );
 
   const W = collapsed ? 56 : 200;
 
@@ -189,8 +205,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </div>
       </Link>
 
-      {/* ── Search ───────────────────────────────────────────────────── */}
-      {!collapsed && (
+      {/* ── Search (hidden while account is locked) ──────────────────── */}
+      {!collapsed && isUnlocked && (
         <div
           ref={searchRef}
           style={{ padding: "10px 10px", borderBottom: "1px solid var(--border-1)", position: "relative" }}
@@ -273,7 +289,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* ── Navigation ───────────────────────────────────────────────── */}
       <nav style={{ flex: 1, paddingTop: 8, paddingBottom: 8, overflowY: "auto" }}>
-        {NAV_SECTIONS.map((section, si) => (
+        {visibleSections.map((section, si) => (
           <div key={section.label} style={{ marginTop: si > 0 ? 8 : 0 }}>
             {/* Section label */}
             {!collapsed && (
@@ -290,13 +306,15 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
             {section.items.map((item) => {
               const Icon = item.icon;
-              const active = !item.locked && isActive(item.route, item.exact);
+              // Pending (unapproved) accounts see every feature locked.
+              const lockedItem = item.locked || !isUnlocked;
+              const active = !lockedItem && isActive(item.route, item.exact);
 
-              if (item.locked) {
+              if (lockedItem) {
                 return (
                   <div
                     key={item.route}
-                    title={collapsed ? item.label : undefined}
+                    title={collapsed ? item.label : !item.locked ? "Menunggu persetujuan admin" : undefined}
                     style={{
                       display: "flex", alignItems: "center", gap: 10,
                       paddingLeft: collapsed ? 0 : 18, paddingRight: 10,
@@ -310,13 +328,17 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     {!collapsed && (
                       <>
                         <span style={{ fontFamily: mono, fontSize: 13, flex: 1 }}>{item.label}</span>
-                        <span style={{
-                          fontFamily: mono, fontSize: 10, color: "var(--text-4)",
-                          background: "var(--surface-2)", borderRadius: 3,
-                          padding: "1px 5px",
-                        }}>
-                          Segera
-                        </span>
+                        {item.locked ? (
+                          <span style={{
+                            fontFamily: mono, fontSize: 10, color: "var(--text-4)",
+                            background: "var(--surface-2)", borderRadius: 3,
+                            padding: "1px 5px",
+                          }}>
+                            Segera
+                          </span>
+                        ) : (
+                          <Lock style={{ width: 12, height: 12, flexShrink: 0 }} />
+                        )}
                       </>
                     )}
                   </div>
@@ -388,6 +410,63 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
         ))}
       </nav>
+
+      {/* ── User + logout ────────────────────────────────────────────── */}
+      {user && (
+        <div style={{
+          borderTop: "1px solid var(--border-1)",
+          display: "flex", alignItems: "center", gap: 8,
+          padding: collapsed ? "10px 0" : "10px 12px",
+          justifyContent: collapsed ? "center" : "flex-start",
+        }}>
+          <div
+            title={user.username}
+            style={{
+              width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "var(--signal-dim)",
+              fontFamily: mono, fontSize: 12, fontWeight: 700,
+              color: "var(--signal)", textTransform: "uppercase",
+            }}
+          >
+            {user.username[0]}
+          </div>
+          {!collapsed && (
+            <>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontFamily: mono, fontSize: 12, fontWeight: 600, color: "var(--text-1)",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {user.username}
+                </div>
+                <div style={{
+                  fontFamily: mono, fontSize: 9, letterSpacing: "0.08em",
+                  color: isUnlocked ? "var(--positive)" : "var(--warning)",
+                }}>
+                  {user.role === "admin" ? "ADMIN" : isUnlocked ? "AKTIF" : "MENUNGGU"}
+                </div>
+              </div>
+              <button
+                onClick={async () => { await logout(); window.location.href = "/"; }}
+                title="Keluar"
+                aria-label="Keluar"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 26, height: 26, borderRadius: 5, flexShrink: 0,
+                  background: "transparent", border: "none",
+                  color: "var(--text-4)", cursor: "pointer", transition: "color 0.1s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--danger)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-4)"; }}
+                data-testid="button-logout"
+              >
+                <LogOut style={{ width: 14, height: 14 }} />
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Theme toggle + collapse toggle ───────────────────────────── */}
       <div style={{ borderTop: "1px solid var(--border-1)", display: "flex" }}>

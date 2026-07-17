@@ -268,7 +268,7 @@ function StockCard({
 
   return (
     <div
-      onClick={() => (window.location.href = `/stock/${stock.symbol}`)}
+      onClick={() => (window.location.href = `/dashboard/stock/${stock.symbol}`)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{

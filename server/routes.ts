@@ -3,6 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { testBandarmologyRouter } from "./routes/testBandarmology";
 import { registerAdminRoutes } from "./routes/admin";
+import { registerAuthRoutes } from "./routes/auth";
 import { registerScraperRoutes } from "./routes/scraper";
 import { registerBacktestRoutes } from "./routes/backtest";
 import { registerDistributionRoutes } from "./routes/distribution";
@@ -34,6 +35,8 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   app.use("/api", testBandarmologyRouter);
+
+  registerAuthRoutes(app);
 
   // Seed data check (simple check on startup)
   try {

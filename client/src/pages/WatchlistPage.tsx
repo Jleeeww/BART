@@ -339,7 +339,7 @@ function WatchlistCard({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          window.location.href = `/stock/${item.symbol}`;
+          window.location.href = `/dashboard/stock/${item.symbol}`;
         }}
         data-testid={`watchlist-detail-${item.symbol}`}
         style={{
@@ -784,7 +784,7 @@ export default function WatchlistPage() {
                 alertItems.map((alert, i) => (
                   <div
                     key={i}
-                    onClick={() => (window.location.href = `/stock/${alert.symbol}`)}
+                    onClick={() => (window.location.href = `/dashboard/stock/${alert.symbol}`)}
                     style={{
                       padding: "10px 16px",
                       borderBottom: "1px solid var(--border-1)",
@@ -872,7 +872,7 @@ export default function WatchlistPage() {
                 Tambahkan saham dari Radar untuk mulai memantau portofolio intelijen.
               </p>
               <button
-                onClick={() => (window.location.href = "/radar")}
+                onClick={() => (window.location.href = "/dashboard/radar")}
                 data-testid="button-go-to-radar"
                 style={{
                   fontFamily: mono,
@@ -961,7 +961,7 @@ export default function WatchlistPage() {
                       accent={accent}
                       scoreColor={sColor}
                       onRemove={() => removeFromWatchlist(item.symbol)}
-                      onClick={() => (window.location.href = `/stock/${item.symbol}`)}
+                      onClick={() => (window.location.href = `/dashboard/stock/${item.symbol}`)}
                     />
                   );
                 })}

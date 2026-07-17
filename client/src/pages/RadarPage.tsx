@@ -442,7 +442,7 @@ export default function RadarPage() {
               return (
                 <div
                   key={stock.symbol}
-                  onClick={() => window.location.href = `/stock/${stock.symbol}`}
+                  onClick={() => window.location.href = `/dashboard/stock/${stock.symbol}`}
                   style={{
                     display: "grid",
                     gridTemplateColumns: "2fr 1fr 1fr 100px 160px 110px 130px",
@@ -593,7 +593,7 @@ export default function RadarPage() {
                       ★
                     </button>
                     <button
-                      onClick={e => { e.stopPropagation(); window.location.href = `/stock/${stock.symbol}`; }}
+                      onClick={e => { e.stopPropagation(); window.location.href = `/dashboard/stock/${stock.symbol}`; }}
                       style={{
                         fontFamily: mono, fontSize: 13, letterSpacing: "0.08em",
                         padding: "4px 10px", borderRadius: 4, cursor: "pointer",

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 
@@ -319,7 +320,7 @@ BHS,PT Bahana Securities,null,28.4B IDR,6.5%,9550,9540`
             )}
 
             <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-              <a
+              <Link
                 href={`/stock/${result.symbol}`}
                 style={{
                   fontSize: 13, padding: "6px 14px", background: "var(--surface-4)", border: "1px solid var(--text-4)",
@@ -327,7 +328,7 @@ BHS,PT Bahana Securities,null,28.4B IDR,6.5%,9550,9540`
                 }}
               >
                 → View {result.symbol} Dashboard
-              </a>
+              </Link>
               <span style={{ fontSize: 13, color: "var(--text-3)", padding: "6px 0" }}>
                 {result.brokersSeeded} brokers seeded on {result.date}
               </span>

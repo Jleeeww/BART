@@ -12,6 +12,37 @@ const vector1536 = customType<{ data: number[]; driverData: string }>({
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ─── Auth: users + sessions ─────────────────────────────────────
+// Registration flow: user registers (status=PENDING) → can log in immediately
+// but all features are locked → admin approves (status=APPROVED) → unlocked.
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(), // format: s2:<salthex>:<scrypt64hex>
+  role: text("role").notNull().default("user"), // 'user' | 'admin'
+  status: text("status").notNull().default("PENDING"), // PENDING | APPROVED | REJECTED
+  createdAt: timestamp("created_at").defaultNow(),
+  approvedAt: timestamp("approved_at"),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  approvedAt: true,
+});
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export const authSessions = pgTable("auth_sessions", {
+  token: text("token").primaryKey(),
+  userId: integer("user_id").notNull(), // plain link (no FK, per codebase convention)
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+export type AuthSession = typeof authSessions.$inferSelect;
+
 export const stocks = pgTable("stocks", {
   id: serial("id").primaryKey(),
   symbol: text("symbol").notNull().unique(),

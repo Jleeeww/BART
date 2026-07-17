@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Sparkles, ExternalLink } from "lucide-react";
 
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
@@ -110,7 +111,7 @@ export default function TemaPasarPage() {
                 {flags.map((f) => (
                   <div key={f.id} style={{ background: "var(--surface-1)", border: "1px solid var(--border-2)", borderRadius: 10, padding: "12px 16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
-                      <a href={`/stock/${f.symbol}`} style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>{f.symbol}</a>
+                      <Link href={`/stock/${f.symbol}`} style={{ fontFamily: mono, fontSize: 14, fontWeight: 700, color: "var(--text-1)" }}>{f.symbol}</Link>
                       {f.sector && <span style={{ fontFamily: mono, fontSize: 11, color: "var(--text-4)" }}>{f.sector}</span>}
                       <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, color: dirColor[f.direction] ?? "var(--text-3)" }}>{f.direction}</span>
                       <span style={{ fontFamily: mono, fontSize: 11, color: "var(--text-4)", marginLeft: "auto" }}>keyakinan: {f.confidence}</span>
