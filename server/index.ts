@@ -6,7 +6,10 @@ import * as Sentry from "@sentry/node";
 
 // GlitchTip/Sentry error tracking — no-op unless SENTRY_DSN is set.
 if (process.env.SENTRY_DSN) {
-  Sentry.init({ dsn: process.env.SENTRY_DSN, tracesSampleRate: 0.1 });
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: 0.01,
+  });
 }
 
 // Schedules fn() daily at the given local clock time (hour:minute in tzOffsetHours UTC offset)
