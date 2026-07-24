@@ -163,6 +163,9 @@ export default function StockDashboard() {
   const [feedLoading, setFeedLoading] = useState(true);
   const [bandarData, setBandarData] = useState<any>(null);
   const [bandarLoading, setBandarLoading] = useState(true);
+  const [brokerHistoryFor, setBrokerHistoryFor] = useState<string | null>(null);
+  const [brokerHistory, setBrokerHistory] = useState<any[]>([]);
+  const [brokerHistoryLoading, setBrokerHistoryLoading] = useState(false);
 
   const TAB_IDS = ["overview", "flow", "financials", "news", "risk", "insider", "valuation"] as const;
 
@@ -325,6 +328,7 @@ export default function StockDashboard() {
       .finally(() => setFeedLoading(false));
     // Real bandarmology (Stockbit broker net buy/sell)
     setBandarData(null); setBandarLoading(true);
+    setBrokerHistoryFor(null); setBrokerHistory([]);
     fetch(`/api/bandarmology/${stock.symbol}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data && data.symbol) setBandarData(data); })
@@ -1042,17 +1046,65 @@ export default function StockDashboard() {
                                 <p className="text-xs font-semibold text-text-3 uppercase tracking-wide mb-2">{col.title}</p>
                                 <div className="divide-y divide-border/40">
                                   {col.rows.slice(0, 6).map((r: any, i: number) => (
-                                    <div key={i} className="flex items-center justify-between py-1.5" style={{ fontVariantNumeric: "tabular-nums" }}>
-                                      <span className="text-sm font-semibold text-foreground">{r.broker}</span>
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      onClick={() => {
+                                        const next = brokerHistoryFor === r.broker ? null : r.broker;
+                                        setBrokerHistoryFor(next);
+                                        if (next && stock) {
+                                          setBrokerHistoryLoading(true);
+                                          fetch(`/api/bandarmology/${stock.symbol}/broker/${next}/history?limit=30`)
+                                            .then(res => res.ok ? res.json() : null)
+                                            .then(data => setBrokerHistory(data?.history ?? []))
+                                            .catch(() => setBrokerHistory([]))
+                                            .finally(() => setBrokerHistoryLoading(false));
+                                        }
+                                      }}
+                                      className="w-full flex items-center justify-between py-1.5 hover:bg-surface-2 rounded transition-colors text-left"
+                                      style={{ fontVariantNumeric: "tabular-nums" }}
+                                    >
+                                      <span className="text-sm font-semibold text-foreground underline decoration-dotted">{r.broker}</span>
                                       <span className="text-xs text-text-4">{r.type === "FOREIGN" ? "Asing" : r.type === "GOVERNMENT" ? "Pemerintah" : "Lokal"}</span>
                                       <span className="text-sm font-medium w-24 text-right" style={{ color: col.pos ? "var(--positive)" : "var(--danger)" }}>{b(r.value)}</span>
-                                    </div>
+                                    </button>
                                   ))}
                                 </div>
                               </div>
                             ))}
                           </div>
                           <p className="text-xs text-text-4 mt-3">Sumber: Stockbit · {bandarData.brokerCount} broker · {bandarData.date}</p>
+
+                          {brokerHistoryFor && (
+                            <div className="mt-4 pt-4 border-t border-border/40">
+                              <p className="text-xs font-semibold text-text-3 uppercase tracking-wide mb-2">
+                                Aktivitas Harian — {brokerHistoryFor}
+                              </p>
+                              {brokerHistoryLoading && (
+                                <p className="text-xs text-text-4">Memuat riwayat...</p>
+                              )}
+                              {!brokerHistoryLoading && brokerHistory.length === 0 && (
+                                <p className="text-xs text-text-4">Belum ada riwayat tersimpan untuk broker ini di saham ini.</p>
+                              )}
+                              {!brokerHistoryLoading && brokerHistory.length > 0 && (
+                                <div className="max-h-64 overflow-y-auto divide-y divide-border/40">
+                                  {brokerHistory.map((h: any) => (
+                                    <div key={h.date} className="grid grid-cols-4 gap-2 py-1.5 text-xs" style={{ fontVariantNumeric: "tabular-nums" }}>
+                                      <span className="text-text-3">{h.date}</span>
+                                      <span className="font-medium" style={{ color: h.netValue >= 0 ? "var(--positive)" : "var(--danger)" }}>{b(h.netValue)}</span>
+                                      <span className="text-text-4">{h.netLot.toLocaleString("id-ID")} lot</span>
+                                      <span className="text-text-4 text-right">
+                                        {h.closePrice != null ? h.closePrice.toLocaleString("id-ID") : "-"}
+                                        {h.changePct != null && (
+                                          <span className={h.changePct >= 0 ? "text-[var(--positive)]" : "text-[var(--danger)]"}> ({h.changePct >= 0 ? "+" : ""}{h.changePct.toFixed(2)}%)</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </Card>
                       );
                     })()}

@@ -31,13 +31,20 @@ const INPUT_COST_PER_TOKEN  = 3.00  / 1_000_000;   // $3.00/MTok
 const OUTPUT_COST_PER_TOKEN = 15.00 / 1_000_000;   // $15.00/MTok
 const WEB_SEARCH_COST       = 0.01;                 // $0.01/call
 
+// Per-model pricing. The chat pipeline runs claude-opus-4-8; every other
+// pipeline stays on claude-sonnet-4-5 (the default when `model` is omitted).
+const MODEL_PRICING: Record<string, { inPerTok: number; outPerTok: number }> = {
+  'claude-sonnet-4-5': { inPerTok: INPUT_COST_PER_TOKEN, outPerTok: OUTPUT_COST_PER_TOKEN },
+  'claude-opus-4-8':   { inPerTok: 5.00 / 1_000_000,     outPerTok: 25.00 / 1_000_000 },
+};
+
 // ── Daily caps ────────────────────────────────────────────────
 
 const BASE_DAILY_CAPS: Record<Pipeline | 'global', number> = {
   news:       2.00,
   management: 1.00,
   insider:    2.00,
-  chat:       1.00,
+  chat:       2.50,   // chat runs claude-opus-4-8 ($5/$25 per MTok) — see MODEL_PRICING
   thematic:   1.50,
   global:     5.00,
 };
@@ -101,11 +108,13 @@ function ensureToday(): void {
 export function estimateCost(
   inputTokens:  number,
   outputTokens: number,
-  webSearches:  number = 0
+  webSearches:  number = 0,
+  model:        string = 'claude-sonnet-4-5'
 ): number {
+  const pricing = MODEL_PRICING[model] ?? MODEL_PRICING['claude-sonnet-4-5'];
   return (
-    inputTokens  * INPUT_COST_PER_TOKEN +
-    outputTokens * OUTPUT_COST_PER_TOKEN +
+    inputTokens  * pricing.inPerTok +
+    outputTokens * pricing.outPerTok +
     webSearches  * WEB_SEARCH_COST
   );
 }
@@ -114,10 +123,11 @@ export function recordCost(
   pipeline:     Pipeline,
   inputTokens:  number,
   outputTokens: number,
-  webSearches:  number = 0
+  webSearches:  number = 0,
+  model:        string = 'claude-sonnet-4-5'
 ): number {
   ensureToday();
-  const cost = estimateCost(inputTokens, outputTokens, webSearches);
+  const cost = estimateCost(inputTokens, outputTokens, webSearches, model);
   _state[pipeline] += cost;
   _state.total     += cost;
   _state.requestCount += 1;

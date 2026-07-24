@@ -34,6 +34,15 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
+// Bookkeeping table for server/scripts/seed.ts — created there via raw SQL
+// (CREATE TABLE IF NOT EXISTS) so the seed runner has zero schema dependencies.
+// Declared here only so drizzle-kit push doesn't see it as drift and drop it.
+export const seedHistory = pgTable("_seed_history", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const authSessions = pgTable("auth_sessions", {
   token: text("token").primaryKey(),
   userId: integer("user_id").notNull(), // plain link (no FK, per codebase convention)
@@ -457,3 +466,34 @@ export const thematicStockFlags = pgTable('thematic_stock_flags', {
 export const insertThematicStockFlagSchema = createInsertSchema(thematicStockFlags).omit({ id: true, createdAt: true });
 export type InsertThematicStockFlag = z.infer<typeof insertThematicStockFlagSchema>;
 export type ThematicStockFlag = typeof thematicStockFlags.$inferSelect;
+
+// ─── Chat with BART — per-user Q&A conversations ─────────────────
+export const conversations = pgTable('conversations', {
+  id:        serial('id').primaryKey(),
+  userId:    integer('user_id').notNull(),        // plain link (no FK, per codebase convention)
+  title:     text('title').notNull().default('Percakapan baru'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  userIdx: index('conversations_user_idx').on(table.userId),
+}));
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+export const chatMessages = pgTable('chat_messages', {
+  id:             serial('id').primaryKey(),
+  conversationId: integer('conversation_id').notNull(),  // plain link (no FK, per codebase convention)
+  role:           text('role').notNull(),                // 'user' | 'assistant'
+  content:        text('content').notNull(),
+  toolsUsed:      jsonb('tools_used'),                   // [{ name, label }] | null
+  widgets:        jsonb('widgets'),                      // [{ id, type, title, data }] | null — rendered charts/widgets
+  createdAt:      timestamp('created_at').defaultNow(),
+}, (table) => ({
+  convIdx: index('chat_messages_conversation_idx').on(table.conversationId),
+}));
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;

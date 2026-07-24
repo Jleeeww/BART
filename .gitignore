@@ -9,6 +9,8 @@ vite.config.ts.*
 .env
 .env.local
 .env.*.local
+server/.stockbit-state.json
+server/.stockbit-token.json
 
 # Local Claude Code state
 .claude/

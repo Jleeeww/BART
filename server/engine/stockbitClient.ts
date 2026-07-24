@@ -8,10 +8,10 @@
  * per-broker daily activity used to reconstruct per-stock
  * bandarmology (broker net buy/sell, foreign/local/gov split).
  *
- * ⚠️ AUTH: uses STOCKBIT_TOKEN from .env (a Bearer JWT copied
- * from a logged-in Stockbit web session). Tokens expire (~24h);
- * refresh by re-copying from the browser or via STOCKBIT_EMAIL/
- * STOCKBIT_PASSWORD login (see refreshToken()).
+ * ⚠️ AUTH: starts from STOCKBIT_TOKEN in .env (a Bearer JWT copied
+ * from a logged-in Stockbit web session), then gets swapped out at
+ * runtime via setToken() by stockbitAuth.ts's scheduled Playwright
+ * refresh (reuses a saved login session — no stored password/OTP).
  *
  * ⚠️ ToS: automated access to Stockbit may violate their Terms.
  * Enabled only when STOCKBIT_TOKEN is set. Personal use, at the
@@ -32,10 +32,15 @@ const BASE_HEADERS: Record<string, string> = {
 };
 
 export function stockbitEnabled(): boolean {
-  return !!process.env.STOCKBIT_TOKEN;
+  return !!token;
 }
 
 let token = process.env.STOCKBIT_TOKEN ?? '';
+
+/** Called by stockbitAuth's scheduled refresh (or a cached token at boot) to swap in a fresh token. */
+export function setToken(newToken: string): void {
+  token = newToken;
+}
 
 // Serialized queue: ~1 request / 8s stays well under 40 / 5min.
 let queue: Promise<unknown> = Promise.resolve();

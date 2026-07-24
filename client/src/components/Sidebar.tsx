@@ -18,6 +18,7 @@ import {
   Lock,
   LogOut,
   Users,
+  MessageSquare,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -51,6 +52,7 @@ const NAV_SECTIONS: Section[] = [
       { icon: BarChart2,  label: "Pasar",  route: "/pasar"  },
       { icon: Newspaper,  label: "Berita", route: "/berita", badge: "NEW" },
       { icon: Sparkles,   label: "Tema Pasar", route: "/tema", badge: "AI" },
+      { icon: MessageSquare, label: "Chat BART", route: "/chat", badge: "AI" },
     ],
   },
   {

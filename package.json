@@ -14,7 +14,8 @@
     "postinstall": "playwright install chromium --with-deps",
     "seed": "tsx --env-file=.env server/scripts/seed.ts",
     "seed:new": "tsx server/scripts/newSeed.ts",
-    "seed:lq45": "tsx --env-file=.env server/scripts/seedLQ45.ts"
+    "seed:lq45": "tsx --env-file=.env server/scripts/seedLQ45.ts",
+    "stockbit:login": "tsx --env-file=.env server/scripts/stockbitLogin.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.93.0",
@@ -68,6 +69,7 @@
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.55.0",
+    "react-markdown": "^10.1.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.4",
     "tailwind-merge": "^2.6.0",

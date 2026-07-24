@@ -208,6 +208,31 @@ app.use((req, res, next) => {
       }, 70000);
       scheduleDaily(16, 45, 7, runBandarmology, 'bandarmology');
 
+      // Stockbit token refresh — headless Playwright reusing a saved login
+      // session (see server/scripts/stockbitLogin.ts for the one-time manual
+      // login). Runs every 20h so the ~24h token never actually expires.
+      // If the saved session itself has expired, this just logs a warning —
+      // run stockbitLogin.ts again by hand (needs OTP).
+      const runStockbitRefresh = async () => {
+        const { readCachedToken, refreshToken } = await import('./engine/stockbitAuth');
+        const { setToken } = await import('./engine/stockbitClient');
+        const cached = readCachedToken();
+        if (cached) setToken(cached);
+        const fresh = await refreshToken();
+        if (fresh) {
+          setToken(fresh);
+          log('[stockbitAuth] token refreshed', 'stockbitAuth');
+        } else {
+          log('[stockbitAuth] refresh skipped/failed — saved session may need re-login (run stockbitLogin.ts)', 'stockbitAuth');
+        }
+      };
+      setTimeout(() => {
+        runStockbitRefresh().catch((err) => log(`[stockbitAuth] startup error: ${err}`, 'stockbitAuth'));
+      }, 15000);
+      setInterval(() => {
+        runStockbitRefresh().catch((err) => log(`[stockbitAuth] error: ${err}`, 'stockbitAuth'));
+      }, 20 * 3600 * 1000);
+
       // Macro flow fetch — 06:00 WIB (23:00 UTC prev day, post-US close) and 16:30 WIB (09:30 UTC, post-IDX close)
       const runMacroFlow = async () => {
         const { getMacroFlowSnapshot, persistMacroFlowSnapshot } = await import('./engine/macroFlowFetcher');

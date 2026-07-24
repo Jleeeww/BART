@@ -19,6 +19,7 @@ import { registerSimulationRoutes } from "./routes/simulation";
 import { registerPipelineRoutes } from "./routes/pipeline";
 import { registerStocksRoutes } from "./routes/stocks";
 import { registerAiRoutes } from "./routes/ai";
+import { registerChatRoutes } from "./routes/chat";
 import { registerIdxDataRoutes } from "./routes/idxData";
 import { registerThematicRoutes } from "./routes/thematic";
 
@@ -636,6 +637,9 @@ export async function registerRoutes(
 
   // ── AI routes ─────────────────────────────────────────────────────────────────
   registerAiRoutes(app);
+
+  // ── Chat with BART routes ─────────────────────────────────────────────────────
+  registerChatRoutes(app);
   // ── Simulation routes ────────────────────────────────────────────────────────
   registerSimulationRoutes(app);
 

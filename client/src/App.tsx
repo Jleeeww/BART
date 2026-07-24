@@ -16,6 +16,7 @@ import ScreenerPage from "@/pages/ScreenerPage";
 import PasarPage from "@/pages/PasarPage";
 import BeritaPage from "@/pages/BeritaPage";
 import TemaPasarPage from "@/pages/TemaPasarPage";
+import ChatPage from "@/pages/ChatPage";
 import AdminConfigPage from "@/pages/AdminConfigPage";
 import AdminSeed from "@/pages/AdminSeed";
 import AdminUsersPage from "@/pages/AdminUsersPage";
@@ -40,6 +41,7 @@ function DashboardRouter() {
       <Route path="/pasar" component={PasarPage} />
       <Route path="/berita" component={BeritaPage} />
       <Route path="/tema" component={TemaPasarPage} />
+      <Route path="/chat" component={ChatPage} />
       {user?.role === "admin" && <Route path="/admin/users" component={AdminUsersPage} />}
       {user?.role === "admin" && <Route path="/admin/config" component={AdminConfigPage} />}
       {user?.role === "admin" && <Route path="/admin/seed" component={AdminSeed} />}

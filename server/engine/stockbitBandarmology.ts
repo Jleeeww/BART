@@ -22,6 +22,7 @@ export interface BrokerLeg {
   type: 'FOREIGN' | 'LOCAL' | 'GOVERNMENT';
   value: number; // signed net IDR
   lot: number;
+  avgPrice: number;
 }
 
 export interface StockBandar {
@@ -34,6 +35,7 @@ export interface StockBandar {
   topBuyers: BrokerLeg[];
   topSellers: BrokerLeg[];
   brokerCount: number;
+  allLegs: BrokerLeg[];
 }
 
 interface Cache { at: number; date: string; byStock: Map<string, StockBandar>; }
@@ -80,7 +82,7 @@ export async function buildBandarmology(force = false): Promise<Cache | null> {
     ok++;
     for (const r of rows) {
       if (!legs.has(r.stockCode)) legs.set(r.stockCode, []);
-      legs.get(r.stockCode)!.push({ broker: r.brokerCode, type: r.type, value: r.value, lot: r.lot });
+      legs.get(r.stockCode)!.push({ broker: r.brokerCode, type: r.type, value: r.value, lot: r.lot, avgPrice: r.avgPrice });
     }
   }
   if (ok === 0) return cache;
@@ -100,6 +102,7 @@ export async function buildBandarmology(force = false): Promise<Cache | null> {
       topBuyers: sorted.filter((l) => l.value > 0).slice(0, 8),
       topSellers: sorted.filter((l) => l.value < 0).slice(-8).reverse(),
       brokerCount: arr.length,
+      allLegs: arr,
     });
   }
 
@@ -143,10 +146,62 @@ export async function getBandarmology(symbol: string): Promise<StockBandar | nul
       topBuyers: bd.topBuyers ?? [],
       topSellers: bd.topSellers ?? [],
       brokerCount: bd.brokerCount ?? 0,
+      allLegs: bd.allLegs ?? [],
     };
   } catch {
     return null;
   }
+}
+
+export interface BrokerDayActivity {
+  date: string;
+  netValue: number;
+  netLot: number;
+  avgPrice: number;
+  closePrice: number | null;
+  changePct: number | null;
+}
+
+/**
+ * One broker's daily net value/lot for one stock, over its ingested history.
+ * Reads session_history.broker_data.allLegs — populated going forward by
+ * ingestBandarmology(); rows ingested before allLegs existed only have
+ * topBuyers/topSellers, so this broker may be missing from those older days
+ * unless it was a top-8 buyer/seller that day.
+ */
+export async function getBrokerHistory(
+  symbol: string, brokerCode: string, limit = 90,
+): Promise<BrokerDayActivity[]> {
+  const { db } = await import('../db');
+  const { sessionHistory } = await import('../../shared/schema');
+  const { eq, and, desc } = await import('drizzle-orm');
+
+  const sym = symbol.toUpperCase();
+  const broker = brokerCode.toUpperCase();
+  const rows = await db
+    .select()
+    .from(sessionHistory)
+    .where(and(eq(sessionHistory.symbol, sym), eq(sessionHistory.flowReliability, 'STOCKBIT')))
+    .orderBy(desc(sessionHistory.date))
+    .limit(limit);
+
+  const out: BrokerDayActivity[] = [];
+  for (const r of rows) {
+    const bd = r.brokerData as any;
+    if (!bd) continue;
+    const legs: BrokerLeg[] = bd.allLegs ?? [...(bd.topBuyers ?? []), ...(bd.topSellers ?? [])];
+    const leg = legs.find((l) => l.broker?.toUpperCase() === broker);
+    if (!leg) continue;
+    out.push({
+      date: r.date,
+      netValue: leg.value,
+      netLot: leg.lot,
+      avgPrice: leg.avgPrice ?? 0,
+      closePrice: r.close ?? null,
+      changePct: r.changePct ?? null,
+    });
+  }
+  return out;
 }
 
 /**
@@ -180,7 +235,7 @@ export async function ingestBandarmology(): Promise<{ updated: number; date: str
       netDomesticFlow: domesticNet,
       foreignBuy, foreignSell,
       flowBias, flowIntensity: intensity, flowReliability: 'STOCKBIT',
-      brokerData: { topBuyers: b.topBuyers, topSellers: b.topSellers, brokerCount: b.brokerCount },
+      brokerData: { topBuyers: b.topBuyers, topSellers: b.topSellers, brokerCount: b.brokerCount, allLegs: b.allLegs },
     };
 
     await db.insert(sessionHistory).values({

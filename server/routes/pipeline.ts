@@ -83,6 +83,18 @@ export function registerPipelineRoutes(app: Express): void {
     }
   });
 
+  // One broker's daily net value/lot history for one stock (Broker Daily Activity).
+  app.get('/api/bandarmology/:symbol/broker/:brokerCode/history', async (req, res) => {
+    try {
+      const { getBrokerHistory } = await import('../engine/stockbitBandarmology');
+      const limit = Math.min(Number(req.query.limit) || 90, 365);
+      const history = await getBrokerHistory(req.params.symbol, req.params.brokerCode, limit);
+      res.json({ symbol: req.params.symbol.toUpperCase(), broker: req.params.brokerCode.toUpperCase(), history });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // Trigger the full broker sweep → ingest into session_history.
   app.post('/api/ingest/bandarmology', async (_req, res) => {
     try {
