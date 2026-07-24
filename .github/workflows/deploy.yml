@@ -1,0 +1,25 @@
+name: Deploy to bart.finance
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  trigger-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sign and trigger the server's deploy webhook
+        env:
+          WEBHOOK_SECRET: ${{ secrets.BART_WEBHOOK_SECRET }}
+        run: |
+          if [ -z "$WEBHOOK_SECRET" ]; then
+            echo "::error::BART_WEBHOOK_SECRET repo secret is not set"
+            exit 1
+          fi
+          BODY='{"ref":"refs/heads/main"}'
+          SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | sed 's/^.* //')"
+          curl -fsS -X POST https://bart.finance/deploy-webhook \
+            -H "X-GitHub-Event: push" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: $SIG" \
+            -d "$BODY"
