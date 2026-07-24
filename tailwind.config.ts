@@ -14,42 +14,42 @@ export default {
         sm: "3px",     // was 4px
       },
       colors: {
-        // ── New surface tokens ──────────────────────────────────────────
-        "surface-0": "#000000",
-        "surface-1": "#0a0a0a",
-        "surface-2": "#0f0f0f",
-        "surface-3": "#141414",
-        "surface-4": "#1a1a1a",
+        // ── Surface tokens (theme-driven via CSS vars) ──────────────────
+        "surface-0": "var(--surface-0)",
+        "surface-1": "var(--surface-1)",
+        "surface-2": "var(--surface-2)",
+        "surface-3": "var(--surface-3)",
+        "surface-4": "var(--surface-4)",
 
-        // ── New semantic/signal tokens ──────────────────────────────────
-        signal: "#4FC3F7",
-        "signal-dim": "#4FC3F726",
-        positive: "#4ADE80",
-        warning: "#FBBF24",
-        danger: "#F87171",
+        // ── Semantic/signal tokens ──────────────────────────────────────
+        signal: "var(--signal)",
+        "signal-dim": "var(--signal-dim)",
+        positive: "var(--positive)",
+        warning: "var(--warning)",
+        danger: "var(--danger)",
 
         // ── Text scale ──────────────────────────────────────────────────
-        "text-1": "#F4F4F5",
-        "text-2": "#A1A1AA",
-        "text-3": "#71717A",
-        "text-4": "#3F3F46",
+        "text-1": "var(--text-1)",
+        "text-2": "var(--text-2)",
+        "text-3": "var(--text-3)",
+        "text-4": "var(--text-4)",
 
-        // ── Backward-compat aliases (remove after full page migration) ──
-        "bg-base": "#000000",
-        "bg-elevated": "#0a0a0a",
-        "bg-elevated-2": "#0f0f0f",
-        "bg-hover": "#141414",
-        "bg-active": "#1a1a1a",
-        "text-primary": "#F4F4F5",
-        "text-secondary": "#A1A1AA",
-        "text-tertiary": "#71717A",
-        "text-disabled": "#3F3F46",
-        "border-subtle": "rgba(255,255,255,0.04)",
-        "border-default": "rgba(255,255,255,0.08)",
-        "border-strong": "rgba(255,255,255,0.14)",
-        brand: "#4FC3F7",   // updated to match signal
-        emerald: "#4ADE80",
-        amber: "#FBBF24",
+        // ── Backward-compat aliases ─────────────────────────────────────
+        "bg-base": "var(--surface-0)",
+        "bg-elevated": "var(--surface-1)",
+        "bg-elevated-2": "var(--surface-2)",
+        "bg-hover": "var(--surface-3)",
+        "bg-active": "var(--surface-4)",
+        "text-primary": "var(--text-1)",
+        "text-secondary": "var(--text-2)",
+        "text-tertiary": "var(--text-3)",
+        "text-disabled": "var(--text-4)",
+        "border-subtle": "var(--border-1)",
+        "border-default": "var(--border-2)",
+        "border-strong": "var(--border-3)",
+        brand: "var(--signal)",
+        emerald: "var(--positive)",
+        amber: "var(--warning)",
 
         // ── HSL-variable system (Radix / shadcn) ───────────────────────
         background: "hsl(var(--background) / <alpha-value>)",

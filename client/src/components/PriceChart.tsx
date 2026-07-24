@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   createChart,
   CrosshairMode,
@@ -156,7 +158,8 @@ function calcStoch(data: OHLCVData[], period = 14) {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const CHART_DARK = { bg: "#0a0a0a", grid: "#161616", text: "#666", border: "#222" };
+const CHART_DARK  = { bg: "#0a0a0a", grid: "#161616", text: "#8b8b94", border: "#222222" };
+const CHART_LIGHT = { bg: "#ffffff", grid: "#eef2f7", text: "#475569", border: "#cbd5e1" };
 const TIMEFRAMES = ["1D", "5D", "1M", "3M", "6M", "1Y", "5Y", "All"];
 
 const DRAWING_TOOLS: { key: DrawingTool; icon: string; label: string }[] = [
@@ -192,6 +195,8 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
   const macdRef = useRef<HTMLDivElement>(null);
   const stochRef = useRef<HTMLDivElement>(null);
   const chartInst = useRef<IChartApi | null>(null);
+  const { theme } = useTheme();
+  const CHART = theme === "dark" ? CHART_DARK : CHART_LIGHT;
 
   const [chartType, setChartType] = useState<ChartType>("candle");
   const [activeInds, setActiveInds] = useState<Set<IndicatorKey>>(new Set());
@@ -200,9 +205,29 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
   const [showIndPanel, setShowIndPanel] = useState(false);
   const [ohlc, setOhlc] = useState<{ o: number; h: number; l: number; c: number; chg: number; chgPct: number } | null>(null);
 
-  const rawData = data && data.length > 0 ? data : [];
-  const ohlcv: OHLCVData[] = rawData.length > 0 ? toOHLCV(rawData) : generateFallbackData();
+  // Fetch live OHLCV from Yahoo when a symbol is given and no data was passed in.
+  const usesRemote = !!symbol && !(data && data.length > 0);
+  const { data: fetched, isLoading } = useQuery<{ symbol: string; bars: OHLCVData[] }>({
+    queryKey: ["/api/stocks", symbol, "ohlcv"],
+    enabled: usesRemote,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // While real data for a symbol is still loading, do NOT flash synthetic
+  // fallback candles — show a loading state instead. Fallback is only for the
+  // demo case (no symbol) or when the fetch genuinely failed.
+  const waitingForReal = usesRemote && isLoading && !fetched;
+
+  const rawData =
+    data && data.length > 0 ? data :
+    fetched?.bars && fetched.bars.length > 0 ? fetched.bars :
+    [];
+  const ohlcv: OHLCVData[] =
+    rawData.length > 0 ? toOHLCV(rawData) :
+    waitingForReal ? [] :
+    generateFallbackData();
   const displaySymbol = symbol || "DEMO";
+  const noData = usesRemote && !waitingForReal && rawData.length === 0; // fetch done, empty/error
 
   useEffect(() => {
     if (ohlcv.length === 0) return;
@@ -216,21 +241,21 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
       chg: last.close - prev.close,
       chgPct: ((last.close - prev.close) / prev.close) * 100,
     });
-  }, [data]);
+  }, [data, fetched]);
 
   useEffect(() => {
     if (!mainRef.current || ohlcv.length === 0) return;
 
     const chart = createChart(mainRef.current, {
-      layout: { background: { color: CHART_DARK.bg }, textColor: CHART_DARK.text, fontFamily: "Inter, sans-serif", fontSize: 11 },
-      grid: { vertLines: { color: CHART_DARK.grid }, horzLines: { color: CHART_DARK.grid } },
+      layout: { background: { color: CHART.bg }, textColor: CHART.text, fontFamily: "Inter, sans-serif", fontSize: 11 },
+      grid: { vertLines: { color: CHART.grid }, horzLines: { color: CHART.grid } },
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: { color: "#444", width: 1, style: LineStyle.Dashed, labelBackgroundColor: "#333" },
         horzLine: { color: "#444", width: 1, style: LineStyle.Dashed, labelBackgroundColor: "#333" },
       },
-      rightPriceScale: { borderColor: CHART_DARK.border, scaleMargins: { top: 0.08, bottom: 0.18 } },
-      timeScale: { borderColor: CHART_DARK.border, timeVisible: true, secondsVisible: false, barSpacing: 8 },
+      rightPriceScale: { borderColor: CHART.border, scaleMargins: { top: 0.08, bottom: 0.18 } },
+      timeScale: { borderColor: CHART.border, timeVisible: true, secondsVisible: false, barSpacing: 8 },
       width: mainRef.current.clientWidth,
       height: 420,
     });
@@ -314,15 +339,15 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
     obs.observe(mainRef.current);
 
     return () => { obs.disconnect(); chart.remove(); chartInst.current = null; };
-  }, [chartType, activeInds, data]);
+  }, [chartType, activeInds, data, fetched, theme]);
 
   useEffect(() => {
     if (!rsiRef.current || !activeInds.has("RSI") || ohlcv.length === 0) return;
     const chart = createChart(rsiRef.current, {
-      layout: { background: { color: CHART_DARK.bg }, textColor: CHART_DARK.text, fontSize: 10 },
-      grid: { vertLines: { color: CHART_DARK.grid }, horzLines: { color: CHART_DARK.grid } },
-      rightPriceScale: { borderColor: CHART_DARK.border, scaleMargins: { top: 0.1, bottom: 0.1 } },
-      timeScale: { borderColor: CHART_DARK.border, visible: false },
+      layout: { background: { color: CHART.bg }, textColor: CHART.text, fontSize: 10 },
+      grid: { vertLines: { color: CHART.grid }, horzLines: { color: CHART.grid } },
+      rightPriceScale: { borderColor: CHART.border, scaleMargins: { top: 0.1, bottom: 0.1 } },
+      timeScale: { borderColor: CHART.border, visible: false },
       crosshair: { mode: CrosshairMode.Normal },
       width: rsiRef.current.clientWidth,
       height: 110,
@@ -337,15 +362,15 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
     const obs = new ResizeObserver(e => { if (e[0]) chart.applyOptions({ width: e[0].contentRect.width }); });
     obs.observe(rsiRef.current);
     return () => { obs.disconnect(); chart.remove(); };
-  }, [activeInds, data]);
+  }, [activeInds, data, fetched, theme]);
 
   useEffect(() => {
     if (!macdRef.current || !activeInds.has("MACD") || ohlcv.length === 0) return;
     const chart = createChart(macdRef.current, {
-      layout: { background: { color: CHART_DARK.bg }, textColor: CHART_DARK.text, fontSize: 10 },
-      grid: { vertLines: { color: CHART_DARK.grid }, horzLines: { color: CHART_DARK.grid } },
-      rightPriceScale: { borderColor: CHART_DARK.border, scaleMargins: { top: 0.1, bottom: 0.1 } },
-      timeScale: { borderColor: CHART_DARK.border, visible: false },
+      layout: { background: { color: CHART.bg }, textColor: CHART.text, fontSize: 10 },
+      grid: { vertLines: { color: CHART.grid }, horzLines: { color: CHART.grid } },
+      rightPriceScale: { borderColor: CHART.border, scaleMargins: { top: 0.1, bottom: 0.1 } },
+      timeScale: { borderColor: CHART.border, visible: false },
       crosshair: { mode: CrosshairMode.Normal },
       width: macdRef.current.clientWidth,
       height: 110,
@@ -361,15 +386,15 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
     const obs = new ResizeObserver(e => { if (e[0]) chart.applyOptions({ width: e[0].contentRect.width }); });
     obs.observe(macdRef.current);
     return () => { obs.disconnect(); chart.remove(); };
-  }, [activeInds, data]);
+  }, [activeInds, data, fetched, theme]);
 
   useEffect(() => {
     if (!stochRef.current || !activeInds.has("STOCH") || ohlcv.length === 0) return;
     const chart = createChart(stochRef.current, {
-      layout: { background: { color: CHART_DARK.bg }, textColor: CHART_DARK.text, fontSize: 10 },
-      grid: { vertLines: { color: CHART_DARK.grid }, horzLines: { color: CHART_DARK.grid } },
-      rightPriceScale: { borderColor: CHART_DARK.border, scaleMargins: { top: 0.1, bottom: 0.1 } },
-      timeScale: { borderColor: CHART_DARK.border, visible: false },
+      layout: { background: { color: CHART.bg }, textColor: CHART.text, fontSize: 10 },
+      grid: { vertLines: { color: CHART.grid }, horzLines: { color: CHART.grid } },
+      rightPriceScale: { borderColor: CHART.border, scaleMargins: { top: 0.1, bottom: 0.1 } },
+      timeScale: { borderColor: CHART.border, visible: false },
       crosshair: { mode: CrosshairMode.Normal },
       width: stochRef.current.clientWidth,
       height: 110,
@@ -384,7 +409,7 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
     const obs = new ResizeObserver(e => { if (e[0]) chart.applyOptions({ width: e[0].contentRect.width }); });
     obs.observe(stochRef.current);
     return () => { obs.disconnect(); chart.remove(); };
-  }, [activeInds, data]);
+  }, [activeInds, data, fetched, theme]);
 
   const toggleInd = (key: IndicatorKey) => {
     setActiveInds(prev => { const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next; });
@@ -400,10 +425,10 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
   const isPositive = (ohlc?.chg ?? 0) >= 0;
 
   return (
-    <div className="flex rounded-lg border border-border/30 overflow-hidden bg-[#0a0a0a]" style={{ minHeight: 520 }}>
+    <div className="flex rounded-lg border border-border/30 overflow-hidden bg-surface-1" style={{ minHeight: 520 }}>
 
       {/* ── Left Toolbar ── */}
-      <div className="flex flex-col items-center gap-0.5 py-3 px-1.5 border-r border-border/20 bg-[#0d0d0d] shrink-0" style={{ width: 42 }}>
+      <div className="flex flex-col items-center gap-0.5 py-3 px-1.5 border-r border-border/20 bg-surface-2 shrink-0" style={{ width: 42 }}>
         {DRAWING_TOOLS.map((tool, i) => [
           (i === 2 || i === 6 || i === 9) && (
             <div key={`sep-${i}`} className="w-5 border-t border-border/20 my-1" />
@@ -415,8 +440,8 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
             data-testid={`button-tool-${tool.key}`}
             className={`w-7 h-7 rounded flex items-center justify-center text-sm transition-all ${
               activeTool === tool.key
-                ? "bg-[#38BDF8] text-black"
-                : "text-gray-500 hover:text-gray-200 hover:bg-white/5"
+                ? "bg-signal text-surface-0"
+                : "text-text-3 hover:text-text-1 hover:bg-white/5"
             }`}
           >
             {tool.icon}
@@ -428,23 +453,23 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* ── Top Toolbar ── */}
-        <div className="flex items-center gap-3 px-3 py-2 border-b border-border/20 bg-[#0d0d0d] shrink-0 flex-wrap">
+        <div className="flex items-center gap-3 px-3 py-2 border-b border-border/20 bg-surface-2 shrink-0 flex-wrap">
           {/* Symbol + OHLC */}
           <div className="flex items-center gap-2 text-xs font-mono shrink-0">
             <span className="text-white font-bold">{displaySymbol}</span>
-            <span className="text-gray-500">·</span>
-            <span className="text-gray-500">{activeTimeframe}</span>
-            <span className="text-gray-500">·</span>
-            <span className="text-gray-500">IDX</span>
+            <span className="text-text-3">·</span>
+            <span className="text-text-3">{activeTimeframe}</span>
+            <span className="text-text-3">·</span>
+            <span className="text-text-3">IDX</span>
             {ohlc && (
               <>
-                <span className="text-gray-500 ml-1">O</span>
+                <span className="text-text-3 ml-1">O</span>
                 <span className="text-white">{ohlc.o.toLocaleString("id-ID")}</span>
-                <span className="text-gray-500">H</span>
+                <span className="text-text-3">H</span>
                 <span className="text-[#26a69a]">{ohlc.h.toLocaleString("id-ID")}</span>
-                <span className="text-gray-500">L</span>
+                <span className="text-text-3">L</span>
                 <span className="text-[#ef5350]">{ohlc.l.toLocaleString("id-ID")}</span>
-                <span className="text-gray-500">C</span>
+                <span className="text-text-3">C</span>
                 <span className="text-white">{ohlc.c.toLocaleString("id-ID")}</span>
                 <span className={isPositive ? "text-[#26a69a]" : "text-[#ef5350]"}>
                   {isPositive ? "+" : ""}{ohlc.chg.toLocaleString("id-ID")} ({isPositive ? "+" : ""}{ohlc.chgPct.toFixed(2)}%)
@@ -463,7 +488,7 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
                 title={ct.key}
                 onClick={() => setChartType(ct.key)}
                 data-testid={`button-charttype-${ct.key}`}
-                className={`w-7 h-6 rounded text-sm transition-all ${chartType === ct.key ? "bg-[#38BDF8] text-black" : "text-gray-500 hover:text-gray-200"}`}
+                className={`w-7 h-6 rounded text-sm transition-all ${chartType === ct.key ? "bg-signal text-surface-0" : "text-text-3 hover:text-text-1"}`}
               >
                 {ct.label}
               </button>
@@ -475,37 +500,37 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
             <button
               onClick={() => setShowIndPanel(p => !p)}
               data-testid="button-indicators-panel"
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-semibold transition-all ${showIndPanel ? "border-[#38BDF8] text-[#38BDF8] bg-[#38BDF810]" : "border-border/30 text-gray-400 hover:text-white hover:border-gray-500"}`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-semibold transition-all ${showIndPanel ? "border-signal text-signal bg-signal-dim" : "border-border/30 text-text-3 hover:text-text-1 hover:border-gray-500"}`}
             >
               <span>⊞</span> Indikator
               {activeInds.size > 0 && (
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-[#38BDF8] text-black text-[10px] font-bold">{activeInds.size}</span>
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-signal text-surface-0 text-[10px] font-bold">{activeInds.size}</span>
               )}
             </button>
 
             {/* Indicators Panel Dropdown */}
             {showIndPanel && (
-              <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-lg border border-border/40 bg-[#111] shadow-2xl overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-lg border border-border/40 bg-surface-3 shadow-2xl overflow-hidden">
                 <div className="px-3 py-2 border-b border-border/20">
-                  <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">Indikator</p>
+                  <p className="text-xs font-bold text-text-2 uppercase tracking-widest">Indikator</p>
                 </div>
                 {["Overlay", "Oscillator"].map(group => (
                   <div key={group}>
-                    <div className="px-3 py-1.5 bg-[#0d0d0d]">
-                      <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">{group}</p>
+                    <div className="px-3 py-1.5 bg-surface-2">
+                      <p className="text-[10px] font-bold text-text-4 uppercase tracking-widest">{group}</p>
                     </div>
                     {INDICATORS.filter(ind => ind.group === group).map(ind => (
                       <button
                         key={ind.key}
                         onClick={() => toggleInd(ind.key)}
                         data-testid={`button-indicator-${ind.key}`}
-                        className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-all hover:bg-white/5 ${activeInds.has(ind.key) ? "text-white" : "text-gray-500"}`}
+                        className={`w-full flex items-center justify-between px-3 py-2 text-xs transition-all hover:bg-white/5 ${activeInds.has(ind.key) ? "text-white" : "text-text-3"}`}
                       >
                         <div className="flex items-center gap-2">
                           <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ind.color }} />
                           <span className="font-medium">{ind.label}</span>
                         </div>
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${activeInds.has(ind.key) ? "border-[#38BDF8] bg-[#38BDF8] text-black" : "border-gray-600"}`}>
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${activeInds.has(ind.key) ? "border-signal bg-signal text-surface-0" : "border-gray-600"}`}>
                           {activeInds.has(ind.key) ? "✓" : ""}
                         </div>
                       </button>
@@ -516,7 +541,7 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
                   <button
                     onClick={() => setActiveInds(new Set())}
                     data-testid="button-reset-indicators"
-                    className="text-xs text-gray-500 hover:text-red-400 transition-colors"
+                    className="text-xs text-text-3 hover:text-red-400 transition-colors"
                   >
                     Reset Semua
                   </button>
@@ -527,16 +552,28 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
         </div>
 
         {/* ── Main Chart ── */}
-        <div ref={mainRef} className="w-full" style={{ height: 420 }} />
+        <div className="relative w-full" style={{ height: 420 }}>
+          <div ref={mainRef} className="w-full h-full" />
+          {waitingForReal && (
+            <div className="absolute inset-0 flex items-center justify-center bg-surface-1 text-text-3 text-xs tracking-widest uppercase">
+              <span className="animate-pulse">Memuat data {displaySymbol}…</span>
+            </div>
+          )}
+          {noData && (
+            <div className="absolute inset-0 flex items-center justify-center bg-surface-1 text-text-4 text-xs tracking-widest uppercase">
+              Data harga tidak tersedia
+            </div>
+          )}
+        </div>
 
         {/* ── Sub-chart: RSI ── */}
         {activeInds.has("RSI") && (
           <div className="border-t border-border/20 shrink-0">
-            <div className="flex items-center gap-2 px-3 py-1 bg-[#0d0d0d]">
+            <div className="flex items-center gap-2 px-3 py-1 bg-surface-2">
               <div className="w-2 h-2 rounded-full bg-[#a78bfa]" />
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">RSI (14)</span>
-              <span className="text-[10px] text-gray-600">OB: 70 · OS: 30</span>
-              <button onClick={() => toggleInd("RSI")} data-testid="button-close-rsi" className="ml-auto text-[10px] text-gray-600 hover:text-red-400">✕</button>
+              <span className="text-[10px] font-bold text-text-3 uppercase tracking-widest">RSI (14)</span>
+              <span className="text-[10px] text-text-4">OB: 70 · OS: 30</span>
+              <button onClick={() => toggleInd("RSI")} data-testid="button-close-rsi" className="ml-auto text-[10px] text-text-4 hover:text-red-400">✕</button>
             </div>
             <div ref={rsiRef} className="w-full" style={{ height: 110 }} />
           </div>
@@ -545,11 +582,11 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
         {/* ── Sub-chart: MACD ── */}
         {activeInds.has("MACD") && (
           <div className="border-t border-border/20 shrink-0">
-            <div className="flex items-center gap-2 px-3 py-1 bg-[#0d0d0d]">
-              <div className="w-2 h-2 rounded-full bg-[#38BDF8]" />
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">MACD (12, 26, 9)</span>
-              <span className="text-[10px] text-gray-600">Biru: MACD · Oranye: Signal · Histogram</span>
-              <button onClick={() => toggleInd("MACD")} data-testid="button-close-macd" className="ml-auto text-[10px] text-gray-600 hover:text-red-400">✕</button>
+            <div className="flex items-center gap-2 px-3 py-1 bg-surface-2">
+              <div className="w-2 h-2 rounded-full bg-signal" />
+              <span className="text-[10px] font-bold text-text-3 uppercase tracking-widest">MACD (12, 26, 9)</span>
+              <span className="text-[10px] text-text-4">Biru: MACD · Oranye: Signal · Histogram</span>
+              <button onClick={() => toggleInd("MACD")} data-testid="button-close-macd" className="ml-auto text-[10px] text-text-4 hover:text-red-400">✕</button>
             </div>
             <div ref={macdRef} className="w-full" style={{ height: 110 }} />
           </div>
@@ -558,31 +595,31 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
         {/* ── Sub-chart: Stochastic ── */}
         {activeInds.has("STOCH") && (
           <div className="border-t border-border/20 shrink-0">
-            <div className="flex items-center gap-2 px-3 py-1 bg-[#0d0d0d]">
+            <div className="flex items-center gap-2 px-3 py-1 bg-surface-2">
               <div className="w-2 h-2 rounded-full bg-[#fb923c]" />
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Stochastic (14)</span>
-              <span className="text-[10px] text-gray-600">OB: 80 · OS: 20</span>
-              <button onClick={() => toggleInd("STOCH")} data-testid="button-close-stoch" className="ml-auto text-[10px] text-gray-600 hover:text-red-400">✕</button>
+              <span className="text-[10px] font-bold text-text-3 uppercase tracking-widest">Stochastic (14)</span>
+              <span className="text-[10px] text-text-4">OB: 80 · OS: 20</span>
+              <button onClick={() => toggleInd("STOCH")} data-testid="button-close-stoch" className="ml-auto text-[10px] text-text-4 hover:text-red-400">✕</button>
             </div>
             <div ref={stochRef} className="w-full" style={{ height: 110 }} />
           </div>
         )}
 
         {/* ── Bottom Timeframe Bar ── */}
-        <div className="flex items-center justify-between px-3 py-1.5 border-t border-border/20 bg-[#0d0d0d] shrink-0">
+        <div className="flex items-center justify-between px-3 py-1.5 border-t border-border/20 bg-surface-2 shrink-0">
           <div className="flex items-center gap-0.5">
             {TIMEFRAMES.map(tf => (
               <button
                 key={tf}
                 onClick={() => setActiveTimeframe(tf)}
                 data-testid={`button-timeframe-${tf}`}
-                className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${activeTimeframe === tf ? "bg-[#38BDF8] text-black" : "text-gray-500 hover:text-white"}`}
+                className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${activeTimeframe === tf ? "bg-signal text-surface-0" : "text-text-3 hover:text-text-1"}`}
               >
                 {tf}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-3 text-[10px] text-gray-600">
+          <div className="flex items-center gap-3 text-[10px] text-text-4">
             {(["MA20", "MA50", "EMA9", "EMA21", "BB", "VWAP"] as IndicatorKey[])
               .filter(k => activeInds.has(k))
               .map(k => {

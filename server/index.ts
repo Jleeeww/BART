@@ -124,6 +124,19 @@ app.use((req, res, next) => {
         .then(({ logStartupCostEstimate }) => logStartupCostEstimate())
         .catch(() => {});
 
+      // Runtime admin config — start the background refresh so getConfigSync
+      // (crisis mode / suppression / scanner / cost caps) is always warm.
+      import('./engine/systemConfig')
+        .then(({ startConfigRefresh }) => startConfigRefresh())
+        .catch(err => console.warn('[startup] systemConfig refresh error:', err));
+
+      // Warm the macro regime cache immediately so scoring never fails open on a
+      // cold boot (getCachedMacroRegime defaults to a conservative ×0.9 until this
+      // resolves; the full snapshot+regime run happens ~35s after boot, see below).
+      import('./engine/macroRegimeDetector')
+        .then(({ computeMacroRegime }) => computeMacroRegime().catch(() => {}))
+        .catch(() => {});
+
       // News pipeline — first run after 30s (let server warm up), then every 15min
       setTimeout(() => {
         import('./engine/newsFetcher')
@@ -139,6 +152,86 @@ app.use((req, res, next) => {
       import('./engine/ragEngine')
         .then(({ ensureRagSchema }) => ensureRagSchema())
         .catch(err => console.warn('[startup] RAG schema init error:', err));
+
+      // OHLCV price ingestion — Yahoo (.JK) → session_history, dataSource='YAHOO'.
+      // Hourly during IDX market hours (so today's forming candle updates), plus
+      // one run ~20s after boot so prices are fresh immediately in dev.
+      const runOHLCVIngest = async () => {
+        const { ingestOHLCVBatch } = await import('./engine/ohlcvIngester');
+        const { HOMEPAGE_UNIVERSE } = await import('./engine/lq45Universe');
+        const { invalidateRadarCache } = await import('./engine/radarEngine');
+        const r = await ingestOHLCVBatch(HOMEPAGE_UNIVERSE, 40);
+        invalidateRadarCache();
+        log(`[ohlcvIngest] ok=${r.ok}/${r.total} bars=${r.totalBars} failed=${r.failed.length}`, 'ohlcvIngest');
+      };
+      const isIDXHoursWIB = (): boolean => {
+        const wib = new Date(Date.now() + 7 * 3600 * 1000); // shift to WIB, read as UTC
+        const day = wib.getUTCDay();   // 0=Sun … 6=Sat
+        const hour = wib.getUTCHours();
+        return day >= 1 && day <= 5 && hour >= 9 && hour < 16;
+      };
+      setTimeout(() => {
+        runOHLCVIngest().catch((err) => log(`[ohlcvIngest] startup error: ${err}`, 'ohlcvIngest'));
+      }, 20000);
+      setInterval(() => {
+        if (isIDXHoursWIB()) {
+          runOHLCVIngest().catch((err) => log(`[ohlcvIngest] error: ${err}`, 'ohlcvIngest'));
+        }
+      }, 60 * 60 * 1000);
+      log('OHLCV ingestion scheduled (hourly during IDX market hours + startup)', 'ohlcvIngest');
+
+      // IDX fundamentals refresh — price + PER/ROE into stocks table, daily
+      // 17:15 WIB (post-close) + one run 40s after boot.
+      const runFundamentals = async () => {
+        const { updateStocksFromIDX } = await import('./engine/idxFundamentalsIngester');
+        const r = await updateStocksFromIDX();
+        log(`[idxFundamentals] updated=${r.updated} price=${r.priceUpdated} ratio=${r.ratioUpdated}`, 'idxFundamentals');
+      };
+      setTimeout(() => {
+        runFundamentals().catch((err) => log(`[idxFundamentals] startup error: ${err}`, 'idxFundamentals'));
+      }, 40000);
+      scheduleDaily(17, 15, 7, runFundamentals, 'idxFundamentals');
+
+      // Bandarmology (Stockbit broker net buy/sell) → session_history flow columns.
+      // Post-market 16:45 WIB + one run 70s after boot. No-ops if STOCKBIT_TOKEN is
+      // absent/expired (graceful). Sweep respects Stockbit rate limits.
+      const runBandarmology = async () => {
+        const { stockbitEnabled } = await import('./engine/stockbitClient');
+        if (!stockbitEnabled()) return;
+        const { ingestBandarmology } = await import('./engine/stockbitBandarmology');
+        const r = await ingestBandarmology();
+        if (r) log(`[bandarmology] updated=${r.updated} date=${r.date}`, 'bandarmology');
+        else log('[bandarmology] skipped (token missing/expired or sweep failed)', 'bandarmology');
+      };
+      setTimeout(() => {
+        runBandarmology().catch((err) => log(`[bandarmology] startup error: ${err}`, 'bandarmology'));
+      }, 70000);
+      scheduleDaily(16, 45, 7, runBandarmology, 'bandarmology');
+
+      // Stockbit token refresh — headless Playwright reusing a saved login
+      // session (see server/scripts/stockbitLogin.ts for the one-time manual
+      // login). Runs every 20h so the ~24h token never actually expires.
+      // If the saved session itself has expired, this just logs a warning —
+      // run stockbitLogin.ts again by hand (needs OTP).
+      const runStockbitRefresh = async () => {
+        const { readCachedToken, refreshToken } = await import('./engine/stockbitAuth');
+        const { setToken } = await import('./engine/stockbitClient');
+        const cached = readCachedToken();
+        if (cached) setToken(cached);
+        const fresh = await refreshToken();
+        if (fresh) {
+          setToken(fresh);
+          log('[stockbitAuth] token refreshed', 'stockbitAuth');
+        } else {
+          log('[stockbitAuth] refresh skipped/failed — saved session may need re-login (run stockbitLogin.ts)', 'stockbitAuth');
+        }
+      };
+      setTimeout(() => {
+        runStockbitRefresh().catch((err) => log(`[stockbitAuth] startup error: ${err}`, 'stockbitAuth'));
+      }, 15000);
+      setInterval(() => {
+        runStockbitRefresh().catch((err) => log(`[stockbitAuth] error: ${err}`, 'stockbitAuth'));
+      }, 20 * 3600 * 1000);
 
       // Macro flow fetch — 06:00 WIB (23:00 UTC prev day, post-US close) and 16:30 WIB (09:30 UTC, post-IDX close)
       const runMacroFlow = async () => {
@@ -166,6 +259,26 @@ app.use((req, res, next) => {
       };
       scheduleDaily(6, 0, 7, runMacroFlow, 'macroFlow_earlyAM');
       scheduleDaily(16, 30, 7, runMacroFlow, 'macroFlow_postMarket');
+      // One run ~35s after boot so the regime (incl. real/proxy CDS) is fresh in dev.
+      setTimeout(() => {
+        runMacroFlow().catch((err) => log(`[macroFlow] startup error: ${err}`, 'macroFlow'));
+      }, 35000);
+
+      // Thematic Event Scanner (Layer 8, overlay only) — twice daily ~07:00 & ~12:00 WIB.
+      // Both slots share the $1.50/day thematic cap + $5 global breaker, so if the
+      // AM run exhausts budget the midday run auto-skips (SKIPPED_COST).
+      const runThematicScanSlot = async (slot: 'AM' | 'MIDDAY') => {
+        const { isScannerEnabled } = await import('./engine/systemConfig');
+        if (!isScannerEnabled()) { log(`[thematic:${slot}] disabled by admin — skip`, 'thematic'); return; }
+        if (!process.env.ANTHROPIC_API_KEY) { log(`[thematic:${slot}] no ANTHROPIC_API_KEY — skip`, 'thematic'); return; }
+        const { isCapReached } = await import('./engine/costTracker');
+        if (isCapReached('thematic')) { log(`[thematic:${slot}] cost cap reached — skip`, 'thematic'); return; }
+        const { runThematicScan } = await import('./engine/thematicScanner');
+        const r = await runThematicScan(slot);
+        log(`[thematic:${slot}] status=${r.status} themes=${r.eventCount} flags=${r.flags.length} cost=$${r.costUsd.toFixed(4)}`, 'thematic');
+      };
+      scheduleDaily(7,  0, 7, () => runThematicScanSlot('AM'),     'thematic_AM');
+      scheduleDaily(12, 0, 7, () => runThematicScanSlot('MIDDAY'), 'thematic_midday');
 
       // Outcome tracker — daily at 17:00 WIB (10:00 UTC)
       scheduleDaily(17, 0, 7, async () => {

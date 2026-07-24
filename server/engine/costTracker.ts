@@ -21,7 +21,9 @@
  * ============================================================
  */
 
-export type Pipeline = 'news' | 'management' | 'insider' | 'chat';
+import { getCostCapOverrides } from './systemConfig';
+
+export type Pipeline = 'news' | 'management' | 'insider' | 'chat' | 'thematic';
 
 // ── Pricing constants ─────────────────────────────────────────
 
@@ -29,15 +31,45 @@ const INPUT_COST_PER_TOKEN  = 3.00  / 1_000_000;   // $3.00/MTok
 const OUTPUT_COST_PER_TOKEN = 15.00 / 1_000_000;   // $15.00/MTok
 const WEB_SEARCH_COST       = 0.01;                 // $0.01/call
 
+// Per-model pricing. The chat pipeline runs claude-opus-4-8; every other
+// pipeline stays on claude-sonnet-4-5 (the default when `model` is omitted).
+const MODEL_PRICING: Record<string, { inPerTok: number; outPerTok: number }> = {
+  'claude-sonnet-4-5': { inPerTok: INPUT_COST_PER_TOKEN, outPerTok: OUTPUT_COST_PER_TOKEN },
+  'claude-opus-4-8':   { inPerTok: 5.00 / 1_000_000,     outPerTok: 25.00 / 1_000_000 },
+};
+
 // ── Daily caps ────────────────────────────────────────────────
 
-export const DAILY_CAPS: Record<Pipeline | 'global', number> = {
+const BASE_DAILY_CAPS: Record<Pipeline | 'global', number> = {
   news:       2.00,
   management: 1.00,
   insider:    2.00,
-  chat:       1.00,
+  chat:       2.50,   // chat runs claude-opus-4-8 ($5/$25 per MTok) — see MODEL_PRICING
+  thematic:   1.50,
   global:     5.00,
 };
+
+// Effective caps = base caps merged with any admin runtime overrides (cost_caps).
+// Read synchronously so the hot circuit-breaker path never blocks.
+function effectiveCaps(): Record<Pipeline | 'global', number> {
+  try {
+    const ov = getCostCapOverrides();
+    return {
+      ...BASE_DAILY_CAPS,
+      ...(typeof ov.news     === 'number' ? { news:     ov.news }     : {}),
+      ...(typeof ov.thematic === 'number' ? { thematic: ov.thematic } : {}),
+      ...(typeof ov.global   === 'number' ? { global:   ov.global }   : {}),
+      ...(typeof ov.management === 'number' ? { management: ov.management } : {}),
+      ...(typeof ov.insider  === 'number' ? { insider:  ov.insider }  : {}),
+      ...(typeof ov.chat     === 'number' ? { chat:     ov.chat }     : {}),
+    };
+  } catch {
+    return BASE_DAILY_CAPS;
+  }
+}
+
+// Back-compat export: base caps (callers that read a static number still work).
+export const DAILY_CAPS = BASE_DAILY_CAPS;
 
 // ── In-memory state ───────────────────────────────────────────
 
@@ -47,6 +79,7 @@ interface DayState {
   management:     number;
   insider:        number;
   chat:           number;
+  thematic:       number;
   total:          number;
   requestCount:   number;
 }
@@ -58,7 +91,7 @@ function todayWIB(): string {
 }
 
 function freshState(): DayState {
-  return { date: todayWIB(), news: 0, management: 0, insider: 0, chat: 0, total: 0, requestCount: 0 };
+  return { date: todayWIB(), news: 0, management: 0, insider: 0, chat: 0, thematic: 0, total: 0, requestCount: 0 };
 }
 
 let _state: DayState = freshState();
@@ -75,11 +108,13 @@ function ensureToday(): void {
 export function estimateCost(
   inputTokens:  number,
   outputTokens: number,
-  webSearches:  number = 0
+  webSearches:  number = 0,
+  model:        string = 'claude-sonnet-4-5'
 ): number {
+  const pricing = MODEL_PRICING[model] ?? MODEL_PRICING['claude-sonnet-4-5'];
   return (
-    inputTokens  * INPUT_COST_PER_TOKEN +
-    outputTokens * OUTPUT_COST_PER_TOKEN +
+    inputTokens  * pricing.inPerTok +
+    outputTokens * pricing.outPerTok +
     webSearches  * WEB_SEARCH_COST
   );
 }
@@ -88,10 +123,11 @@ export function recordCost(
   pipeline:     Pipeline,
   inputTokens:  number,
   outputTokens: number,
-  webSearches:  number = 0
+  webSearches:  number = 0,
+  model:        string = 'claude-sonnet-4-5'
 ): number {
   ensureToday();
-  const cost = estimateCost(inputTokens, outputTokens, webSearches);
+  const cost = estimateCost(inputTokens, outputTokens, webSearches, model);
   _state[pipeline] += cost;
   _state.total     += cost;
   _state.requestCount += 1;
@@ -101,8 +137,9 @@ export function recordCost(
 
 export function isCapReached(pipeline: Pipeline): boolean {
   ensureToday();
-  if (_state[pipeline] >= DAILY_CAPS[pipeline]) return true;
-  if (_state.total     >= DAILY_CAPS.global)   return true;
+  const caps = effectiveCaps();
+  if (_state[pipeline] >= caps[pipeline]) return true;
+  if (_state.total     >= caps.global)   return true;
   return false;
 }
 
@@ -119,13 +156,16 @@ export function getCostSummary(): string {
     `Mgmt=$${_state.management.toFixed(4)} ` +
     `Insider=$${_state.insider.toFixed(4)} ` +
     `Chat=$${_state.chat.toFixed(4)} ` +
-    `Total=$${_state.total.toFixed(4)}/${DAILY_CAPS.global} ` +
+    `Thematic=$${_state.thematic.toFixed(4)} ` +
+    `Total=$${_state.total.toFixed(4)}/${effectiveCaps().global} ` +
     `Requests=${_state.requestCount}`
   );
 }
 
 // Debounced persist — at most once per 30s to avoid hammering DB
 let _persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+let _thematicColEnsured = false;
 
 function persistCost(): void {
   if (_persistTimer) return;
@@ -134,18 +174,24 @@ function persistCost(): void {
     try {
       const { pool } = await import('../db');
       const s = _state;
+      // api_cost_log is not Drizzle-managed; ensure the thematic column exists (idempotent, once).
+      if (!_thematicColEnsured) {
+        await pool.query(`ALTER TABLE api_cost_log ADD COLUMN IF NOT EXISTS thematic_cost numeric DEFAULT 0`).catch(() => {});
+        _thematicColEnsured = true;
+      }
       await pool.query(
-        `INSERT INTO api_cost_log (date, estimated_cost_usd, news_cost, management_cost, insider_cost, chat_cost, request_count, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        `INSERT INTO api_cost_log (date, estimated_cost_usd, news_cost, management_cost, insider_cost, chat_cost, thematic_cost, request_count, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
          ON CONFLICT (date) DO UPDATE SET
            estimated_cost_usd = EXCLUDED.estimated_cost_usd,
            news_cost           = EXCLUDED.news_cost,
            management_cost     = EXCLUDED.management_cost,
            insider_cost        = EXCLUDED.insider_cost,
            chat_cost           = EXCLUDED.chat_cost,
+           thematic_cost       = EXCLUDED.thematic_cost,
            request_count       = EXCLUDED.request_count,
            updated_at          = NOW()`,
-        [s.date, s.total, s.news, s.management, s.insider, s.chat, s.requestCount]
+        [s.date, s.total, s.news, s.management, s.insider, s.chat, s.thematic, s.requestCount]
       );
     } catch { /* non-fatal */ }
   }, 30_000);

@@ -9,16 +9,25 @@ export function registerManagementRoutes(app: Express): void {
   app.get('/api/management/:symbol', async (req, res) => {
     try {
       const symbol = req.params.symbol.toUpperCase();
+
+      // Factual layer — real board/ownership roster from IDX (free, no AI).
+      const { fetchIDXCompanyProfile } = await import('../engine/idxCompanyProfile');
+      const roster = await fetchIDXCompanyProfile(symbol);
+
+      // Qualitative layer — AI research scores, if previously run (optional).
       const { getCachedManagementResult } = await import('../engine/managementScorer');
       const result = getCachedManagementResult(symbol);
-      if (!result) {
+
+      if (!roster && !result) {
         return res.status(404).json({
-          error:   'No management research found for this symbol',
+          error:  'No management data available for this symbol',
           symbol,
-          hint:    'Trigger research via POST /api/management/:symbol/research',
+          hint:   'IDX roster unavailable; trigger AI research via POST /api/management/:symbol/research',
         });
       }
-      res.status(200).json(result);
+
+      // Backward-compatible: AI fields stay top-level; add `roster` alongside.
+      res.status(200).json({ ...(result ?? {}), roster });
     } catch (err) {
       res.status(500).json({ error: String(err) });
     }

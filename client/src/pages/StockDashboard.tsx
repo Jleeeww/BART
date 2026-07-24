@@ -2,6 +2,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams } from "wouter";
 import { useStock } from "@/hooks/use-stocks";
 import { StatusCard } from "@/components/StatusCard";
+import { ScoreMeaning } from "@/components/ScoreMeaning";
+import { ThematicOverlay } from "@/components/ThematicOverlay";
 import { LayerBreakdown } from "@/components/LayerBreakdown";
 import { ScoreRing as ScoreRingV3 } from "@/components/v3/ScoreRing";
 import { BODMemberCard } from "@/components/v3/BODMemberCard";
@@ -78,6 +80,7 @@ import { PriceChart } from "@/components/PriceChart";
 import { MetricCard } from "@/components/MetricCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Loader2, 
   PieChart, 
@@ -124,7 +127,7 @@ function ConvictionTimeline({ phase, explanation }: { phase: string; explanation
           />
         ))}
       </div>
-      <div className="flex justify-between text-[10px] text-muted-foreground uppercase font-bold px-0.5 mb-3">
+      <div className="flex justify-between text-[12px] text-muted-foreground uppercase font-bold px-0.5 mb-3">
         {phases.map((p, idx) => (
           <span key={p} className={idx === currentIndex ? "text-primary" : ""}>{phaseLabels[p]}</span>
         ))}
@@ -149,6 +152,20 @@ export default function StockDashboard() {
   const [newsData, setNewsData] = useState<any>(null);
   const [managementData, setManagementData] = useState<any>(null);
   const [insiderData, setInsiderData] = useState<any>(null);
+  const [idxRatio, setIdxRatio] = useState<any>(null);
+  const [idxAnnouncements, setIdxAnnouncements] = useState<any[]>([]);
+  const [mgmtLoading, setMgmtLoading] = useState(true);
+  const [ratioLoading, setRatioLoading] = useState(true);
+  const [annLoading, setAnnLoading] = useState(true);
+  const [valLoading, setValLoading] = useState(true);
+  const [newsLoading, setNewsLoading] = useState(true);
+  const [newsFeed, setNewsFeed] = useState<any[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [bandarData, setBandarData] = useState<any>(null);
+  const [bandarLoading, setBandarLoading] = useState(true);
+  const [brokerHistoryFor, setBrokerHistoryFor] = useState<string | null>(null);
+  const [brokerHistory, setBrokerHistory] = useState<any[]>([]);
+  const [brokerHistoryLoading, setBrokerHistoryLoading] = useState(false);
 
   const TAB_IDS = ["overview", "flow", "financials", "news", "risk", "insider", "valuation"] as const;
 
@@ -286,26 +303,47 @@ export default function StockDashboard() {
 
   useEffect(() => {
     if (!stock) return;
+    setValuationData(null); setValLoading(true);
     fetch(`/api/valuation/${stock.symbol}`)
       .then(r => { if (!r.ok) throw new Error('Valuation fetch failed'); return r.json(); })
       .then(data => { if (data.error) throw new Error(data.error); setValuationData(data); })
-      .catch(err => { console.error(err); setValuationData(null); });
+      .catch(err => { console.error(err); setValuationData(null); })
+      .finally(() => setValLoading(false));
   }, [stock]);
 
   useEffect(() => {
     if (!stock) return;
+    setNewsData(null); setNewsLoading(true);
     fetch(`/api/news/${stock.symbol}`)
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data && Array.isArray(data.impacts)) setNewsData(data); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setNewsLoading(false));
+    // Default berita: real RSS news with images (no AI needed)
+    setNewsFeed([]); setFeedLoading(true);
+    fetch(`/api/news/feed?symbol=${stock.symbol}&company=${encodeURIComponent(stock.name ?? '')}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && Array.isArray(data.articles)) setNewsFeed(data.articles); })
+      .catch(() => {})
+      .finally(() => setFeedLoading(false));
+    // Real bandarmology (Stockbit broker net buy/sell)
+    setBandarData(null); setBandarLoading(true);
+    setBrokerHistoryFor(null); setBrokerHistory([]);
+    fetch(`/api/bandarmology/${stock.symbol}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && data.symbol) setBandarData(data); })
+      .catch(() => {})
+      .finally(() => setBandarLoading(false));
   }, [stock]);
 
   useEffect(() => {
     if (!stock) return;
+    setManagementData(null); setMgmtLoading(true);
     fetch(`/api/management/${stock.symbol}`)
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data && typeof data.compositeScore === 'number') setManagementData(data); })
-      .catch(() => {});
+      .then(data => { if (data && (data.roster || typeof data.compositeScore === 'number')) setManagementData(data); })
+      .catch(() => {})
+      .finally(() => setMgmtLoading(false));
   }, [stock]);
 
   useEffect(() => {
@@ -314,6 +352,23 @@ export default function StockDashboard() {
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data && (data.signal || data.score !== undefined)) setInsiderData(data); })
       .catch(() => {});
+  }, [stock]);
+
+  // Official IDX fundamentals + announcements
+  useEffect(() => {
+    if (!stock) return;
+    setIdxRatio(null); setRatioLoading(true);
+    setIdxAnnouncements([]); setAnnLoading(true);
+    fetch(`/api/idx/ratios/${stock.symbol}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && data.code) setIdxRatio(data); })
+      .catch(() => {})
+      .finally(() => setRatioLoading(false));
+    fetch(`/api/idx/announcements/${stock.symbol}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && Array.isArray(data.items)) setIdxAnnouncements(data.items); })
+      .catch(() => {})
+      .finally(() => setAnnLoading(false));
   }, [stock]);
 
   if (isLoading) {
@@ -394,7 +449,7 @@ export default function StockDashboard() {
       <div
         style={{
           position: "sticky", top: 0, zIndex: 40,
-          background: "#0a0a0a", borderBottom: "1px solid rgba(255,255,255,0.06)",
+          background: "var(--surface-1)", borderBottom: "1px solid var(--border-2)",
           height: 56, padding: "0 24px",
           display: "flex", alignItems: "center", gap: 16,
         }}
@@ -402,7 +457,7 @@ export default function StockDashboard() {
         {/* Logo */}
         <div
           className="flex-shrink-0 rounded-md flex items-center justify-center overflow-hidden"
-          style={{ width: 32, height: 32, background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.06)" }}
+          style={{ width: 32, height: 32, background: "var(--surface-2)", border: "1px solid var(--border-2)" }}
         >
           <img
             src={`https://assets.stockbit.com/logos/companies/${stock.symbol}.png`}
@@ -415,7 +470,7 @@ export default function StockDashboard() {
               if (parent) {
                 const span = document.createElement("span");
                 span.textContent = stock.symbol.slice(0, 2);
-                span.style.cssText = `font-family:${mono};font-size:10px;font-weight:700;color:#38BDF8`;
+                span.style.cssText = `font-family:${mono};font-size:10px;font-weight:700;color:var(--signal)`;
                 parent.appendChild(span);
               }
             }}
@@ -424,17 +479,17 @@ export default function StockDashboard() {
 
         {/* Symbol · Name · Sector */}
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <span style={{ fontFamily: mono, fontSize: 15, fontWeight: 700, color: "#F4F4F5" }}>
+          <span style={{ fontFamily: mono, fontSize: 15, fontWeight: 700, color: "var(--text-1)" }}>
             {stock.symbol}
           </span>
           <span style={{ color: "rgba(255,255,255,0.12)" }}>·</span>
-          <span style={{ fontFamily: inter, fontSize: 13, color: "#71717A" }}>
+          <span style={{ fontFamily: inter, fontSize: 13, color: "var(--text-3)" }}>
             {stock.name}
           </span>
           {stock.sector && (
             <span style={{
-              fontFamily: mono, fontSize: 8, letterSpacing: "0.12em",
-              textTransform: "uppercase" as const, color: "#4FC3F7",
+              fontFamily: mono, fontSize: 13, letterSpacing: "0.12em",
+              textTransform: "uppercase" as const, color: "var(--signal)",
               background: "rgba(56,189,248,0.08)", border: "1px solid rgba(56,189,248,0.15)",
               borderRadius: 4, padding: "2px 7px",
             }}>
@@ -446,12 +501,12 @@ export default function StockDashboard() {
         {/* Price + change + session — right-aligned */}
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 20 }}>
           <div style={{ textAlign: "right" }}>
-            <p style={{ fontFamily: mono, fontSize: 16, fontWeight: 700, color: "#F4F4F5", lineHeight: 1 }}>
+            <p style={{ fontFamily: mono, fontSize: 16, fontWeight: 700, color: "var(--text-1)", lineHeight: 1 }}>
               Rp {parseFloat(String(stock.price).replace(/[^0-9.-]/g, "") || "0").toLocaleString("id-ID")}
             </p>
             <p style={{
-              fontFamily: mono, fontSize: 11, marginTop: 3,
-              color: parseFloat(stock.changePercent) > 0 ? "#4ADE80" : parseFloat(stock.changePercent) < 0 ? "#F87171" : "#71717A",
+              fontFamily: mono, fontSize: 13, marginTop: 3,
+              color: parseFloat(stock.changePercent) > 0 ? "var(--positive)" : parseFloat(stock.changePercent) < 0 ? "var(--danger)" : "var(--text-3)",
             }}>
               {parseFloat(stock.changePercent) > 0
                 ? `▲ +${parseFloat(stock.changePercent).toFixed(2)}%`
@@ -462,24 +517,24 @@ export default function StockDashboard() {
           </div>
 
           {/* Divider */}
-          <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.06)" }} />
+          <div style={{ width: 1, height: 24, background: "var(--border-2)" }} />
 
           {/* Session badge */}
           <div style={{ textAlign: "right" }} data-testid="badge-session-status">
             <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <div style={{
                 width: 6, height: 6, borderRadius: "50%",
-                background: sessionStatus.color === "green" ? "#4ADE80" : sessionStatus.color === "yellow" ? "#FBBF24" : "#F87171",
+                background: sessionStatus.color === "green" ? "var(--positive)" : sessionStatus.color === "yellow" ? "var(--warning)" : "var(--danger)",
                 boxShadow: sessionStatus.color === "green" ? "0 0 6px rgba(16,185,129,0.6)" : "none",
               }} />
               <span style={{
-                fontFamily: mono, fontSize: 10,
-                color: sessionStatus.color === "green" ? "#4ADE80" : sessionStatus.color === "yellow" ? "#FBBF24" : "#F87171",
+                fontFamily: mono, fontSize: 12,
+                color: sessionStatus.color === "green" ? "var(--positive)" : sessionStatus.color === "yellow" ? "var(--warning)" : "var(--danger)",
               }}>
                 {sessionStatus.label}
               </span>
             </div>
-            <p style={{ fontFamily: mono, fontSize: 8, color: "#3F3F46", marginTop: 2, letterSpacing: "0.06em" }}>
+            <p style={{ fontFamily: mono, fontSize: 13, color: "var(--text-4)", marginTop: 2, letterSpacing: "0.06em" }}>
               SESI IDX
             </p>
           </div>
@@ -496,15 +551,15 @@ export default function StockDashboard() {
 
           {/* CHART — Hero, top of analysis area */}
           <motion.div variants={itemVariants}>
-            <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)" }}>
-              <PriceChart />
+            <div style={{ borderRadius: 10, overflow: "hidden", border: "1px solid var(--border-2)" }}>
+              <PriceChart symbol={symbol} />
             </div>
           </motion.div>
 
           {/* SCORE BLOCK — primary decision artifact, below chart */}
           <motion.div variants={itemVariants}>
             {aiLoading ? (
-              <div style={{ height: 160, background: "#0a0a0a", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}
+              <div style={{ height: 160, background: "var(--surface-1)", borderRadius: 10, border: "1px solid var(--border-2)" }}
                 className="animate-pulse" />
             ) : (
               <StatusCard
@@ -523,12 +578,22 @@ export default function StockDashboard() {
             )}
           </motion.div>
 
+          {/* SCORE-MEANING EDUCATION + IHSG-correlation disclaimer (macro hardening) */}
+          <motion.div variants={itemVariants}>
+            <ScoreMeaning score={readinessScore} />
+          </motion.div>
+
+          {/* THEMATIC OVERLAY — labeled "Interpretasi AI", pure overlay (never affects score) */}
+          <motion.div variants={itemVariants}>
+            <ThematicOverlay symbol={symbol} />
+          </motion.div>
+
 
           {/* TABS — Analysis sections below score */}
           <motion.div variants={itemVariants} className="space-y-4">
 
             <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <div style={{ marginBottom: 16, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ marginBottom: 16, borderBottom: "1px solid var(--border-2)" }}>
                 <TabsList
                   className="w-full justify-start h-auto overflow-x-auto no-scrollbar p-0"
                   style={{ background: "transparent", gap: 0, borderRadius: 0 }}
@@ -547,9 +612,9 @@ export default function StockDashboard() {
                       value={tab.id}
                       className="px-4 py-2.5 transition-all rounded-none border-b-2"
                       style={{
-                        fontFamily: mono, fontSize: 11, letterSpacing: "0.04em",
-                        borderBottom: activeTab === tab.id ? "2px solid #4FC3F7" : "2px solid transparent",
-                        color: activeTab === tab.id ? "#4FC3F7" : "#71717A",
+                        fontFamily: mono, fontSize: 13, letterSpacing: "0.04em",
+                        borderBottom: activeTab === tab.id ? "2px solid var(--signal)" : "2px solid transparent",
+                        color: activeTab === tab.id ? "var(--signal)" : "var(--text-3)",
                         background: "transparent",
                       }}
                       data-state={activeTab === tab.id ? "active" : "inactive"}
@@ -557,8 +622,8 @@ export default function StockDashboard() {
                       {tab.label}
                       {(tab as any).demoData && (
                         <span style={{
-                          marginLeft: 5, fontSize: 8, fontWeight: 700, padding: "1px 4px",
-                          background: "#78350f", color: "#fbbf24", borderRadius: 2,
+                          marginLeft: 5, fontSize: 13, fontWeight: 700, padding: "1px 4px",
+                          background: "#78350f", color: "var(--warning)", borderRadius: 2,
                           letterSpacing: "0.06em", verticalAlign: "middle",
                         }}>DEMO</span>
                       )}
@@ -574,43 +639,43 @@ export default function StockDashboard() {
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                         {/* Card 1: RINGKASAN */}
                         <div style={{
-                          background: "#080808", border: "1px solid rgba(255,255,255,0.04)",
+                          background: "var(--surface-1)", border: "1px solid var(--border-1)",
                           borderRadius: 10, padding: "18px 20px",
                         }}>
-                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 14 }}>
+                          <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 14 }}>
                             RINGKASAN
                           </p>
                           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                             {(mainReasons.length > 0 ? mainReasons.slice(0, 3) : ["Memuat analisis..."]).map((r, i) => (
                               <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                                <span style={{ fontFamily: mono, fontSize: 11, color: "#4ADE80", flexShrink: 0, lineHeight: "18px" }}>+</span>
-                                <span style={{ fontFamily: inter, fontSize: 12, color: "#A1A1AA", lineHeight: 1.55 }}>{r}</span>
+                                <span style={{ fontFamily: mono, fontSize: 13, color: "var(--positive)", flexShrink: 0, lineHeight: "18px" }}>+</span>
+                                <span style={{ fontFamily: inter, fontSize: 12, color: "var(--text-2)", lineHeight: 1.55 }}>{r}</span>
                               </div>
                             ))}
                           </div>
                         </div>
                         {/* Card 2: ALIRAN INSTITUSI */}
                         <div style={{
-                          background: "#080808", border: "1px solid rgba(255,255,255,0.04)",
+                          background: "var(--surface-1)", border: "1px solid var(--border-1)",
                           borderRadius: 10, padding: "18px 20px",
                         }}>
-                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 14 }}>
+                          <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 14 }}>
                             ALIRAN INSTITUSI
                           </p>
                           {bandarmologyScore !== null ? (
                             <>
                               <p style={{
                                 fontFamily: mono, fontSize: 26, fontWeight: 700,
-                                color: bandarmologyScore >= 70 ? "#4ADE80" : bandarmologyScore >= 50 ? "#4FC3F7" : bandarmologyScore >= 40 ? "#FBBF24" : "#F87171",
+                                color: bandarmologyScore >= 70 ? "var(--positive)" : bandarmologyScore >= 50 ? "var(--signal)" : bandarmologyScore >= 40 ? "var(--warning)" : "var(--danger)",
                                 lineHeight: 1, marginBottom: 6,
                               }}>
                                 {bandarmologyScore >= 70 ? "+" : bandarmologyScore < 40 ? "−" : "~"}{bandarmologyScore}
                               </p>
-                              <p style={{ fontFamily: mono, fontSize: 10, color: "#71717A", marginBottom: 14 }}>
+                              <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", marginBottom: 14 }}>
                                 Skor bandarmologi agregat
                               </p>
-                              <div style={{ height: 1, background: "rgba(255,255,255,0.04)", marginBottom: 12 }} />
-                              <p style={{ fontFamily: mono, fontSize: 10, color: "#71717A" }}>
+                              <div style={{ height: 1, background: "var(--border-1)", marginBottom: 12 }} />
+                              <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)" }}>
                                 Skor M6: {bandarmologyScore} · Tren: {
                                   aiData?.brokerStabilityScore?.score >= 65 ? "naik" :
                                   aiData?.brokerStabilityScore?.score >= 40 ? "stabil" : "turun"
@@ -618,28 +683,28 @@ export default function StockDashboard() {
                               </p>
                             </>
                           ) : (
-                            <p style={{ fontFamily: mono, fontSize: 11, color: "#3F3F46" }}>Memuat...</p>
+                            <p style={{ fontFamily: mono, fontSize: 13, color: "var(--text-4)" }}>Memuat...</p>
                           )}
                         </div>
                         {/* Card 3: KONTEKS MAKRO */}
                         <div style={{
-                          background: "#080808", border: "1px solid rgba(255,255,255,0.04)",
+                          background: "var(--surface-1)", border: "1px solid var(--border-1)",
                           borderRadius: 10, padding: "18px 20px",
                         }}>
-                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 14 }}>
+                          <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 14 }}>
                             KONTEKS MAKRO
                           </p>
                           {newsOverride ? (
-                            <p style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: "#F87171", marginBottom: 6 }}>
+                            <p style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: "var(--danger)", marginBottom: 6 }}>
                               ⚠ Override aktif
                             </p>
                           ) : (
-                            <p style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: "#F4F4F5", marginBottom: 6 }}>
+                            <p style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: "var(--text-1)", marginBottom: 6 }}>
                               Normal
                             </p>
                           )}
-                          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "10px 0" }} />
-                          <p style={{ fontFamily: mono, fontSize: 10, color: "#71717A" }}>
+                          <div style={{ height: 1, background: "var(--border-1)", margin: "10px 0" }} />
+                          <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)" }}>
                             {newsData?.impacts?.length > 0
                               ? `${newsData.impacts.length} berita relevan · `
                               : "Tidak ada berita · "}
@@ -656,19 +721,19 @@ export default function StockDashboard() {
                     {/* ── Risk + Profil Trader ── */}
                     {!aiLoading && (mainRisk || traderProfile) && (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                        <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "14px 16px" }}>
-                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#3F3F46", marginBottom: 8 }}>
+                        <div style={{ background: "var(--surface-1)", border: "1px solid var(--border-2)", borderRadius: 8, padding: "14px 16px" }}>
+                          <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--text-4)", marginBottom: 8 }}>
                             RISIKO UTAMA
                           </p>
-                          <p style={{ fontFamily: inter, fontSize: 13, color: "#71717A", lineHeight: 1.55 }}>
+                          <p style={{ fontFamily: inter, fontSize: 13, color: "var(--text-3)", lineHeight: 1.55 }}>
                             {mainRisk || "—"}
                           </p>
                         </div>
-                        <div style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "14px 16px" }}>
-                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.15em", textTransform: "uppercase", color: "#3F3F46", marginBottom: 8 }}>
+                        <div style={{ background: "var(--surface-1)", border: "1px solid var(--border-2)", borderRadius: 8, padding: "14px 16px" }}>
+                          <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.15em", textTransform: "uppercase", color: "var(--text-4)", marginBottom: 8 }}>
                             PROFIL TRADER
                           </p>
-                          <p style={{ fontFamily: inter, fontSize: 13, color: "#71717A", lineHeight: 1.55 }}>
+                          <p style={{ fontFamily: inter, fontSize: 13, color: "var(--text-3)", lineHeight: 1.55 }}>
                             {traderProfile
                               ? traderProfile.replace(/Investor defensif/gi, "Trader konservatif").replace(/Investor menengah/gi, "Trader aktif")
                               : "—"}
@@ -716,13 +781,13 @@ export default function StockDashboard() {
                                   : 'text-amber-400'
                               }`}
                             />
-                            <span className="font-mono text-[9px] tracking-widest text-[#6b7280] uppercase">
+                            <span className="font-mono text-[12px] tracking-widest text-[var(--text-3)] uppercase">
                               PERINGATAN DISTRIBUSI DINI
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <span
-                              className={`font-mono text-[9px] px-2 py-0.5 rounded-sm border ${
+                              className={`font-mono text-[12px] px-2 py-0.5 rounded-sm border ${
                                 distWarning.alertLevel === 'BAHAYA_DISTRIBUSI'
                                   ? 'bg-red-500/10 text-red-400 border-red-500/30'
                                   : distWarning.alertLevel === 'WASPADA_DISTRIBUSI'
@@ -733,7 +798,7 @@ export default function StockDashboard() {
                             >
                               {distWarning.conditionsMet}/{distWarning.totalConditions} kondisi
                             </span>
-                            <span className="font-mono text-[9px] text-[#6b7280]">
+                            <span className="font-mono text-[12px] text-[var(--text-3)]">
                               {distWarning.confidence}
                             </span>
                           </div>
@@ -763,15 +828,15 @@ export default function StockDashboard() {
                                 distWarning.conditions?.c3_brokerSideSwitch !== null
                             )
                             .map((detail: string, i: number) => (
-                              <p key={i} className="font-mono text-[10px] text-[#9ca3af]">
+                              <p key={i} className="font-mono text-[12px] text-[var(--text-3)]">
                                 {detail}
                               </p>
                             ))}
                         </div>
-                        <div className="bg-[#ffffff04] rounded-sm px-3 py-2 flex items-start gap-2">
-                          <span className="text-[#38BDF8] text-xs mt-0.5">→</span>
+                        <div className="bg-[var(--border-1)] rounded-sm px-3 py-2 flex items-start gap-2">
+                          <span className="text-[var(--signal)] text-xs mt-0.5">→</span>
                           <p
-                            className="font-mono text-[10px] text-[#6b7280]"
+                            className="font-mono text-[12px] text-[var(--text-3)]"
                             data-testid="text-distribution-recommendation"
                           >
                             {distWarning.recommendation}
@@ -784,6 +849,52 @@ export default function StockDashboard() {
                   
                   {/* Financials Tab */}
                   <TabsContent value="financials" className="mt-0 focus-visible:outline-none space-y-6">
+                    {ratioLoading && !idxRatio && (
+                      <Card className="p-5 border-border/50 bg-card">
+                        <Skeleton className="h-4 w-56 mb-4" />
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {Array.from({ length: 8 }).map((_, i) => (
+                            <div key={i} className="rounded-md border border-border/40 bg-surface-2 px-3 py-2.5">
+                              <Skeleton className="h-2.5 w-10 mb-2" />
+                              <Skeleton className="h-5 w-16" />
+                            </div>
+                          ))}
+                        </div>
+                      </Card>
+                    )}
+                    {idxRatio && (
+                      <Card className="p-5 border-border/50 bg-card">
+                        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                          <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                            <Activity className="w-4 h-4 text-signal" /> Rasio Fundamental — Resmi IDX
+                          </h3>
+                          <span className="text-xs text-text-3" style={{ fontVariantNumeric: "tabular-nums" }}>
+                            Per {idxRatio.fsDate ?? "—"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {[
+                            { label: "PER", val: idxRatio.per, suffix: "x" },
+                            { label: "PBV", val: idxRatio.pbv, suffix: "x" },
+                            { label: "DER", val: idxRatio.der, suffix: "x" },
+                            { label: "ROE", val: idxRatio.roe, suffix: "%" },
+                            { label: "ROA", val: idxRatio.roa, suffix: "%" },
+                            { label: "NPM", val: idxRatio.npm, suffix: "%" },
+                            { label: "EPS", val: idxRatio.eps, suffix: "" },
+                            { label: "Book Value", val: idxRatio.bookValue, suffix: "" },
+                          ].map((m) => (
+                            <div key={m.label} className="rounded-md border border-border/40 bg-surface-2 px-3 py-2.5">
+                              <div className="text-xs text-text-3 uppercase tracking-wide mb-1">{m.label}</div>
+                              <div className="text-lg font-semibold text-foreground" style={{ fontVariantNumeric: "tabular-nums" }}>
+                                {m.val != null ? `${Number(m.val).toLocaleString("id-ID", { maximumFractionDigits: 2 })}${m.suffix}` : "—"}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-text-4 mt-3">Sumber: laporan keuangan resmi IDX (www.idx.co.id)</p>
+                      </Card>
+                    )}
+
                     <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
                       <h3 className="text-lg font-bold font-display mb-4 text-foreground">Ringkasan Kinerja Keuangan</h3>
                       <p className="text-muted-foreground leading-relaxed mb-4">
@@ -889,6 +1000,115 @@ export default function StockDashboard() {
 
                   {/* Flow Tab */}
                   <TabsContent value="flow" className="mt-0 focus-visible:outline-none space-y-6">
+                    {bandarLoading && !bandarData && (
+                      <Card className="p-5 border-border/50 bg-card">
+                        <Skeleton className="h-4 w-48 mb-4" />
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                          {[0,1,2].map(i => <Skeleton key={i} className="h-14" />)}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          {[0,1].map(i => <Skeleton key={i} className="h-28" />)}
+                        </div>
+                      </Card>
+                    )}
+                    {bandarData && (() => {
+                      const b = (n: number) => `${n >= 0 ? "+" : ""}${(n / 1e9).toLocaleString("id-ID", { maximumFractionDigits: 1 })} M`;
+                      const fNet = bandarData.foreignNet ?? 0;
+                      return (
+                        <Card className="p-5 border-border/50 bg-card">
+                          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                            <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                              <Activity className="w-4 h-4 text-signal" /> Bandarmology — Broker Net (Stockbit)
+                            </h3>
+                            <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                              style={{ color: fNet >= 0 ? "var(--positive)" : "var(--danger)", background: fNet >= 0 ? "var(--signal-dim)" : "rgba(220,38,38,0.1)" }}>
+                              {fNet >= 0 ? "AKUMULASI ASING" : "DISTRIBUSI ASING"}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-3 mb-5" style={{ fontVariantNumeric: "tabular-nums" }}>
+                            {[
+                              { label: "Net Asing", val: bandarData.foreignNet },
+                              { label: "Net Lokal", val: bandarData.localNet },
+                              { label: "Net Pemerintah", val: bandarData.govNet },
+                            ].map((m) => (
+                              <div key={m.label} className="rounded-md border border-border/40 bg-surface-2 px-3 py-2.5">
+                                <div className="text-xs text-text-3 uppercase tracking-wide mb-1">{m.label}</div>
+                                <div className="text-base font-semibold" style={{ color: (m.val ?? 0) >= 0 ? "var(--positive)" : "var(--danger)" }}>{b(m.val ?? 0)}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {[
+                              { title: "Top Broker Beli", rows: bandarData.topBuyers ?? [], pos: true },
+                              { title: "Top Broker Jual", rows: bandarData.topSellers ?? [], pos: false },
+                            ].map((col) => (
+                              <div key={col.title}>
+                                <p className="text-xs font-semibold text-text-3 uppercase tracking-wide mb-2">{col.title}</p>
+                                <div className="divide-y divide-border/40">
+                                  {col.rows.slice(0, 6).map((r: any, i: number) => (
+                                    <button
+                                      key={i}
+                                      type="button"
+                                      onClick={() => {
+                                        const next = brokerHistoryFor === r.broker ? null : r.broker;
+                                        setBrokerHistoryFor(next);
+                                        if (next && stock) {
+                                          setBrokerHistoryLoading(true);
+                                          fetch(`/api/bandarmology/${stock.symbol}/broker/${next}/history?limit=30`)
+                                            .then(res => res.ok ? res.json() : null)
+                                            .then(data => setBrokerHistory(data?.history ?? []))
+                                            .catch(() => setBrokerHistory([]))
+                                            .finally(() => setBrokerHistoryLoading(false));
+                                        }
+                                      }}
+                                      className="w-full flex items-center justify-between py-1.5 hover:bg-surface-2 rounded transition-colors text-left"
+                                      style={{ fontVariantNumeric: "tabular-nums" }}
+                                    >
+                                      <span className="text-sm font-semibold text-foreground underline decoration-dotted">{r.broker}</span>
+                                      <span className="text-xs text-text-4">{r.type === "FOREIGN" ? "Asing" : r.type === "GOVERNMENT" ? "Pemerintah" : "Lokal"}</span>
+                                      <span className="text-sm font-medium w-24 text-right" style={{ color: col.pos ? "var(--positive)" : "var(--danger)" }}>{b(r.value)}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <p className="text-xs text-text-4 mt-3">Sumber: Stockbit · {bandarData.brokerCount} broker · {bandarData.date}</p>
+
+                          {brokerHistoryFor && (
+                            <div className="mt-4 pt-4 border-t border-border/40">
+                              <p className="text-xs font-semibold text-text-3 uppercase tracking-wide mb-2">
+                                Aktivitas Harian — {brokerHistoryFor}
+                              </p>
+                              {brokerHistoryLoading && (
+                                <p className="text-xs text-text-4">Memuat riwayat...</p>
+                              )}
+                              {!brokerHistoryLoading && brokerHistory.length === 0 && (
+                                <p className="text-xs text-text-4">Belum ada riwayat tersimpan untuk broker ini di saham ini.</p>
+                              )}
+                              {!brokerHistoryLoading && brokerHistory.length > 0 && (
+                                <div className="max-h-64 overflow-y-auto divide-y divide-border/40">
+                                  {brokerHistory.map((h: any) => (
+                                    <div key={h.date} className="grid grid-cols-4 gap-2 py-1.5 text-xs" style={{ fontVariantNumeric: "tabular-nums" }}>
+                                      <span className="text-text-3">{h.date}</span>
+                                      <span className="font-medium" style={{ color: h.netValue >= 0 ? "var(--positive)" : "var(--danger)" }}>{b(h.netValue)}</span>
+                                      <span className="text-text-4">{h.netLot.toLocaleString("id-ID")} lot</span>
+                                      <span className="text-text-4 text-right">
+                                        {h.closePrice != null ? h.closePrice.toLocaleString("id-ID") : "-"}
+                                        {h.changePct != null && (
+                                          <span className={h.changePct >= 0 ? "text-[var(--positive)]" : "text-[var(--danger)]"}> ({h.changePct >= 0 ? "+" : ""}{h.changePct.toFixed(2)}%)</span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })()}
+
                     {/* SECTION 1: MARKET REGIME (CORE ENGINE) */}
                     {!aiLoading && aiData?.marketMode && (
                       <Card className={`p-6 border-2 shadow-md ${
@@ -983,7 +1203,7 @@ export default function StockDashboard() {
                               style={{ width: `${aiData.controlQualityScore.score}%` }}
                             />
                           </div>
-                          <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
+                          <div className="flex justify-between mt-1 text-[12px] text-muted-foreground">
                             <span>Lemah</span>
                             <span>Kuat</span>
                           </div>
@@ -1256,10 +1476,10 @@ export default function StockDashboard() {
                                         const insight = aiData?.brokerInsights?.find((i: any) => i.brokerCode === broker.code);
                                         return insight ? (
                                           <div className="inline-flex flex-col items-end">
-                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-secondary text-foreground uppercase">
+                                            <span className="text-[12px] font-bold px-1.5 py-0.5 rounded bg-secondary text-foreground uppercase">
                                               {insight.inferredRole}
                                             </span>
-                                            <span className="text-[9px] text-muted-foreground mt-0.5 whitespace-nowrap">
+                                            <span className="text-[12px] text-muted-foreground mt-0.5 whitespace-nowrap">
                                               Conf: {insight.confidenceLevel}
                                             </span>
                                           </div>
@@ -1382,17 +1602,102 @@ export default function StockDashboard() {
 
                   {/* News Tab */}
                   <TabsContent value="news" className="mt-0 focus-visible:outline-none space-y-6">
+                    {/* Default: real market news with images (no AI needed) */}
+                    <div>
+                      <h3 className="text-base font-bold text-foreground flex items-center gap-2 mb-4">
+                        <Newspaper className="w-4 h-4 text-signal" /> Berita Pasar Terkini
+                      </h3>
+                      {feedLoading && newsFeed.length === 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <Card key={i} className="overflow-hidden border-border/50 bg-card">
+                              <Skeleton className="h-40 w-full" />
+                              <div className="p-4">
+                                <Skeleton className="h-3 w-24 mb-2" />
+                                <Skeleton className="h-4 w-full mb-1.5" />
+                                <Skeleton className="h-4 w-2/3" />
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : newsFeed.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {newsFeed.slice(0, 12).map((n: any, i: number) => (
+                            <a key={i} href={n.url || undefined} target="_blank" rel="noopener noreferrer"
+                              className="group block rounded-lg border border-border/50 bg-card overflow-hidden hover:border-signal/50 transition-colors">
+                              {n.imageUrl ? (
+                                <div className="h-40 w-full overflow-hidden bg-surface-2">
+                                  <img src={n.imageUrl} alt="" loading="lazy"
+                                    className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
+                                </div>
+                              ) : null}
+                              <div className="p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="text-xs font-semibold text-signal">{n.source}</span>
+                                  <span className="text-xs text-text-4" style={{ fontVariantNumeric: "tabular-nums" }}>
+                                    {n.publishedAt ? new Date(n.publishedAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short" }) : ""}
+                                  </span>
+                                </div>
+                                <p className="text-sm font-semibold text-foreground leading-snug mb-1.5 line-clamp-2">{n.title}</p>
+                                <p className="text-xs text-text-3 leading-relaxed line-clamp-2">{n.summary}</p>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <Card className="p-6 border-border/50 bg-card text-center">
+                          <p className="text-sm text-text-3">Belum ada berita pasar tersedia.</p>
+                        </Card>
+                      )}
+                    </div>
+
+                    {annLoading && idxAnnouncements.length === 0 && (
+                      <Card className="p-5 border-border/50 bg-card">
+                        <Skeleton className="h-4 w-48 mb-4" />
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div key={i} className="flex items-center gap-3 py-2.5 border-t border-border/30 first:border-t-0">
+                            <Skeleton className="h-3 w-20 shrink-0" />
+                            <Skeleton className="h-4 flex-1" />
+                          </div>
+                        ))}
+                      </Card>
+                    )}
+                    {idxAnnouncements.length > 0 && (
+                      <Card className="p-5 border-border/50 bg-card">
+                        <h3 className="text-base font-bold text-foreground flex items-center gap-2 mb-4">
+                          <Activity className="w-4 h-4 text-signal" /> Pengumuman Resmi IDX
+                        </h3>
+                        <div className="divide-y divide-border/40">
+                          {idxAnnouncements.slice(0, 10).map((a: any, i: number) => {
+                            const link = a.attachments?.[0]?.url;
+                            const dateStr = a.date ? new Date(a.date).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" }) : "";
+                            const Row = (
+                              <div className="py-2.5 flex items-start gap-3">
+                                <span className="text-xs text-text-4 shrink-0 mt-0.5 w-20" style={{ fontVariantNumeric: "tabular-nums" }}>{dateStr}</span>
+                                <span className="text-sm text-foreground leading-snug flex-1">{a.title}</span>
+                              </div>
+                            );
+                            return link ? (
+                              <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="block hover:bg-surface-2 -mx-2 px-2 rounded transition-colors">{Row}</a>
+                            ) : <div key={i}>{Row}</div>;
+                          })}
+                        </div>
+                        <p className="text-xs text-text-4 mt-3">Sumber: keterbukaan informasi IDX</p>
+                      </Card>
+                    )}
+
                     {/* WEB SEARCH ANALYSIS — shown only when AI enrichment is available */}
                     {aiData?.webSearchAnalysis && (
-                      <Card className="p-5 border border-[#38BDF8]/20 bg-gradient-to-br from-[#0d1a2a] to-[#0a1520] shadow-sm" data-testid="card-web-search-analysis">
+                      <Card className="p-5 border border-[var(--signal)]/20 bg-gradient-to-br from-[#0d1a2a] to-[#0a1520] shadow-sm" data-testid="card-web-search-analysis">
                         <div className="flex items-center gap-2 mb-3">
-                          <Sparkles className="w-4 h-4 text-[#38BDF8]" />
-                          <p className="text-xs font-bold text-[#38BDF8] uppercase tracking-widest" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                          <Sparkles className="w-4 h-4 text-[var(--signal)]" />
+                          <p className="text-xs font-bold text-[var(--signal)] uppercase tracking-widest" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
                             Analisis Live — Web Search
                           </p>
-                          <span className="ml-auto text-[10px] text-[#6b7280] font-mono">claude-sonnet</span>
+                          <span className="ml-auto text-[12px] text-[var(--text-3)] font-mono">claude-sonnet</span>
                         </div>
-                        <p className="text-sm text-[#d1d5db] leading-relaxed whitespace-pre-wrap">
+                        <p className="text-sm text-[var(--text-2)] leading-relaxed whitespace-pre-wrap">
                           {aiData.webSearchAnalysis}
                         </p>
                       </Card>
@@ -1401,7 +1706,7 @@ export default function StockDashboard() {
                     {/* MACRO OVERRIDE BANNER — shown when any impact has YES_HARD */}
                     {newsData?.impacts?.some((i: any) => i.macroOverride === 'YES_HARD') && (
                       <div className="bg-red-500/5 border border-red-500/20 rounded-md px-4 py-2 mb-3">
-                        <p className="text-red-400 text-[10px] uppercase tracking-widest font-bold" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                        <p className="text-red-400 text-[12px] uppercase tracking-widest font-bold" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
                           ⚠ OVERRIDE MAKRO AKTIF — sinyal positif saham ini dikurangi signifikan oleh kondisi makro
                         </p>
                       </div>
@@ -1409,7 +1714,20 @@ export default function StockDashboard() {
 
                     {/* SECTION 1: Analyzed News Impacts */}
                     {/* Analyzed impacts — filtered by symbol/sector only */}
-                    {newsData?.impacts?.length > 0 ? (
+                    {newsLoading && !newsData ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <Card key={i} className="p-4 border-border/50 bg-card">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Skeleton className="h-3 w-16" />
+                              <Skeleton className="h-3 w-24" />
+                            </div>
+                            <Skeleton className="h-4 w-3/4 mb-2" />
+                            <Skeleton className="h-3 w-full" />
+                          </Card>
+                        ))}
+                      </div>
+                    ) : newsData?.impacts?.length > 0 ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         {newsData.impacts.map((impact: any, idx: number) => (
                           <NewsArticleCard
@@ -1424,13 +1742,13 @@ export default function StockDashboard() {
                       </div>
                     ) : (
                       <div style={{
-                        background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.05)",
+                        background: "var(--surface-1)", border: "1px solid var(--border-1)",
                         borderRadius: 8, padding: "32px 24px", textAlign: "center",
                       }}>
-                        <p style={{ fontFamily: mono, fontSize: 11, color: "#3F3F46", marginBottom: 6 }}>
+                        <p style={{ fontFamily: mono, fontSize: 13, color: "var(--text-4)", marginBottom: 6 }}>
                           Tidak ada berita relevan untuk {symbol} dalam 30 hari terakhir.
                         </p>
-                        <p style={{ fontFamily: mono, fontSize: 10, color: "#27272A" }}>
+                        <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)" }}>
                           Pipeline berita aktif setiap 15 menit.
                         </p>
                       </div>
@@ -1589,7 +1907,7 @@ export default function StockDashboard() {
                                           {["Rendah", "Sedang", "Tinggi"].map((level) => (
                                             <span 
                                               key={level}
-                                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                              className={`text-[12px] font-bold px-2 py-0.5 rounded ${
                                                 level === aiData.trapDetection.confidence
                                                   ? aiData.trapDetection.type === "bull_trap"
                                                     ? "bg-red-500 text-white"
@@ -1655,7 +1973,74 @@ export default function StockDashboard() {
 
                   {/* Insider Tab */}
                   <TabsContent value="insider" className="mt-0 focus-visible:outline-none space-y-5">
-                    {managementData ? (
+                    {/* Factual roster — official IDX data (free, no AI, always shown) */}
+                    {mgmtLoading && !managementData?.roster && (
+                      <div className="flex flex-col gap-4">
+                        {[0, 1].map((s) => (
+                          <div key={s} className="rounded-lg border border-border/50 bg-card p-4">
+                            <Skeleton className="h-3 w-32 mb-4" />
+                            {[0, 1, 2, 3].map((i) => (
+                              <div key={i} className="flex items-center justify-between py-2.5 border-t border-border/30 first:border-t-0">
+                                <Skeleton className="h-4 w-44" />
+                                <Skeleton className="h-3 w-16" />
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {managementData?.roster && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                        {[
+                          { title: "DIREKTUR", rows: managementData.roster.directors, flag: "affiliated", flagLabel: "Terafiliasi" },
+                          { title: "KOMISARIS", rows: managementData.roster.commissioners, flag: "independent", flagLabel: "Independen" },
+                        ].filter((s) => s.rows?.length > 0).map((section) => (
+                          <div key={section.title} style={{ background: "var(--surface-1)", border: "1px solid var(--border-2)", borderRadius: 10, padding: "16px 20px" }}>
+                            <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 12 }}>
+                              {section.title} · {section.rows.length}
+                            </p>
+                            {section.rows.map((m: any, i: number) => (
+                              <div key={`${m.name}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderTop: i > 0 ? "1px solid var(--border-1)" : "none" }}>
+                                <div style={{ minWidth: 0 }}>
+                                  <span style={{ fontFamily: inter, fontSize: 13, color: "var(--text-1)" }}>{m.name}</span>
+                                  <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", marginLeft: 8, textTransform: "uppercase" }}>{m.position}</span>
+                                </div>
+                                <span style={{ fontFamily: mono, fontSize: 12, flexShrink: 0, color: m[section.flag] ? "var(--positive)" : "var(--text-3)" }}>
+                                  {section.flagLabel}: {m[section.flag] ? "Ya" : "Tidak"}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                        {managementData.roster.shareholders?.length > 0 && (
+                          <div style={{ background: "var(--surface-1)", border: "1px solid var(--border-2)", borderRadius: 10, padding: "16px 20px" }}>
+                            <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 12 }}>
+                              PEMEGANG SAHAM · {managementData.roster.shareholders.length}
+                            </p>
+                            {managementData.roster.shareholders.slice(0, 12).map((s: any, i: number) => (
+                              <div key={`${s.name}-${i}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderTop: i > 0 ? "1px solid var(--border-1)" : "none" }}>
+                                <div style={{ minWidth: 0 }}>
+                                  <span style={{ fontFamily: inter, fontSize: 13, color: "var(--text-1)" }}>{s.name}</span>
+                                  {s.controller && <span style={{ fontFamily: mono, fontSize: 13, color: "var(--warning)", marginLeft: 8 }}>PENGENDALI</span>}
+                                  <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", marginLeft: 8 }}>{s.category}</span>
+                                </div>
+                                <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 600, flexShrink: 0, color: "var(--text-2)" }}>
+                                  {s.percent != null ? `${s.percent.toFixed(3)}%` : "—"}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {managementData.roster.secretary && (
+                          <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)" }}>
+                            Sekretaris Perusahaan: <span style={{ color: "var(--text-3)" }}>{managementData.roster.secretary.name}</span>
+                            {managementData.roster.secretary.email && ` · ${managementData.roster.secretary.email}`}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {mgmtLoading ? null : managementData?.compositeScore != null ? (
                       <>
                         {/* Critical red flag banner */}
                         {managementData.hasCriticalRedFlag && (
@@ -1663,10 +2048,10 @@ export default function StockDashboard() {
                             background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.25)",
                             borderRadius: 8, padding: "12px 16px",
                           }}>
-                            <p style={{ fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", color: "#F87171", marginBottom: 4, textTransform: "uppercase" }}>
+                            <p style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", color: "var(--danger)", marginBottom: 4, textTransform: "uppercase" }}>
                               ⛔ Bendera Merah Kritis Teridentifikasi
                             </p>
-                            <p style={{ fontFamily: inter, fontSize: 12, color: "#FCA5A5", lineHeight: 1.55 }}>
+                            <p style={{ fontFamily: inter, fontSize: 12, color: "var(--danger)", lineHeight: 1.55 }}>
                               {managementData.criticalRedFlagMember}: {managementData.criticalRedFlagReason}
                             </p>
                           </div>
@@ -1674,30 +2059,30 @@ export default function StockDashboard() {
 
                         {/* Section 1: Composite score ring */}
                         <div style={{
-                          background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)",
+                          background: "var(--surface-1)", border: "1px solid var(--border-2)",
                           borderRadius: 10, padding: "20px 24px",
                           display: "flex", alignItems: "center", gap: 28,
                         }}>
                           <ScoreRingV3 score={managementData.compositeScore} size={120} showLabel />
                           <div style={{ flex: 1 }}>
-                            <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 8 }}>
+                            <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 8 }}>
                               INTEGRITAS & REKAM JEJAK BOD
                             </p>
                             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                               <span style={{
-                                fontFamily: mono, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em",
-                                color: managementData.qualityLabel === "KUAT" ? "#4ADE80" : managementData.qualityLabel === "LEMAH" ? "#F87171" : "#FBBF24",
+                                fontFamily: mono, fontSize: 13, fontWeight: 700, letterSpacing: "0.08em",
+                                color: managementData.qualityLabel === "KUAT" ? "var(--positive)" : managementData.qualityLabel === "LEMAH" ? "var(--danger)" : "var(--warning)",
                                 background: managementData.qualityLabel === "KUAT" ? "rgba(74,222,128,0.10)" : managementData.qualityLabel === "LEMAH" ? "rgba(248,113,113,0.10)" : "rgba(251,191,36,0.10)",
                                 border: managementData.qualityLabel === "KUAT" ? "1px solid rgba(74,222,128,0.25)" : managementData.qualityLabel === "LEMAH" ? "1px solid rgba(248,113,113,0.25)" : "1px solid rgba(251,191,36,0.25)",
                                 borderRadius: 9999, padding: "3px 10px",
                               }}>
                                 {managementData.qualityLabel}
                               </span>
-                              <span style={{ fontFamily: mono, fontSize: 9, color: "#3F3F46" }}>
+                              <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)" }}>
                                 Reliabilitas: {managementData.reliability}
                               </span>
                             </div>
-                            <p style={{ fontFamily: inter, fontSize: 12, color: "#71717A" }}>
+                            <p style={{ fontFamily: inter, fontSize: 12, color: "var(--text-3)" }}>
                               {managementData.scoredMemberCount} anggota dinilai
                               {managementData.excludedMemberCount > 0 && ` · ${managementData.excludedMemberCount} dikecualikan`}
                             </p>
@@ -1706,10 +2091,10 @@ export default function StockDashboard() {
 
                         {/* Section 2: 5-component breakdown */}
                         <div style={{
-                          background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.05)",
+                          background: "var(--surface-1)", border: "1px solid var(--border-1)",
                           borderRadius: 10, padding: "16px 20px",
                         }}>
-                          <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 14 }}>
+                          <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 14 }}>
                             BOBOT KOMPONEN
                           </p>
                           {[
@@ -1719,19 +2104,19 @@ export default function StockDashboard() {
                             { label: "Stabilitas",       weight: 15, score: null },
                             { label: "Reputasi",         weight: 10, score: null },
                           ].map((comp) => {
-                            const color = comp.score !== null ? (comp.score >= 70 ? "#4ADE80" : comp.score >= 50 ? "#4FC3F7" : comp.score >= 40 ? "#FBBF24" : "#F87171") : "rgba(255,255,255,0.06)";
+                            const color = comp.score !== null ? (comp.score >= 70 ? "var(--positive)" : comp.score >= 50 ? "var(--signal)" : comp.score >= 40 ? "var(--warning)" : "var(--danger)") : "var(--border-2)";
                             return (
                               <div key={comp.label} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                                 <div style={{ width: 120, flexShrink: 0 }}>
-                                  <span style={{ fontFamily: mono, fontSize: 10, color: "#A1A1AA" }}>{comp.label}</span>
+                                  <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-2)" }}>{comp.label}</span>
                                 </div>
-                                <span style={{ fontFamily: mono, fontSize: 8, color: "#27272A", background: "rgba(255,255,255,0.02)", borderRadius: 3, padding: "1px 5px", flexShrink: 0, width: 28, textAlign: "center" }}>
+                                <span style={{ fontFamily: mono, fontSize: 13, color: "var(--text-4)", background: "rgba(255,255,255,0.02)", borderRadius: 3, padding: "1px 5px", flexShrink: 0, width: 28, textAlign: "center" }}>
                                   {comp.weight}%
                                 </span>
-                                <div style={{ flex: 1, height: 2, background: "rgba(255,255,255,0.05)", borderRadius: 9999 }}>
+                                <div style={{ flex: 1, height: 2, background: "var(--border-1)", borderRadius: 9999 }}>
                                   <div style={{ height: "100%", width: comp.score !== null ? `${comp.score}%` : "0%", background: color, borderRadius: 9999, transition: "width 0.7s" }} />
                                 </div>
-                                <div style={{ width: 28, textAlign: "right", fontFamily: mono, fontSize: 11, fontWeight: 600, color: comp.score !== null ? color : "#27272A" }}>
+                                <div style={{ width: 28, textAlign: "right", fontFamily: mono, fontSize: 13, fontWeight: 600, color: comp.score !== null ? color : "var(--text-4)" }}>
                                   {comp.score !== null ? comp.score : "—"}
                                 </div>
                               </div>
@@ -1742,7 +2127,7 @@ export default function StockDashboard() {
                         {/* Section 3: BOD member cards */}
                         {managementData.memberScores?.length > 0 && (
                           <div>
-                            <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.14em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 10 }}>
+                            <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.14em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 10 }}>
                               PROFIL ANGGOTA BOD
                             </p>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -1763,21 +2148,26 @@ export default function StockDashboard() {
                         )}
                       </>
                     ) : (
-                      /* Empty state — no research yet */
+                      /* Optional AI scoring layer — roster is already shown above */
                       <div style={{
-                        background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.05)",
-                        borderRadius: 10, padding: "40px 24px", textAlign: "center",
+                        background: "var(--surface-1)", border: "1px solid var(--border-1)",
+                        borderRadius: 10, padding: "24px", textAlign: "center",
                       }}>
-                        <p style={{ fontFamily: mono, fontSize: 11, color: "#3F3F46", marginBottom: 8 }}>
-                          Riset manajemen belum tersedia untuk {symbol}.
-                        </p>
-                        <p style={{ fontFamily: inter, fontSize: 12, color: "#27272A", marginBottom: 20, lineHeight: 1.6 }}>
-                          Riset BOD membutuhkan koneksi API. Klik untuk memicu riset baru.
+                        <p style={{ fontFamily: inter, fontSize: 12, color: "var(--text-3)", marginBottom: 16, lineHeight: 1.6 }}>
+                          Skor kualitatif AI (rekam jejak, tata kelola, red flag) belum dijalankan — opsional, di atas roster asli di atas.
                         </p>
                         <button
                           onClick={async () => {
                             try {
-                              await fetch(`/api/management/${symbol}/research`, { method: "POST" });
+                              const members = [
+                                ...(managementData?.roster?.directors ?? []),
+                                ...(managementData?.roster?.commissioners ?? []),
+                              ].map((m: any) => ({ name: m.name, title: m.position }));
+                              await fetch(`/api/management/${symbol}/research`, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ members, companyName: stock?.name ?? symbol }),
+                              });
                               const res = await fetch(`/api/management/${symbol}`);
                               const data = await res.json();
                               if (data && typeof data.compositeScore === "number") {
@@ -1786,30 +2176,30 @@ export default function StockDashboard() {
                             } catch {}
                           }}
                           style={{
-                            fontFamily: mono, fontSize: 10, letterSpacing: "0.1em",
-                            color: "#4FC3F7", background: "rgba(79,195,247,0.07)",
+                            fontFamily: mono, fontSize: 12, letterSpacing: "0.1em",
+                            color: "var(--signal)", background: "rgba(79,195,247,0.07)",
                             border: "1px solid rgba(79,195,247,0.2)",
                             borderRadius: 6, padding: "8px 16px", cursor: "pointer",
                           }}
                         >
-                          PICU RISET MANAJEMEN →
+                          PICU SCORING AI (OPSIONAL) →
                         </button>
                       </div>
                     )}
 
                     {/* Section 5: OJK Insider Activity (Layer 7) */}
                     <div style={{
-                      background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)",
+                      background: "var(--surface-1)", border: "1px solid var(--border-2)",
                       borderRadius: 10, padding: "18px 20px",
                     }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                        <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase" }}>
+                        <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "var(--text-4)", textTransform: "uppercase" }}>
                           AKTIVITAS INSIDER (90 HARI)
                         </p>
                         {insiderData?.clusterBuySignal && (
                           <span style={{
-                            fontFamily: mono, fontSize: 9, fontWeight: 700, letterSpacing: "0.08em",
-                            color: "#4ADE80", background: "rgba(74,222,128,0.10)",
+                            fontFamily: mono, fontSize: 12, fontWeight: 700, letterSpacing: "0.08em",
+                            color: "var(--positive)", background: "rgba(74,222,128,0.10)",
                             border: "1px solid rgba(74,222,128,0.25)",
                             borderRadius: 9999, padding: "3px 10px",
                           }}>
@@ -1820,7 +2210,7 @@ export default function StockDashboard() {
 
                       {!insiderData ? (
                         <div style={{ textAlign: "center", paddingTop: 8, paddingBottom: 8 }}>
-                          <p style={{ fontFamily: mono, fontSize: 11, color: "#3F3F46" }}>
+                          <p style={{ fontFamily: mono, fontSize: 13, color: "var(--text-4)" }}>
                             Data insider belum cukup untuk dianalisis
                           </p>
                           <button
@@ -1838,8 +2228,8 @@ export default function StockDashboard() {
                               } catch {}
                             }}
                             style={{
-                              fontFamily: mono, fontSize: 10, letterSpacing: "0.1em",
-                              color: "#4FC3F7", background: "rgba(79,195,247,0.07)",
+                              fontFamily: mono, fontSize: 12, letterSpacing: "0.1em",
+                              color: "var(--signal)", background: "rgba(79,195,247,0.07)",
                               border: "1px solid rgba(79,195,247,0.2)",
                               borderRadius: 6, padding: "8px 16px", cursor: "pointer", marginTop: 10,
                             }}
@@ -1848,7 +2238,7 @@ export default function StockDashboard() {
                           </button>
                         </div>
                       ) : insiderData.signal === "INSUFFICIENT_DATA" ? (
-                        <p style={{ fontFamily: inter, fontSize: 12, color: "#71717A", marginBottom: 8 }}>
+                        <p style={{ fontFamily: inter, fontSize: 12, color: "var(--text-3)", marginBottom: 8 }}>
                           Data insider belum cukup untuk dianalisis
                         </p>
                       ) : (
@@ -1856,8 +2246,8 @@ export default function StockDashboard() {
                           {/* Stat row */}
                           <div style={{ display: "flex", gap: 20, marginBottom: 14, flexWrap: "wrap" as const }}>
                             {[
-                              { label: "Pembelian", value: `${insiderData.insiderBuyCount ?? 0} transaksi`, color: "#4ADE80" },
-                              { label: "Penjualan", value: `${insiderData.insiderSellCount ?? 0} transaksi`, color: "#F87171" },
+                              { label: "Pembelian", value: `${insiderData.insiderBuyCount ?? 0} transaksi`, color: "var(--positive)" },
+                              { label: "Penjualan", value: `${insiderData.insiderSellCount ?? 0} transaksi`, color: "var(--danger)" },
                               { label: "Nilai Net", value: (() => {
                                 const v = insiderData.netInsiderValue ?? 0;
                                 const abs = Math.abs(v);
@@ -1865,24 +2255,24 @@ export default function StockDashboard() {
                                            : abs >= 1e6 ? `Rp ${(abs/1e6).toFixed(0)}Jt`
                                            : `Rp ${abs.toLocaleString("id-ID")}`;
                                 return (v >= 0 ? "+" : "−") + fmt;
-                              })(), color: (insiderData.netInsiderValue ?? 0) >= 0 ? "#4ADE80" : "#F87171" },
+                              })(), color: (insiderData.netInsiderValue ?? 0) >= 0 ? "var(--positive)" : "var(--danger)" },
                             ].map((s) => (
                               <div key={s.label}>
-                                <p style={{ fontFamily: mono, fontSize: 8, letterSpacing: "0.12em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 3 }}>
+                                <p style={{ fontFamily: mono, fontSize: 13, letterSpacing: "0.12em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 3 }}>
                                   {s.label}
                                 </p>
                                 <p style={{ fontFamily: mono, fontSize: 13, fontWeight: 700, color: s.color }}>{s.value}</p>
                               </div>
                             ))}
                             <div>
-                              <p style={{ fontFamily: mono, fontSize: 8, letterSpacing: "0.12em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 3 }}>
+                              <p style={{ fontFamily: mono, fontSize: 13, letterSpacing: "0.12em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 3 }}>
                                 Sinyal
                               </p>
                               <p style={{
-                                fontFamily: mono, fontSize: 11, fontWeight: 700,
-                                color: insiderData.signal === "STRONG_BUY" || insiderData.signal === "BUY" ? "#4ADE80"
-                                     : insiderData.signal === "STRONG_SELL" || insiderData.signal === "SELL" ? "#F87171"
-                                     : "#FBBF24",
+                                fontFamily: mono, fontSize: 13, fontWeight: 700,
+                                color: insiderData.signal === "STRONG_BUY" || insiderData.signal === "BUY" ? "var(--positive)"
+                                     : insiderData.signal === "STRONG_SELL" || insiderData.signal === "SELL" ? "var(--danger)"
+                                     : "var(--warning)",
                               }}>
                                 {insiderData.signal?.replace("_", " ")}
                               </p>
@@ -1891,7 +2281,7 @@ export default function StockDashboard() {
 
                           {/* Note */}
                           {insiderData.note && (
-                            <p style={{ fontFamily: inter, fontSize: 11, color: "#71717A", marginBottom: 14, lineHeight: 1.55 }}>
+                            <p style={{ fontFamily: inter, fontSize: 13, color: "var(--text-3)", marginBottom: 14, lineHeight: 1.55 }}>
                               {insiderData.note}
                             </p>
                           )}
@@ -1902,7 +2292,7 @@ export default function StockDashboard() {
                               background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.2)",
                               borderRadius: 6, padding: "8px 12px", marginBottom: 14,
                             }}>
-                              <p style={{ fontFamily: mono, fontSize: 10, color: "#4ADE80", fontWeight: 600 }}>
+                              <p style={{ fontFamily: mono, fontSize: 12, color: "var(--positive)", fontWeight: 600 }}>
                                 Cluster Buy: 3+ insider beli dalam 14 hari
                                 {insiderData.priceContextSignal && " — saat harga lemah"}
                               </p>
@@ -1912,7 +2302,7 @@ export default function StockDashboard() {
                           {/* Top transactions */}
                           {(insiderData.topTransactions ?? insiderData.allTransactions ?? []).length > 0 && (
                             <div>
-                              <p style={{ fontFamily: mono, fontSize: 8, letterSpacing: "0.12em", color: "#3F3F46", textTransform: "uppercase", marginBottom: 8 }}>
+                              <p style={{ fontFamily: mono, fontSize: 13, letterSpacing: "0.12em", color: "var(--text-4)", textTransform: "uppercase", marginBottom: 8 }}>
                                 TRANSAKSI TERBARU
                               </p>
                               <div style={{ display: "flex", flexDirection: "column" as const, gap: 4 }}>
@@ -1923,25 +2313,25 @@ export default function StockDashboard() {
                                     background: "rgba(255,255,255,0.02)", borderRadius: 5,
                                     flexWrap: "wrap" as const,
                                   }}>
-                                    <span style={{ fontFamily: mono, fontSize: 9, color: "#3F3F46", flexShrink: 0 }}>
+                                    <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)", flexShrink: 0 }}>
                                       {tx.transactionDate}
                                     </span>
-                                    <span style={{ fontFamily: inter, fontSize: 11, color: "#A1A1AA", flex: 1, minWidth: 80 }}>
+                                    <span style={{ fontFamily: inter, fontSize: 13, color: "var(--text-2)", flex: 1, minWidth: 80 }}>
                                       {tx.personName}
                                     </span>
-                                    <span style={{ fontFamily: mono, fontSize: 9, color: "#52525B" }}>
+                                    <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)" }}>
                                       {tx.role?.slice(0, 20)}
                                     </span>
                                     <span style={{
-                                      fontFamily: mono, fontSize: 9, fontWeight: 700,
-                                      color: tx.transactionType === "BUY" ? "#4ADE80" : "#F87171",
+                                      fontFamily: mono, fontSize: 12, fontWeight: 700,
+                                      color: tx.transactionType === "BUY" ? "var(--positive)" : "var(--danger)",
                                     }}>
                                       {tx.transactionType === "BUY" ? "BELI" : "JUAL"}
                                     </span>
-                                    <span style={{ fontFamily: mono, fontSize: 10, color: "#71717A" }}>
+                                    <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)" }}>
                                       {Number(tx.shares).toLocaleString("id-ID")} lbr
                                     </span>
-                                    <span style={{ fontFamily: mono, fontSize: 10, color: "#A1A1AA", fontWeight: 600 }}>
+                                    <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-2)", fontWeight: 600 }}>
                                       {(() => {
                                         const v = Number(tx.totalValue);
                                         if (v >= 1e9) return `Rp ${(v/1e9).toFixed(1)}M`;
@@ -1961,7 +2351,7 @@ export default function StockDashboard() {
                               background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)",
                               borderRadius: 6, padding: "8px 12px", marginTop: 12,
                             }}>
-                              <p style={{ fontFamily: mono, fontSize: 9, color: "#FBBF24" }}>
+                              <p style={{ fontFamily: mono, fontSize: 12, color: "var(--warning)" }}>
                                 Pelaporan terlambat terdeteksi — sinyal tata kelola negatif
                               </p>
                             </div>
@@ -1974,7 +2364,21 @@ export default function StockDashboard() {
                   {/* Valuasi Tab */}
                   <TabsContent value="valuation" className="mt-0 focus-visible:outline-none">
                     <div className="p-4 space-y-4">
-                      {valuationData ? (() => {
+                      {valLoading && !valuationData ? (
+                        <div className="space-y-4">
+                          <Card className="p-5 border-border/50 bg-card">
+                            <Skeleton className="h-4 w-40 mb-4" />
+                            <div className="grid grid-cols-2 gap-3">
+                              {Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="rounded-md border border-border/40 bg-surface-2 p-3">
+                                  <Skeleton className="h-2.5 w-16 mb-2" />
+                                  <Skeleton className="h-6 w-20" />
+                                </div>
+                              ))}
+                            </div>
+                          </Card>
+                        </div>
+                      ) : valuationData ? (() => {
                         const v = valuationData.valuation?.valuation;
                         const q = valuationData.valuation?.quality;
                         const bench = valuationData.sectorBenchmark;
@@ -1983,46 +2387,46 @@ export default function StockDashboard() {
                         const roeVal = parseFloat(stock.roe);
                         const nm = parseFloat(stock.netMargin);
                         const monoFont = "'IBM Plex Mono', monospace";
-                        const verdictColor = v?.label === 'MURAH' ? '#34d399' : v?.label === 'MAHAL' ? '#fbbf24' : '#94a3b8';
+                        const verdictColor = v?.label === 'MURAH' ? 'var(--positive)' : v?.label === 'MAHAL' ? 'var(--warning)' : 'var(--text-4)';
                         const verdictBg = v?.label === 'MURAH' ? 'rgba(52,211,153,0.08)' : v?.label === 'MAHAL' ? 'rgba(251,191,36,0.08)' : 'rgba(148,163,184,0.05)';
-                        const qualityColor = q?.label === 'KUAT' ? '#34d399' : q?.label === 'LEMAH' ? '#f87171' : '#94a3b8';
+                        const qualityColor = q?.label === 'KUAT' ? 'var(--positive)' : q?.label === 'LEMAH' ? 'var(--danger)' : 'var(--text-4)';
                         const qualityBg = q?.label === 'KUAT' ? 'rgba(52,211,153,0.08)' : q?.label === 'LEMAH' ? 'rgba(248,113,113,0.08)' : 'rgba(148,163,184,0.05)';
 
                         return (
                           <>
                             <div className="rounded-lg p-5" style={{ background: verdictBg, border: `1px solid ${verdictColor}30` }} data-testid="valuation-verdict">
                               <div className="flex items-center justify-between mb-3">
-                                <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: monoFont, color: '#6b7280' }}>VERDICT VALUASI</p>
-                                <span className="text-[10px] px-2 py-0.5 rounded" style={{ fontFamily: monoFont, background: `${verdictColor}20`, color: verdictColor }}>
+                                <p className="text-[12px] tracking-widest uppercase" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>VERDICT VALUASI</p>
+                                <span className="text-[12px] px-2 py-0.5 rounded" style={{ fontFamily: monoFont, background: `${verdictColor}20`, color: verdictColor }}>
                                   {bench?.displayName ?? 'Umum'}
                                 </span>
                               </div>
                               <p className="text-2xl font-bold mb-1" style={{ fontFamily: monoFont, color: verdictColor }} data-testid="text-valuation-label">
                                 {v?.label === 'MURAH' ? '🟢 MURAH' : v?.label === 'MAHAL' ? '🟡 MAHAL' : v?.label === 'TIDAK_ADA_DATA' ? '⚪ N/A' : '⚪ WAJAR'}
                               </p>
-                              <p className="text-xs leading-relaxed" style={{ fontFamily: monoFont, color: '#94a3b8' }} data-testid="text-valuation-interpretation">
+                              <p className="text-xs leading-relaxed" style={{ fontFamily: monoFont, color: 'var(--text-4)' }} data-testid="text-valuation-interpretation">
                                 {v?.interpretation ?? ''}
                               </p>
                             </div>
 
                             {v?.relativePE !== null && v?.relativePE !== undefined && (
-                              <div className="rounded-md p-4" style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.03)' }} data-testid="valuation-relative-pe">
-                                <p className="text-[9px] tracking-widest uppercase mb-3" style={{ fontFamily: monoFont, color: '#6b7280' }}>P/E RELATIF VS SEKTOR</p>
+                              <div className="rounded-md p-4" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)' }} data-testid="valuation-relative-pe">
+                                <p className="text-[12px] tracking-widest uppercase mb-3" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>P/E RELATIF VS SEKTOR</p>
                                 <div className="flex items-center gap-3 mb-2">
-                                  <span className="text-3xl font-bold" style={{ fontFamily: monoFont, color: v.relativePE < 0.85 ? '#34d399' : v.relativePE > 1.15 ? '#fbbf24' : '#ffffff' }} data-testid="text-relative-pe">
+                                  <span className="text-3xl font-bold" style={{ fontFamily: monoFont, color: v.relativePE < 0.85 ? 'var(--positive)' : v.relativePE > 1.15 ? 'var(--warning)' : 'var(--text-1)' }} data-testid="text-relative-pe">
                                     {v.relativePE.toFixed(2)}x
                                   </span>
-                                  <span className="text-xs" style={{ fontFamily: monoFont, color: '#6b7280' }}>
+                                  <span className="text-xs" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>
                                     {v.relativePE < 1 ? `${Math.round((1 - v.relativePE) * 100)}% di bawah rata-rata` : v.relativePE > 1 ? `${Math.round((v.relativePE - 1) * 100)}% di atas rata-rata` : 'Sama dengan rata-rata'}
                                   </span>
                                 </div>
-                                <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: '#1e1e1e' }}>
-                                  <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, v.relativePE * 50)}%`, background: v.relativePE < 0.85 ? '#34d399' : v.relativePE > 1.15 ? '#fbbf24' : '#64748b' }} />
+                                <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-4)' }}>
+                                  <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, v.relativePE * 50)}%`, background: v.relativePE < 0.85 ? 'var(--positive)' : v.relativePE > 1.15 ? 'var(--warning)' : 'var(--text-4)' }} />
                                 </div>
                                 <div className="flex justify-between mt-1">
-                                  <span className="text-[9px]" style={{ fontFamily: monoFont, color: '#4a5568' }}>0x</span>
-                                  <span className="text-[9px]" style={{ fontFamily: monoFont, color: '#4a5568' }}>1x (avg)</span>
-                                  <span className="text-[9px]" style={{ fontFamily: monoFont, color: '#4a5568' }}>2x</span>
+                                  <span className="text-[12px]" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>0x</span>
+                                  <span className="text-[12px]" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>1x (avg)</span>
+                                  <span className="text-[12px]" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>2x</span>
                                 </div>
                               </div>
                             )}
@@ -2033,33 +2437,33 @@ export default function StockDashboard() {
                                   label: "P/E RATIO", sub: "Price to Earnings",
                                   value: isNaN(pe) || pe === 0 ? null : pe.toFixed(2),
                                   bench: bench?.avgPE?.toFixed(1),
-                                  color: isNaN(pe) || pe === 0 ? '#ffffff20' : pe > (bench?.avgPE ?? 15) * 1.3 ? '#fbbf24' : pe < (bench?.avgPE ?? 15) * 0.7 ? '#34d399' : '#ffffff',
+                                  color: isNaN(pe) || pe === 0 ? 'var(--text-4)' : pe > (bench?.avgPE ?? 15) * 1.3 ? 'var(--warning)' : pe < (bench?.avgPE ?? 15) * 0.7 ? 'var(--positive)' : 'var(--text-1)',
                                 },
                                 {
                                   label: "DIVIDEND YIELD", sub: "Imbal Dividen",
                                   value: isNaN(dy) || dy === 0 ? null : dy.toFixed(2) + '%',
                                   bench: (bench?.avgDivYield?.toFixed(1) ?? '') + '%',
-                                  color: isNaN(dy) || dy === 0 ? '#ffffff20' : dy > (bench?.avgDivYield ?? 2.5) ? '#34d399' : '#ffffff',
+                                  color: isNaN(dy) || dy === 0 ? 'var(--text-4)' : dy > (bench?.avgDivYield ?? 2.5) ? 'var(--positive)' : 'var(--text-1)',
                                 },
                                 {
                                   label: "ROE", sub: "Return on Equity",
                                   value: isNaN(roeVal) || roeVal === 0 ? null : roeVal.toFixed(2) + '%',
                                   bench: (bench?.avgROE?.toFixed(1) ?? '') + '%',
-                                  color: isNaN(roeVal) || roeVal === 0 ? '#ffffff20' : roeVal > (bench?.avgROE ?? 12) ? '#34d399' : roeVal < (bench?.avgROE ?? 12) * 0.5 ? '#f87171' : '#ffffff',
+                                  color: isNaN(roeVal) || roeVal === 0 ? 'var(--text-4)' : roeVal > (bench?.avgROE ?? 12) ? 'var(--positive)' : roeVal < (bench?.avgROE ?? 12) * 0.5 ? 'var(--danger)' : 'var(--text-1)',
                                 },
                                 {
                                   label: "NET MARGIN", sub: "Margin Laba Bersih",
                                   value: isNaN(nm) || nm === 0 ? null : nm.toFixed(2) + '%',
                                   bench: (bench?.avgNetMargin?.toFixed(1) ?? '') + '%',
-                                  color: isNaN(nm) || nm === 0 ? '#ffffff20' : nm > (bench?.avgNetMargin ?? 10) ? '#34d399' : '#ffffff',
+                                  color: isNaN(nm) || nm === 0 ? 'var(--text-4)' : nm > (bench?.avgNetMargin ?? 10) ? 'var(--positive)' : 'var(--text-1)',
                                 },
                               ].map(m => (
-                                <div key={m.label} className="rounded-md p-4" style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.03)' }} data-testid={`valuation-${m.label.toLowerCase().replace(/[\s/]+/g, '-')}`}>
-                                  <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: monoFont, color: '#6b7280' }}>{m.label}</p>
+                                <div key={m.label} className="rounded-md p-4" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)' }} data-testid={`valuation-${m.label.toLowerCase().replace(/[\s/]+/g, '-')}`}>
+                                  <p className="text-[12px] tracking-widest uppercase mb-2" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>{m.label}</p>
                                   <p className="text-2xl font-bold" style={{ fontFamily: monoFont, color: m.color }}>{m.value ?? '—'}</p>
                                   <div className="flex items-center justify-between mt-1">
-                                    <p className="text-[10px]" style={{ fontFamily: monoFont, color: '#6b7280' }}>{m.sub}</p>
-                                    {m.bench && <p className="text-[9px]" style={{ fontFamily: monoFont, color: '#4a5568' }}>avg: {m.bench}</p>}
+                                    <p className="text-[12px]" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>{m.sub}</p>
+                                    {m.bench && <p className="text-[12px]" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>avg: {m.bench}</p>}
                                   </div>
                                 </div>
                               ))}
@@ -2067,19 +2471,19 @@ export default function StockDashboard() {
 
                             <div className="rounded-lg p-4" style={{ background: qualityBg, border: `1px solid ${qualityColor}30` }} data-testid="valuation-quality">
                               <div className="flex items-center justify-between mb-2">
-                                <p className="text-[9px] tracking-widest uppercase" style={{ fontFamily: monoFont, color: '#6b7280' }}>KUALITAS FUNDAMENTAL</p>
+                                <p className="text-[12px] tracking-widest uppercase" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>KUALITAS FUNDAMENTAL</p>
                                 <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ fontFamily: monoFont, background: `${qualityColor}20`, color: qualityColor }} data-testid="text-quality-label">
                                   {q?.label ?? 'N/A'}
                                 </span>
                               </div>
-                              <p className="text-xs leading-relaxed" style={{ fontFamily: monoFont, color: '#94a3b8' }} data-testid="text-quality-interpretation">
+                              <p className="text-xs leading-relaxed" style={{ fontFamily: monoFont, color: 'var(--text-4)' }} data-testid="text-quality-interpretation">
                                 {q?.interpretation ?? ''}
                               </p>
                             </div>
 
-                            <div className="rounded-md p-4" style={{ background: '#161616', border: '1px solid rgba(255,255,255,0.03)' }} data-testid="valuation-analyst-note">
-                              <p className="text-[9px] tracking-widest uppercase mb-2" style={{ fontFamily: monoFont, color: '#6b7280' }}>CATATAN ANALIS</p>
-                              <p className="text-xs leading-relaxed" style={{ fontFamily: monoFont, color: '#6b7280' }}>
+                            <div className="rounded-md p-4" style={{ background: 'var(--surface-3)', border: '1px solid var(--border-1)' }} data-testid="valuation-analyst-note">
+                              <p className="text-[12px] tracking-widest uppercase mb-2" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>CATATAN ANALIS</p>
+                              <p className="text-xs leading-relaxed" style={{ fontFamily: monoFont, color: 'var(--text-3)' }}>
                                 Data valuasi berdasarkan laporan keuangan terakhir. Benchmark sektor ({bench?.displayName ?? 'Umum'}) digunakan sebagai pembanding relatif.
                               </p>
                             </div>
@@ -2087,9 +2491,9 @@ export default function StockDashboard() {
                         );
                       })() : (
                         <div className="space-y-3">
-                          <div className="h-24 rounded-lg animate-pulse" style={{ background: '#161616' }} />
+                          <div className="h-24 rounded-lg animate-pulse" style={{ background: 'var(--surface-3)' }} />
                           <div className="grid grid-cols-2 gap-3">
-                            {[1,2,3,4].map(i => <div key={i} className="h-24 rounded-md animate-pulse" style={{ background: '#161616' }} />)}
+                            {[1,2,3,4].map(i => <div key={i} className="h-24 rounded-md animate-pulse" style={{ background: 'var(--surface-3)' }} />)}
                           </div>
                         </div>
                       )}
@@ -2107,15 +2511,15 @@ export default function StockDashboard() {
         style={{
           position: "fixed", bottom: 20, right: 20, zIndex: 40,
           display: "flex", alignItems: "center", gap: 6,
-          background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.06)",
+          background: "var(--surface-1)", border: "1px solid var(--border-2)",
           borderRadius: 8, padding: "6px 10px", cursor: "pointer",
           opacity: showShortcuts ? 0 : 1, transition: "opacity 0.2s",
         }}
         onClick={() => setShowShortcuts(true)}
         title="Keyboard shortcuts (?)"
       >
-        <span style={{ fontFamily: mono, fontSize: 10, color: "#3F3F46", letterSpacing: "0.06em" }}>?</span>
-        <span style={{ fontFamily: mono, fontSize: 8, color: "#3F3F46", letterSpacing: "0.08em" }}>SHORTCUTS</span>
+        <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)", letterSpacing: "0.06em" }}>?</span>
+        <span style={{ fontFamily: mono, fontSize: 13, color: "var(--text-4)", letterSpacing: "0.08em" }}>SHORTCUTS</span>
       </div>
 
       {/* Keyboard shortcuts overlay */}
@@ -2130,19 +2534,19 @@ export default function StockDashboard() {
         >
           <div
             style={{
-              background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.08)",
+              background: "var(--surface-1)", border: "1px solid var(--border-2)",
               borderRadius: 12, padding: "28px 32px", minWidth: 320,
               boxShadow: "0 25px 50px rgba(0,0,0,0.6)",
             }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-              <p style={{ fontFamily: mono, fontSize: 9, letterSpacing: "0.2em", color: "#3F3F46", textTransform: "uppercase" }}>
+              <p style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.2em", color: "var(--text-4)", textTransform: "uppercase" }}>
                 KEYBOARD SHORTCUTS
               </p>
               <button
                 onClick={() => setShowShortcuts(false)}
-                style={{ fontFamily: mono, fontSize: 10, color: "#3F3F46", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
               >
                 ESC
               </button>
@@ -2158,13 +2562,13 @@ export default function StockDashboard() {
             ].map(({ key, label }) => (
               <div key={key} style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 10 }}>
                 <span style={{
-                  fontFamily: mono, fontSize: 10, fontWeight: 700, color: "#F4F4F5",
-                  background: "#141414", border: "1px solid rgba(255,255,255,0.1)",
+                  fontFamily: mono, fontSize: 12, fontWeight: 700, color: "var(--text-1)",
+                  background: "var(--surface-3)", border: "1px solid var(--border-2)",
                   borderRadius: 4, padding: "3px 8px", minWidth: 24, textAlign: "center",
                 }}>
                   {key}
                 </span>
-                <span style={{ fontFamily: inter, fontSize: 12, color: "#71717A" }}>{label}</span>
+                <span style={{ fontFamily: inter, fontSize: 12, color: "var(--text-3)" }}>{label}</span>
               </div>
             ))}
           </div>

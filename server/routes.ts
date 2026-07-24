@@ -3,6 +3,7 @@ import type { Server } from "http";
 import { storage } from "./storage";
 import { testBandarmologyRouter } from "./routes/testBandarmology";
 import { registerAdminRoutes } from "./routes/admin";
+import { registerAuthRoutes } from "./routes/auth";
 import { registerScraperRoutes } from "./routes/scraper";
 import { registerBacktestRoutes } from "./routes/backtest";
 import { registerDistributionRoutes } from "./routes/distribution";
@@ -18,6 +19,9 @@ import { registerSimulationRoutes } from "./routes/simulation";
 import { registerPipelineRoutes } from "./routes/pipeline";
 import { registerStocksRoutes } from "./routes/stocks";
 import { registerAiRoutes } from "./routes/ai";
+import { registerChatRoutes } from "./routes/chat";
+import { registerIdxDataRoutes } from "./routes/idxData";
+import { registerThematicRoutes } from "./routes/thematic";
 
 // ========================================
 // UNIFIED BRAIN ENGINE
@@ -32,6 +36,8 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   app.use("/api", testBandarmologyRouter);
+
+  registerAuthRoutes(app);
 
   // Seed data check (simple check on startup)
   try {
@@ -631,6 +637,9 @@ export async function registerRoutes(
 
   // ── AI routes ─────────────────────────────────────────────────────────────────
   registerAiRoutes(app);
+
+  // ── Chat with BART routes ─────────────────────────────────────────────────────
+  registerChatRoutes(app);
   // ── Simulation routes ────────────────────────────────────────────────────────
   registerSimulationRoutes(app);
 
@@ -665,6 +674,12 @@ export async function registerRoutes(
   // ── Insider + Management routes ──────────────────────────────────────────────
   registerInsiderRoutes(app);
   registerManagementRoutes(app);
+
+  // ── IDX official market-data routes ──────────────────────────────────────────
+  registerIdxDataRoutes(app);
+
+  // ── Thematic scanner routes (Layer 8 — overlay only) ─────────────────────────
+  registerThematicRoutes(app);
 
   // ── Admin routes ─────────────────────────────────────────────────────────────
   registerAdminRoutes(app);

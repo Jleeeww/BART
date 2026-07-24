@@ -7,7 +7,7 @@ interface DecisionBadgeProps {
 const CONFIG: Record<string, { label: string; icon: string; bg: string; text: string; border: string }> = {
   WATCHLIST_PRIORITAS: {
     label: "Watchlist Prioritas", icon: "★",
-    bg: "rgba(245,158,11,0.10)", text: "#F59E0B", border: "rgba(245,158,11,0.30)",
+    bg: "rgba(245,158,11,0.10)", text: "var(--warning)", border: "rgba(245,158,11,0.30)",
   },
   SIAP_DIPANTAU: {
     label: "Siap Entry", icon: "✓",
@@ -15,17 +15,17 @@ const CONFIG: Record<string, { label: string; icon: string; bg: string; text: st
   },
   HINDARI_DULU: {
     label: "Hindari Dulu", icon: "✕",
-    bg: "rgba(239,68,68,0.10)", text: "#EF4444", border: "rgba(239,68,68,0.30)",
+    bg: "rgba(239,68,68,0.10)", text: "var(--danger)", border: "rgba(239,68,68,0.30)",
   },
   NETRAL: {
     label: "Netral", icon: "○",
-    bg: "rgba(113,113,122,0.10)", text: "#71717A", border: "rgba(113,113,122,0.30)",
+    bg: "rgba(113,113,122,0.10)", text: "var(--text-3)", border: "rgba(113,113,122,0.30)",
   },
 };
 
 const SIZES = {
-  sm: { fontSize: 9,  px: 8,  py: 3, gap: 4 },
-  md: { fontSize: 11, px: 10, py: 5, gap: 5 },
+  sm: { fontSize: 12,  px: 8,  py: 3, gap: 4 },
+  md: { fontSize: 13, px: 10, py: 5, gap: 5 },
   lg: { fontSize: 13, px: 14, py: 7, gap: 7 },
 };
 

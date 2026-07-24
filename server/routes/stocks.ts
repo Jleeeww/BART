@@ -7,6 +7,7 @@ import { UNIVERSE_STOCK_NAMES, UNIVERSE_STOCK_SECTORS } from "../config/constant
 import { db } from "../db";
 import { stocks as stocksTable } from "@shared/schema";
 import { inArray, isNull, and as andOp, eq } from "drizzle-orm";
+import { fetchOHLCV, type OHLCVBar } from "../engine/ohlcvFetcher";
 
 export function registerStocksRoutes(app: Express): void {
   app.get(api.stocks.getBySymbol.path, async (req, res) => {
@@ -49,6 +50,34 @@ export function registerStocksRoutes(app: Express): void {
       console.error(`[SECTOR BACKFILL] Failed:`, err);
     }
   })();
+
+  // ── OHLCV bars for charting (live: IDX official first, Yahoo fallback) ────────
+  // GET /api/stocks/:symbol/ohlcv?range=400  → daily candles for PriceChart.tsx
+  const ohlcvCache = new Map<string, { at: number; bars: OHLCVBar[]; source: string }>();
+  const OHLCV_TTL_MS = 5 * 60 * 1000; // 5 min — intraday freshness without hammering the source
+
+  app.get("/api/stocks/:symbol/ohlcv", async (req, res) => {
+    try {
+      const symbol = req.params.symbol.toUpperCase();
+      const rangeDays = Math.min(Math.max(Number(req.query.range) || 400, 5), 3650);
+      const cacheKey = `${symbol}:${rangeDays}`;
+
+      const hit = ohlcvCache.get(cacheKey);
+      if (hit && Date.now() - hit.at < OHLCV_TTL_MS) {
+        return res.json({ symbol, bars: hit.bars, source: hit.source, cached: true });
+      }
+
+      const { bars, source } = await fetchOHLCV(symbol, rangeDays);
+      if (bars.length === 0) {
+        return res.status(502).json({ message: `No OHLCV data for ${symbol}` });
+      }
+      ohlcvCache.set(cacheKey, { at: Date.now(), bars, source });
+      res.json({ symbol, bars, source, cached: false });
+    } catch (error) {
+      console.error("Error fetching OHLCV:", error);
+      res.status(500).json({ message: "Failed to fetch OHLCV" });
+    }
+  });
 
   app.get("/api/stocks", async (_req, res) => {
     try {
@@ -203,6 +232,7 @@ export function registerStocksRoutes(app: Express): void {
             riskOverride:    readiness.gorenganResult.riskOverride,
             hardOverride:    readiness.hardOverride,
             macroHardCap:    readiness.macroHardCap,
+            macroRegime:     readiness.macroRegime ?? null,
             activeWeightSum: readiness.activeWeightSum,
             compositeV3Layers: readiness.layers,
             scrapeSource:    (stock as any).scrapeSource ?? null,

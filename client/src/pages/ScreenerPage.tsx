@@ -44,28 +44,28 @@ interface Preset {
 
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 const inter = "'Inter', system-ui, sans-serif";
-const S0 = "#000000";
-const S1 = "#0a0a0a";
-const S2 = "#0f0f0f";
-const S3 = "#141414";
-const S4 = "#1a1a1a";
-const B1 = "rgba(255,255,255,0.06)";
+const S0 = "var(--surface-0)";
+const S1 = "var(--surface-1)";
+const S2 = "var(--surface-2)";
+const S3 = "var(--surface-3)";
+const S4 = "var(--surface-4)";
+const B1 = "var(--border-2)";
 const B2 = "rgba(255,255,255,0.10)";
-const T1 = "#F4F4F5";
-const T2 = "#A1A1AA";
-const T3 = "#71717A";
-const T4 = "#3F3F46";
-const SIGNAL = "#4FC3F7";
-const POSITIVE = "#4ADE80";
-const WARNING = "#FBBF24";
-const DANGER = "#F87171";
+const T1 = "var(--text-1)";
+const T2 = "var(--text-2)";
+const T3 = "var(--text-3)";
+const T4 = "var(--text-4)";
+const SIGNAL = "var(--signal)";
+const POSITIVE = "var(--positive)";
+const WARNING = "var(--warning)";
+const DANGER = "var(--danger)";
 
 function scoreColor(s: number) {
-  return s >= 60 ? "#4ADE80" : s >= 45 ? "#4FC3F7" : s >= 30 ? "#FBBF24" : "#F87171";
+  return s >= 60 ? "var(--positive)" : s >= 45 ? "var(--signal)" : s >= 30 ? "var(--warning)" : "var(--danger)";
 }
 
 function bucketAccent(b: string) {
-  return b === "siap_dipantau" ? "#4ADE80" : b === "watchlist_prioritas" ? "#FBBF24" : "#F87171";
+  return b === "siap_dipantau" ? "var(--positive)" : b === "watchlist_prioritas" ? "var(--warning)" : "var(--danger)";
 }
 
 // ─── Presets ──────────────────────────────────────────────────────────────────
@@ -156,7 +156,7 @@ function MiniScoreRing({ score, size = 44 }: { score: number; size?: number }) {
         cy={size / 2}
         r={r}
         fill="none"
-        stroke="rgba(255,255,255,0.06)"
+        stroke="var(--border-2)"
         strokeWidth={3}
       />
       <circle
@@ -177,16 +177,16 @@ function MiniScoreRing({ score, size = 44 }: { score: number; size?: number }) {
 
 function DecisionChip({ bucket }: { bucket: string }) {
   const map: Record<string, { label: string; color: string }> = {
-    siap_dipantau: { label: "SIAP PANTAU", color: "#4ADE80" },
-    watchlist_prioritas: { label: "WATCHLIST", color: "#FBBF24" },
-    hindari_dulu: { label: "HINDARI", color: "#F87171" },
+    siap_dipantau: { label: "SIAP PANTAU", color: "var(--positive)" },
+    watchlist_prioritas: { label: "WATCHLIST", color: "var(--warning)" },
+    hindari_dulu: { label: "HINDARI", color: "var(--danger)" },
   };
-  const { label, color } = map[bucket] ?? { label: bucket, color: "#71717A" };
+  const { label, color } = map[bucket] ?? { label: bucket, color: "var(--text-3)" };
   return (
     <span
       style={{
         fontFamily: mono,
-        fontSize: 7,
+        fontSize: 12,
         letterSpacing: "0.1em",
         color,
         fontWeight: 700,
@@ -216,7 +216,7 @@ function FilterGroup({
       <span
         style={{
           fontFamily: mono,
-          fontSize: 8,
+          fontSize: 13,
           color: T4,
           letterSpacing: "0.1em",
           textTransform: "uppercase",
@@ -234,7 +234,7 @@ function FilterGroup({
             onClick={() => onSelect(item)}
             style={{
               fontFamily: mono,
-              fontSize: 9,
+              fontSize: 12,
               padding: "4px 9px",
               borderRadius: 4,
               cursor: "pointer",
@@ -268,7 +268,7 @@ function StockCard({
 
   return (
     <div
-      onClick={() => (window.location.href = `/stock/${stock.symbol}`)}
+      onClick={() => (window.location.href = `/dashboard/stock/${stock.symbol}`)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -309,7 +309,7 @@ function StockCard({
           <p
             style={{
               fontFamily: inter,
-              fontSize: 11,
+              fontSize: 13,
               color: T3,
               maxWidth: 160,
               overflow: "hidden",
@@ -335,7 +335,7 @@ function StockCard({
             background: inWatchlist ? "rgba(251,191,36,0.12)" : "transparent",
             border: inWatchlist ? "1px solid rgba(251,191,36,0.3)" : `1px solid ${B1}`,
             color: inWatchlist ? WARNING : T4,
-            fontSize: 11,
+            fontSize: 13,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -372,7 +372,7 @@ function StockCard({
       <div
         style={{
           height: 2,
-          background: "rgba(255,255,255,0.06)",
+          background: "var(--border-2)",
           borderRadius: 9999,
           marginBottom: 10,
         }}
@@ -390,13 +390,13 @@ function StockCard({
 
       {/* Sector + price row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontFamily: mono, fontSize: 9, color: T4, letterSpacing: "0.06em" }}>
+        <span style={{ fontFamily: mono, fontSize: 12, color: T4, letterSpacing: "0.06em" }}>
           {stock.sector ?? "—"}
         </span>
         <span
           style={{
             fontFamily: mono,
-            fontSize: 10,
+            fontSize: 12,
             color:
               parseFloat(stock.changePercent) > 0
                 ? POSITIVE
@@ -422,14 +422,14 @@ function StockCard({
             left: 0,
             right: 0,
             zIndex: 20,
-            background: "#1a1a1a",
+            background: "var(--surface-4)",
             border: `1px solid ${B2}`,
             borderRadius: 8,
             padding: "10px 14px",
             boxShadow: "0 8px 24px rgba(0,0,0,0.6)",
           }}
         >
-          <p style={{ fontFamily: inter, fontSize: 11, color: T2, lineHeight: 1.55, margin: 0 }}>
+          <p style={{ fontFamily: inter, fontSize: 13, color: T2, lineHeight: 1.55, margin: 0 }}>
             {stock.aiSentence}
           </p>
         </div>
@@ -620,7 +620,7 @@ export default function ScreenerPage() {
             <p
               style={{
                 fontFamily: mono,
-                fontSize: 9,
+                fontSize: 12,
                 letterSpacing: "0.2em",
                 color: T4,
                 textTransform: "uppercase",
@@ -662,7 +662,7 @@ export default function ScreenerPage() {
           <p
             style={{
               fontFamily: mono,
-              fontSize: 8,
+              fontSize: 13,
               letterSpacing: "0.14em",
               color: T4,
               textTransform: "uppercase",
@@ -679,7 +679,7 @@ export default function ScreenerPage() {
                 onClick={() => applyPreset(preset)}
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
+                  fontSize: 12,
                   letterSpacing: "0.06em",
                   padding: "6px 14px",
                   borderRadius: 6,
@@ -702,7 +702,7 @@ export default function ScreenerPage() {
               onClick={clearAllFilters}
               style={{
                 fontFamily: mono,
-                fontSize: 9,
+                fontSize: 12,
                 padding: "6px 14px",
                 borderRadius: 6,
                 cursor: "pointer",
@@ -734,7 +734,7 @@ export default function ScreenerPage() {
           data-testid="screener-filter-panel"
         >
           {activeChips.length === 0 && (
-            <span style={{ fontFamily: mono, fontSize: 10, color: T4 }}>
+            <span style={{ fontFamily: mono, fontSize: 12, color: T4 }}>
               Semua saham · pilih kueri atau tambah filter di bawah
             </span>
           )}
@@ -746,7 +746,7 @@ export default function ScreenerPage() {
                 alignItems: "center",
                 gap: 6,
                 fontFamily: mono,
-                fontSize: 10,
+                fontSize: 12,
                 letterSpacing: "0.04em",
                 padding: "4px 10px",
                 borderRadius: 4,
@@ -765,7 +765,7 @@ export default function ScreenerPage() {
                   cursor: "pointer",
                   padding: 0,
                   lineHeight: 1,
-                  fontSize: 11,
+                  fontSize: 13,
                 }}
               >
                 ×
@@ -831,7 +831,7 @@ export default function ScreenerPage() {
             <span
               style={{
                 fontFamily: mono,
-                fontSize: 9,
+                fontSize: 12,
                 color: T4,
                 letterSpacing: "0.1em",
               }}
@@ -844,7 +844,7 @@ export default function ScreenerPage() {
                 onClick={() => setSortKey(sk)}
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
+                  fontSize: 12,
                   padding: "5px 10px",
                   borderRadius: 4,
                   cursor: "pointer",
@@ -898,7 +898,7 @@ export default function ScreenerPage() {
             <p
               style={{
                 fontFamily: mono,
-                fontSize: 10,
+                fontSize: 12,
                 color: T4,
                 letterSpacing: "0.15em",
                 marginBottom: 8,

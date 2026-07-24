@@ -12,6 +12,46 @@ const vector1536 = customType<{ data: number[]; driverData: string }>({
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ─── Auth: users + sessions ─────────────────────────────────────
+// Registration flow: user registers (status=PENDING) → can log in immediately
+// but all features are locked → admin approves (status=APPROVED) → unlocked.
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(), // format: s2:<salthex>:<scrypt64hex>
+  role: text("role").notNull().default("user"), // 'user' | 'admin'
+  status: text("status").notNull().default("PENDING"), // PENDING | APPROVED | REJECTED
+  createdAt: timestamp("created_at").defaultNow(),
+  approvedAt: timestamp("approved_at"),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  approvedAt: true,
+});
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+// Bookkeeping table for server/scripts/seed.ts — created there via raw SQL
+// (CREATE TABLE IF NOT EXISTS) so the seed runner has zero schema dependencies.
+// Declared here only so drizzle-kit push doesn't see it as drift and drop it.
+export const seedHistory = pgTable("_seed_history", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const authSessions = pgTable("auth_sessions", {
+  token: text("token").primaryKey(),
+  userId: integer("user_id").notNull(), // plain link (no FK, per codebase convention)
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+export type AuthSession = typeof authSessions.$inferSelect;
+
 export const stocks = pgTable("stocks", {
   id: serial("id").primaryKey(),
   symbol: text("symbol").notNull().unique(),
@@ -337,6 +377,7 @@ export const macroFlowHistory = pgTable('macro_flow_history', {
   ihsgForeign: numeric('ihsg_foreign'),
   indogbUst:   numeric('indogb_ust'),
   indoCds:     numeric('indo_cds'),
+  indoCdsSource: text('indo_cds_source'),   // PROXY | SCRAPE | null — provenance of indo_cds
   eidoVolume:  numeric('eido_volume'),
   eidoChange:  numeric('eido_change'),
   dataQuality: text('data_quality'),
@@ -369,3 +410,90 @@ export const scrapeLog = pgTable('scrape_log', {
 });
 
 export type ScrapeLog = typeof scrapeLog.$inferSelect;
+
+// ─── Runtime admin config (key-value) ───────────────────────────
+// Generic KV so new runtime toggles need no migration. Canonical keys:
+//   crisis_mode           { mode: 'AUTO' | 'FORCE_CRISIS' | 'FORCE_NORMAL' }
+//   suppression_override  { multiplier: number | null }
+//   scanner_enabled       { enabled: boolean }
+//   cost_caps             { news?: number, thematic?: number, global?: number }
+export const systemConfig = pgTable('system_config', {
+  key:       text('key').primaryKey(),
+  value:     jsonb('value').notNull(),
+  updatedBy: text('updated_by'),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+export type SystemConfig = typeof systemConfig.$inferSelect;
+
+// ─── Thematic Event Scanner (Layer 8) — pure labeled overlay ─────
+// NEVER touches the deterministic score. Written only by the scanner.
+export const thematicScan = pgTable('thematic_scan', {
+  id:          serial('id').primaryKey(),
+  scanAt:      timestamp('scan_at').defaultNow(),
+  slot:        text('slot'),                       // AM | MIDDAY | MANUAL
+  status:      text('status').notNull(),           // OK | NO_CATALYST | SKIPPED_COST | ERROR
+  themes:      jsonb('themes'),
+  narrative:   text('narrative'),                  // Bahasa ID "Interpretasi AI" summary
+  eventCount:  integer('event_count'),
+  costUsd:     numeric('cost_usd'),
+  webSearches: integer('web_searches'),
+  model:       text('model'),
+}, (table) => ({
+  scanAtIdx: index('thematic_scan_scan_at_idx').on(table.scanAt),
+}));
+
+export const insertThematicScanSchema = createInsertSchema(thematicScan).omit({ id: true, scanAt: true });
+export type InsertThematicScan = z.infer<typeof insertThematicScanSchema>;
+export type ThematicScan = typeof thematicScan.$inferSelect;
+
+export const thematicStockFlags = pgTable('thematic_stock_flags', {
+  id:         serial('id').primaryKey(),
+  scanId:     integer('scan_id').notNull(),        // plain link (no FK, per codebase convention)
+  symbol:     text('symbol').notNull(),
+  theme:      text('theme'),
+  direction:  text('direction'),                   // POSITIF | NEGATIF | NETRAL
+  sector:     text('sector'),
+  rationale:  text('rationale'),                   // Bahasa ID
+  confidence: text('confidence').notNull().default('LOW'),  // TINGGI | SEDANG | RENDAH | LOW
+  sourceUrls: jsonb('source_urls'),
+  createdAt:  timestamp('created_at').defaultNow(),
+}, (table) => ({
+  scanSymbolIdx: index('thematic_stock_flags_scan_symbol_idx').on(table.scanId, table.symbol),
+  symbolIdx:     index('thematic_stock_flags_symbol_idx').on(table.symbol),
+}));
+
+export const insertThematicStockFlagSchema = createInsertSchema(thematicStockFlags).omit({ id: true, createdAt: true });
+export type InsertThematicStockFlag = z.infer<typeof insertThematicStockFlagSchema>;
+export type ThematicStockFlag = typeof thematicStockFlags.$inferSelect;
+
+// ─── Chat with BART — per-user Q&A conversations ─────────────────
+export const conversations = pgTable('conversations', {
+  id:        serial('id').primaryKey(),
+  userId:    integer('user_id').notNull(),        // plain link (no FK, per codebase convention)
+  title:     text('title').notNull().default('Percakapan baru'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  userIdx: index('conversations_user_idx').on(table.userId),
+}));
+
+export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+export const chatMessages = pgTable('chat_messages', {
+  id:             serial('id').primaryKey(),
+  conversationId: integer('conversation_id').notNull(),  // plain link (no FK, per codebase convention)
+  role:           text('role').notNull(),                // 'user' | 'assistant'
+  content:        text('content').notNull(),
+  toolsUsed:      jsonb('tools_used'),                   // [{ name, label }] | null
+  widgets:        jsonb('widgets'),                      // [{ id, type, title, data }] | null — rendered charts/widgets
+  createdAt:      timestamp('created_at').defaultNow(),
+}, (table) => ({
+  convIdx: index('chat_messages_conversation_idx').on(table.conversationId),
+}));
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;

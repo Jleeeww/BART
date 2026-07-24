@@ -10,12 +10,7 @@
  *   - All verbose text fields generated from compact per-stock data
  */
 
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import ws from 'ws';
-
-neonConfig.webSocketConstructor = ws;
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+import { pool } from '../db';
 
 // ── Per-stock compact data ────────────────────────────────────
 
@@ -850,7 +845,7 @@ function buildParams(s: StockSeed): any[] {
 
 // ── Main ──────────────────────────────────────────────────
 
-async function seedLQ45Stocks() {
+export async function seedLQ45Stocks() {
   console.log(`[seedLQ45] Starting seed — ${NEW_STOCKS.length} stocks to process`);
 
   let inserted = 0;
@@ -906,11 +901,15 @@ async function seedLQ45Stocks() {
   const total = await pool.query('SELECT COUNT(*) FROM stocks');
   console.log(`\n[seedLQ45] Done. Inserted: ${inserted}, Skipped: ${skipped}`);
   console.log(`[seedLQ45] Total stocks in DB: ${total.rows[0].count}`);
-
-  await pool.end();
 }
 
-seedLQ45Stocks().catch(err => {
-  console.error('[seedLQ45] Fatal error:', err);
-  process.exit(1);
-});
+// Standalone run: `pnpm run seed:lq45`. When imported by the seed runner
+// (server/scripts/seed.ts) this block is skipped so the shared pool stays open.
+if (process.argv[1]?.endsWith('seedLQ45.ts')) {
+  seedLQ45Stocks()
+    .then(() => pool.end())
+    .catch(err => {
+      console.error('[seedLQ45] Fatal error:', err);
+      process.exit(1);
+    });
+}

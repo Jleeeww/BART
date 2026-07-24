@@ -46,28 +46,28 @@ interface WatchlistItem {
 // --- Design tokens ---
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 const inter = "'Inter', system-ui, sans-serif";
-const S0 = "#000000";
-const S1 = "#0a0a0a";
-const S2 = "#0f0f0f";
-const S3 = "#141414";
-const S4 = "#1a1a1a";
-const B1 = "rgba(255,255,255,0.06)";
+const S0 = "var(--surface-0)";
+const S1 = "var(--surface-1)";
+const S2 = "var(--surface-2)";
+const S3 = "var(--surface-3)";
+const S4 = "var(--surface-4)";
+const B1 = "var(--border-2)";
 const B2 = "rgba(255,255,255,0.10)";
-const T1 = "#F4F4F5";
-const T2 = "#A1A1AA";
-const T3 = "#71717A";
-const T4 = "#3F3F46";
-const SIGNAL = "#4FC3F7";
-const POSITIVE = "#4ADE80";
-const WARNING = "#FBBF24";
-const DANGER = "#F87171";
+const T1 = "var(--text-1)";
+const T2 = "var(--text-2)";
+const T3 = "var(--text-3)";
+const T4 = "var(--text-4)";
+const SIGNAL = "var(--signal)";
+const POSITIVE = "var(--positive)";
+const WARNING = "var(--warning)";
+const DANGER = "var(--danger)";
 
 function scoreColor(s: number) {
-  return s >= 60 ? "#4ADE80" : s >= 45 ? "#4FC3F7" : s >= 30 ? "#FBBF24" : "#F87171";
+  return s >= 60 ? "var(--positive)" : s >= 45 ? "var(--signal)" : s >= 30 ? "var(--warning)" : "var(--danger)";
 }
 
 function bucketAccent(b: string) {
-  return b === "siap_dipantau" ? "#4ADE80" : b === "watchlist_prioritas" ? "#FBBF24" : "#F87171";
+  return b === "siap_dipantau" ? "var(--positive)" : b === "watchlist_prioritas" ? "var(--warning)" : "var(--danger)";
 }
 
 // --- Sub-components ---
@@ -91,7 +91,7 @@ function StockLogo({ symbol }: { symbol: string }) {
       }}
     >
       {failed ? (
-        <span style={{ fontFamily: mono, fontSize: 10, fontWeight: 700, color: SIGNAL }}>
+        <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, color: SIGNAL }}>
           {symbol.slice(0, 2)}
         </span>
       ) : (
@@ -177,7 +177,7 @@ function WatchlistCard({
           background: "transparent",
           border: `1px solid ${B1}`,
           color: T4,
-          fontSize: 10,
+          fontSize: 12,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -213,7 +213,7 @@ function WatchlistCard({
           <p
             style={{
               fontFamily: inter,
-              fontSize: 10,
+              fontSize: 12,
               color: T3,
               maxWidth: 140,
               overflow: "hidden",
@@ -245,7 +245,7 @@ function WatchlistCard({
               <div
                 style={{
                   height: 2,
-                  background: "rgba(255,255,255,0.06)",
+                  background: "var(--border-2)",
                   borderRadius: 9999,
                   marginBottom: 6,
                 }}
@@ -264,7 +264,7 @@ function WatchlistCard({
                   data-testid={`signal-status-${item.symbol}`}
                   style={{
                     fontFamily: mono,
-                    fontSize: 7,
+                    fontSize: 12,
                     letterSpacing: "0.1em",
                     fontWeight: 700,
                     color: statusColor,
@@ -276,18 +276,18 @@ function WatchlistCard({
             </div>
           </>
         ) : (
-          <span style={{ fontFamily: mono, fontSize: 10, color: T4 }}>[ DATA TIDAK TERSEDIA ]</span>
+          <span style={{ fontFamily: mono, fontSize: 12, color: T4 }}>[ DATA TIDAK TERSEDIA ]</span>
         )}
       </div>
 
       {/* Price change + sector */}
       {stock && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontFamily: mono, fontSize: 10, color: T4 }}>{stock.sector ?? "—"}</span>
+          <span style={{ fontFamily: mono, fontSize: 12, color: T4 }}>{stock.sector ?? "—"}</span>
           <span
             style={{
               fontFamily: mono,
-              fontSize: 10,
+              fontSize: 12,
               color:
                 parseFloat(stock.changePercent) > 0
                   ? POSITIVE
@@ -320,7 +320,7 @@ function WatchlistCard({
             data-testid={`badge-distwarn-${item.symbol}`}
             style={{
               fontFamily: mono,
-              fontSize: 8,
+              fontSize: 13,
               color: DANGER,
               letterSpacing: "0.06em",
             }}
@@ -339,7 +339,7 @@ function WatchlistCard({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          window.location.href = `/stock/${item.symbol}`;
+          window.location.href = `/dashboard/stock/${item.symbol}`;
         }}
         data-testid={`watchlist-detail-${item.symbol}`}
         style={{
@@ -569,7 +569,7 @@ export default function WatchlistPage() {
               <p
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
+                  fontSize: 12,
                   letterSpacing: "0.2em",
                   color: T4,
                   textTransform: "uppercase",
@@ -634,7 +634,7 @@ export default function WatchlistPage() {
                   <p
                     style={{
                       fontFamily: mono,
-                      fontSize: 8,
+                      fontSize: 13,
                       letterSpacing: "0.1em",
                       color: T4,
                       textTransform: "uppercase",
@@ -661,17 +661,17 @@ export default function WatchlistPage() {
               }}
               data-testid="signal-warning-bar"
             >
-              <span style={{ fontFamily: mono, fontSize: 9, color: WARNING, letterSpacing: "0.1em" }}>
+              <span style={{ fontFamily: mono, fontSize: 12, color: WARNING, letterSpacing: "0.1em" }}>
                 ⚠ PERHATIAN
               </span>
-              <span style={{ fontFamily: inter, fontSize: 11, color: T2 }}>
+              <span style={{ fontFamily: inter, fontSize: 13, color: T2 }}>
                 {signalSummary?.diragukan ?? 0} saham diragukan dan {signalSummary?.gugur ?? 0} gugur — tinjau segera.
               </span>
               <span
                 style={{
                   marginLeft: "auto",
                   fontFamily: mono,
-                  fontSize: 10,
+                  fontSize: 12,
                   color: SIGNAL,
                   cursor: "pointer",
                 }}
@@ -735,7 +735,7 @@ export default function WatchlistPage() {
               <p
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
+                  fontSize: 12,
                   letterSpacing: "0.16em",
                   color: T4,
                   textTransform: "uppercase",
@@ -760,7 +760,7 @@ export default function WatchlistPage() {
                 }}
                 style={{
                   fontFamily: mono,
-                  fontSize: 8,
+                  fontSize: 13,
                   color: refreshingSignals ? T4 : T3,
                   cursor: "pointer",
                   background: "none",
@@ -776,7 +776,7 @@ export default function WatchlistPage() {
             <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
               {alertItems.length === 0 ? (
                 <div style={{ padding: "32px 16px", textAlign: "center" }}>
-                  <p style={{ fontFamily: mono, fontSize: 9, color: T4 }}>
+                  <p style={{ fontFamily: mono, fontSize: 12, color: T4 }}>
                     [ TIDAK ADA SINYAL AKTIF ]
                   </p>
                 </div>
@@ -784,10 +784,10 @@ export default function WatchlistPage() {
                 alertItems.map((alert, i) => (
                   <div
                     key={i}
-                    onClick={() => (window.location.href = `/stock/${alert.symbol}`)}
+                    onClick={() => (window.location.href = `/dashboard/stock/${alert.symbol}`)}
                     style={{
                       padding: "10px 16px",
-                      borderBottom: "1px solid rgba(255,255,255,0.03)",
+                      borderBottom: "1px solid var(--border-1)",
                       cursor: "pointer",
                       transition: "background 0.1s",
                       borderLeft: `3px solid ${alert.color}`,
@@ -802,12 +802,12 @@ export default function WatchlistPage() {
                     <div
                       style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}
                     >
-                      <span style={{ fontFamily: mono, fontSize: 11, fontWeight: 700, color: T1 }}>
+                      <span style={{ fontFamily: mono, fontSize: 13, fontWeight: 700, color: T1 }}>
                         {alert.symbol}
                       </span>
-                      <span style={{ fontFamily: mono, fontSize: 8, color: T4 }}>{alert.time}</span>
+                      <span style={{ fontFamily: mono, fontSize: 13, color: T4 }}>{alert.time}</span>
                     </div>
-                    <p style={{ fontFamily: inter, fontSize: 11, color: T3, lineHeight: 1.4 }}>
+                    <p style={{ fontFamily: inter, fontSize: 13, color: T3, lineHeight: 1.4 }}>
                       {alert.message}
                     </p>
                     {alert.severity && (
@@ -816,7 +816,7 @@ export default function WatchlistPage() {
                           display: "inline-block",
                           marginTop: 4,
                           fontFamily: mono,
-                          fontSize: 7,
+                          fontSize: 12,
                           letterSpacing: "0.08em",
                           padding: "2px 5px",
                           borderRadius: 3,
@@ -853,7 +853,7 @@ export default function WatchlistPage() {
               <p
                 style={{
                   fontFamily: mono,
-                  fontSize: 10,
+                  fontSize: 12,
                   letterSpacing: "0.15em",
                   color: T4,
                   marginBottom: 10,
@@ -872,11 +872,11 @@ export default function WatchlistPage() {
                 Tambahkan saham dari Radar untuk mulai memantau portofolio intelijen.
               </p>
               <button
-                onClick={() => (window.location.href = "/radar")}
+                onClick={() => (window.location.href = "/dashboard/radar")}
                 data-testid="button-go-to-radar"
                 style={{
                   fontFamily: mono,
-                  fontSize: 9,
+                  fontSize: 12,
                   letterSpacing: "0.1em",
                   padding: "10px 22px",
                   borderRadius: 6,
@@ -903,7 +903,7 @@ export default function WatchlistPage() {
                 <span
                   style={{
                     fontFamily: mono,
-                    fontSize: 8,
+                    fontSize: 13,
                     color: T4,
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
@@ -917,7 +917,7 @@ export default function WatchlistPage() {
                     onClick={() => setSortMode(s)}
                     style={{
                       fontFamily: mono,
-                      fontSize: 8,
+                      fontSize: 13,
                       padding: "4px 10px",
                       borderRadius: 4,
                       cursor: "pointer",
@@ -961,7 +961,7 @@ export default function WatchlistPage() {
                       accent={accent}
                       scoreColor={sColor}
                       onRemove={() => removeFromWatchlist(item.symbol)}
-                      onClick={() => (window.location.href = `/stock/${item.symbol}`)}
+                      onClick={() => (window.location.href = `/dashboard/stock/${item.symbol}`)}
                     />
                   );
                 })}
@@ -993,7 +993,7 @@ export default function WatchlistPage() {
           }}
           data-testid="undo-toast"
         >
-          <span style={{ fontFamily: mono, fontSize: 11, color: T2 }}>
+          <span style={{ fontFamily: mono, fontSize: 13, color: T2 }}>
             {undoToast.symbol} dihapus dari watchlist
           </span>
           <button
@@ -1001,7 +1001,7 @@ export default function WatchlistPage() {
             data-testid="button-undo-remove"
             style={{
               fontFamily: mono,
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: "0.06em",
               cursor: "pointer",
               color: SIGNAL,

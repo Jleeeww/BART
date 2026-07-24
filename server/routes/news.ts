@@ -21,6 +21,32 @@ export function registerNewsRoutes(app: Express): void {
     }
   });
 
+  // Raw news feed with images (no AI). Optional ?symbol=&company= sorts
+  // relevant articles first. Powers the default Berita tab content.
+  app.get('/api/news/feed', async (req, res) => {
+    try {
+      const { fetchLatestNews, screenArticle } = await import('../engine/newsFetcher');
+      const all = await fetchLatestNews();
+      let articles = all.filter(screenArticle);
+      if (articles.length === 0) articles = all;
+
+      const symbol = String(req.query.symbol || '').toUpperCase();
+      const company = String(req.query.company || '').toLowerCase();
+      const firstWord = company.split(/\s+/).filter((w) => w.length > 3)[0] ?? '';
+      if (symbol || firstWord) {
+        const isRel = (a: any) => {
+          const t = `${a.title} ${a.summary}`.toLowerCase();
+          return (symbol.length >= 3 && t.includes(symbol.toLowerCase())) ||
+                 (firstWord && t.includes(firstWord));
+        };
+        articles = [...articles].sort((a, b) => Number(isRel(b)) - Number(isRel(a)));
+      }
+      res.json({ articles: articles.slice(0, 30) });
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   app.get('/api/news', async (_req, res) => {
     try {
       const { fetchLatestNews, screenArticle } = await import('../engine/newsFetcher');

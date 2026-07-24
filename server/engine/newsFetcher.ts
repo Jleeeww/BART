@@ -31,6 +31,7 @@ export interface RawNewsArticle {
   source: string;
   publishedAt: string;  // ISO 8601
   fetchedAt: string;    // ISO 8601
+  imageUrl: string;     // extracted from RSS enclosure / media / <img>; '' if none
 }
 
 // ── Source registry ──────────────────────────────────────────
@@ -137,6 +138,23 @@ function makeId(title: string, source: string, publishedAt: string): string {
 
 // ── RSS / Atom parser ────────────────────────────────────────
 
+function decodeEntities(s: string): string {
+  return s.replace(/&amp;/g, '&').replace(/&#38;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+}
+
+function stripHtml(s: string): string {
+  return decodeEntities(s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+}
+
+function extractImage(block: string): string {
+  let m =
+    block.match(/<enclosure[^>]+type="image[^"]*"[^>]*url="([^"]+)"/i) ||
+    block.match(/<enclosure[^>]+url="([^"]+)"[^>]*type="image/i) ||
+    block.match(/<media:(?:content|thumbnail)[^>]+url="([^"]+)"/i) ||
+    block.match(/<img[^>]+src="([^"]+)"/i);
+  return m ? decodeEntities(m[1]) : '';
+}
+
 function parseRSSItems(xml: string, sourceName: string): RawNewsArticle[] {
   const fetchedAt = new Date().toISOString();
   const articles: RawNewsArticle[] = [];
@@ -160,17 +178,19 @@ function parseRSSItems(xml: string, sourceName: string): RawNewsArticle[] {
     const publishedAt = parseISO(pubDate);
 
     const id = makeId(title, sourceName, publishedAt);
-    const truncSummary = summary.slice(0, 1000);
+    const imageUrl = extractImage(block);
+    const cleanSummary = stripHtml(summary).slice(0, 600);
 
     articles.push({
       id,
-      title:       title.slice(0, 300),
-      summary:     truncSummary,
-      content:     truncSummary,
+      title:       decodeEntities(title).slice(0, 300),
+      summary:     cleanSummary,
+      content:     cleanSummary,
       url,
       source:      sourceName,
       publishedAt,
       fetchedAt,
+      imageUrl,
     });
   }
 

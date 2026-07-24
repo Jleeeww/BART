@@ -18,10 +18,10 @@ const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 const inter = "'Inter', system-ui, sans-serif";
 
 function accentColor(decision: string) {
-  if (decision === "SIAP_DIPANTAU")      return "#4ADE80";
-  if (decision === "WATCHLIST_PRIORITAS") return "#FBBF24";
-  if (decision === "HINDARI_DULU")        return "#F87171";
-  return "#3F3F46";
+  if (decision === "SIAP_DIPANTAU")      return "var(--positive)";
+  if (decision === "WATCHLIST_PRIORITAS") return "var(--warning)";
+  if (decision === "HINDARI_DULU")        return "var(--danger)";
+  return "var(--text-4)";
 }
 
 function cardGlow(decision: string) {
@@ -42,8 +42,8 @@ export function StatusCard({
   return (
     <div style={{
       display: "flex", overflow: "hidden",
-      background: "#0a0a0a",
-      border: "1px solid rgba(255,255,255,0.08)",
+      background: "var(--surface-1)",
+      border: "1px solid var(--border-2)",
       borderRadius: 12,
       boxShadow: cardGlow(decision),
     }}>
@@ -54,12 +54,12 @@ export function StatusCard({
         {/* Header row */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <span style={{
-            fontFamily: mono, fontSize: 9, letterSpacing: "0.25em",
-            textTransform: "uppercase", color: "#3F3F46",
+            fontFamily: mono, fontSize: 12, letterSpacing: "0.25em",
+            textTransform: "uppercase", color: "var(--text-4)",
           }}>
             KESIAPAN TRADING{symbol ? ` · ${symbol}` : ""}
           </span>
-          <span style={{ fontFamily: mono, fontSize: 9, color: "#3F3F46", letterSpacing: "0.06em" }}>
+          <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)", letterSpacing: "0.06em" }}>
             SESI · {today}
           </span>
         </div>
@@ -84,7 +84,7 @@ export function StatusCard({
                   background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.18)",
                   display: "inline-flex", alignItems: "center",
                 }}>
-                  <span style={{ fontFamily: mono, fontSize: 8, color: "#FBBF24", letterSpacing: "0.05em" }}>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: "var(--warning)", letterSpacing: "0.05em" }}>
                     ⚡ OVERRIDE MAKRO AKTIF
                   </span>
                 </div>
@@ -95,7 +95,7 @@ export function StatusCard({
                   background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.18)",
                   display: "inline-flex", alignItems: "center",
                 }}>
-                  <span style={{ fontFamily: mono, fontSize: 8, color: "#F87171", letterSpacing: "0.05em" }}>
+                  <span style={{ fontFamily: mono, fontSize: 13, color: "var(--danger)", letterSpacing: "0.05em" }}>
                     ⚠ BENDERA MERAH MANAJEMEN
                   </span>
                 </div>
@@ -105,11 +105,11 @@ export function StatusCard({
             {/* Zone 2 — statusLabel headline */}
             <div>
               {statusLabel ? (
-                <p style={{ fontFamily: inter, fontSize: 14, fontWeight: 500, color: "#F4F4F5", lineHeight: 1.6 }}>
+                <p style={{ fontFamily: inter, fontSize: 14, fontWeight: 500, color: "var(--text-1)", lineHeight: 1.6 }}>
                   {statusLabel}
                 </p>
               ) : (
-                <p style={{ fontFamily: inter, fontSize: 14, color: "#3F3F46", lineHeight: 1.6 }}>
+                <p style={{ fontFamily: inter, fontSize: 14, color: "var(--text-4)", lineHeight: 1.6 }}>
                   Memuat analisis...
                 </p>
               )}
@@ -120,8 +120,8 @@ export function StatusCard({
               <button
                 onClick={onAnalysisClick}
                 style={{
-                  fontFamily: mono, fontSize: 10, letterSpacing: "0.1em",
-                  fontWeight: 600, color: "#4FC3F7",
+                  fontFamily: mono, fontSize: 12, letterSpacing: "0.1em",
+                  fontWeight: 600, color: "var(--signal)",
                   background: "rgba(79,195,247,0.07)",
                   border: "1px solid rgba(79,195,247,0.2)",
                   borderRadius: 6, padding: "7px 14px",
@@ -133,7 +133,7 @@ export function StatusCard({
               >
                 ANALISIS LENGKAP →
               </button>
-              <p style={{ fontFamily: mono, fontSize: 9, color: "#3F3F46", letterSpacing: "0.06em", marginTop: 8 }}>
+              <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)", letterSpacing: "0.06em", marginTop: 8 }}>
                 Keyakinan {confidence}%{layerCount > 0 ? ` · ${layerCount}/6 layer aktif` : ""}
               </p>
             </div>
@@ -143,7 +143,7 @@ export function StatusCard({
         {/* Disclaimer — nearly invisible */}
         <p style={{
           marginTop: 14, textAlign: "center",
-          fontFamily: mono, fontSize: 7, color: "rgba(255,255,255,0.06)", lineHeight: 1.5,
+          fontFamily: mono, fontSize: 12, color: "var(--border-2)", lineHeight: 1.5,
         }}>
           Panduan probabilistik — bukan sinyal transaksi. Selalu lakukan analisis mandiri.
         </p>
