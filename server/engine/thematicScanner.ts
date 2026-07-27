@@ -25,6 +25,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { getMatchingCausalEvents, buildMacroContext } from './macroCausalKnowledge';
 import { recordCost, isCapReached } from './costTracker';
+import { getSocialPulse, type SocialPulse } from './xaiClient';
 
 const MODEL = 'claude-sonnet-4-5';
 const CALL_TIMEOUT_MS = 40_000;
@@ -50,6 +51,7 @@ export interface ThematicFlag {
   rationale: string;
   confidence: string;     // TINGGI | SEDANG | RENDAH
   sourceUrls: string[];
+  socialDirection?: 'POSITIF' | 'NEGATIF' | 'NETRAL' | null; // Grok/X live-search read, additive to the news-based `direction`
 }
 
 export interface ThematicScanResult {
@@ -62,6 +64,7 @@ export interface ThematicScanResult {
   costUsd: number;
   webSearches: number;
   model: string;
+  socialPulse: SocialPulse | null; // Grok/X live-search read on today's themes, null if XAI_API_KEY unset
 }
 
 // ── System prompts (Bahasa Indonesia, OJK-safe) ──────────────────
@@ -234,7 +237,7 @@ async function fetchUniverse(): Promise<Array<{ symbol: string; sector: string |
 // ── Main entry ───────────────────────────────────────────────────
 
 const EMPTY_RESULT = (slot: ScanSlot, status: ScanStatus, narrative: string): ThematicScanResult => ({
-  status, slot, themes: [], flags: [], narrative, eventCount: 0, costUsd: 0, webSearches: 0, model: MODEL,
+  status, slot, themes: [], flags: [], narrative, eventCount: 0, costUsd: 0, webSearches: 0, model: MODEL, socialPulse: null,
 });
 
 /**
@@ -287,7 +290,7 @@ export async function runThematicScan(slot: ScanSlot): Promise<ThematicScanResul
       const r: ThematicScanResult = {
         status: 'NO_CATALYST', slot, themes: [], flags: [],
         narrative: 'Tidak ada katalis signifikan hari ini.',
-        eventCount: 0, costUsd: totalCost, webSearches: totalSearches, model: MODEL,
+        eventCount: 0, costUsd: totalCost, webSearches: totalSearches, model: MODEL, socialPulse: null,
       };
       await persist(r).catch(() => {});
       return r;
@@ -387,9 +390,24 @@ export async function runThematicScan(slot: ScanSlot): Promise<ThematicScanResul
       }
     }
 
+    // ── Step 5: social media pulse (Grok/X live search) — optional, additive ──
+    // Separate from the news-driven Claude pipeline above: reads how X/Twitter
+    // is reacting to today's themes for the flagged tickers. No-ops (null) if
+    // XAI_API_KEY isn't set, so this never blocks the core overlay.
+    let socialPulse: SocialPulse | null = null;
+    if (flags.length > 0) {
+      const themesSummary = themes.map((t) => `- [${t.category}] ${t.title}: ${t.summary}`).join('\n');
+      socialPulse = await getSocialPulse(themesSummary, flags.map((f) => f.symbol)).catch(() => null);
+      if (socialPulse) {
+        for (const f of flags) {
+          f.socialDirection = socialPulse.bySymbol[f.symbol] ?? null;
+        }
+      }
+    }
+
     const result: ThematicScanResult = {
       status: 'OK', slot, themes, flags, narrative,
-      eventCount: themes.length, costUsd: totalCost, webSearches: totalSearches, model: MODEL,
+      eventCount: themes.length, costUsd: totalCost, webSearches: totalSearches, model: MODEL, socialPulse,
     };
     await persist(result).catch(() => {});
     return result;
@@ -398,7 +416,7 @@ export async function runThematicScan(slot: ScanSlot): Promise<ThematicScanResul
     return {
       status: 'ERROR', slot, themes: [], flags: [],
       narrative: 'Tidak ada data tema hari ini (terjadi kesalahan saat pemindaian).',
-      eventCount: 0, costUsd: totalCost, webSearches: totalSearches, model: MODEL,
+      eventCount: 0, costUsd: totalCost, webSearches: totalSearches, model: MODEL, socialPulse: null,
     };
   }
 }
@@ -415,6 +433,7 @@ async function persist(result: ThematicScanResult): Promise<void> {
     costUsd: String(result.costUsd),
     webSearches: result.webSearches,
     model: result.model,
+    socialPulse: result.socialPulse,
   });
   if (result.flags.length) {
     await storage.insertThematicFlags(
@@ -425,7 +444,9 @@ async function persist(result: ThematicScanResult): Promise<void> {
         theme: f.theme,
         direction: f.direction,
         sector: f.sector,
-        rationale: f.rationale,
+        rationale: f.socialDirection
+          ? `${f.rationale} [Sosial (X): ${f.socialDirection}]`
+          : f.rationale,
         confidence: f.confidence,
         sourceUrls: f.sourceUrls,
       }))

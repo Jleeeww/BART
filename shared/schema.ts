@@ -439,6 +439,7 @@ export const thematicScan = pgTable('thematic_scan', {
   costUsd:     numeric('cost_usd'),
   webSearches: integer('web_searches'),
   model:       text('model'),
+  socialPulse: jsonb('social_pulse'),               // Grok/X live-search read: { narrative, bySymbol, sources }
 }, (table) => ({
   scanAtIdx: index('thematic_scan_scan_at_idx').on(table.scanAt),
 }));
