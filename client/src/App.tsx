@@ -8,7 +8,7 @@ import { Menu, Loader2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/LandingPage";
 import AuthPage from "@/pages/AuthPage";
-import Homepage from "@/pages/Homepage";
+import Terminal from "@/pages/Terminal";
 import StockDashboard from "@/pages/StockDashboard";
 import RadarPage from "@/pages/RadarPage";
 import WatchlistPage from "@/pages/WatchlistPage";
@@ -33,7 +33,7 @@ function DashboardRouter() {
   const { user } = useAuth();
   return (
     <Switch>
-      <Route path="/" component={Homepage} />
+      <Route path="/" component={Terminal} />
       <Route path="/stock/:symbol" component={StockDashboard} />
       <Route path="/radar" component={RadarPage} />
       <Route path="/watchlist" component={WatchlistPage} />

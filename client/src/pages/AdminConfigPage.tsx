@@ -4,7 +4,8 @@ import { queryClient } from "@/lib/queryClient";
 import { adminFetch, setAdminToken, clearAdminToken, getAdminToken } from "@/lib/adminAuth";
 import { SlidersVertical, Play, Lock, LogOut } from "lucide-react";
 
-const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
+const mono = "var(--font-mono)";
+const sans = "var(--font-sans)";
 
 interface AdminConfig {
   config: {
@@ -12,6 +13,7 @@ interface AdminConfig {
     suppression_override: { multiplier: number | null };
     scanner_enabled: { enabled: boolean };
     cost_caps: { thematic?: number; global?: number };
+    stockbit_token: { configured: boolean; last4: string | null; updatedAt: string | null };
   };
   effectiveRegime: { regime: string; multiplier: number; note: string };
   cost: Record<string, number>;
@@ -21,7 +23,7 @@ interface AdminConfig {
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ background: "var(--surface-1)", border: "1px solid var(--border-2)", borderRadius: 10, padding: "16px 18px" }}>
-      <h2 style={{ fontFamily: mono, fontSize: 12, letterSpacing: "0.1em", color: "var(--text-2)", fontWeight: 700, marginBottom: 12 }}>{title}</h2>
+      <h2 style={{ fontFamily: sans, fontSize: 12, letterSpacing: "0.1em", color: "var(--text-2)", fontWeight: 700, marginBottom: 12 }}>{title}</h2>
       {children}
     </div>
   );
@@ -54,23 +56,23 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
     <div style={{ padding: "80px 32px", maxWidth: 360, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <Lock size={18} style={{ color: "var(--signal)" }} />
-        <h1 style={{ fontFamily: mono, fontSize: 18, fontWeight: 700, color: "var(--text-1)", margin: 0 }}>Admin Login</h1>
+        <h1 style={{ fontFamily: sans, fontSize: 18, fontWeight: 700, color: "var(--text-1)", margin: 0 }}>Admin Login</h1>
       </div>
       <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <input
           type="password" autoFocus placeholder="Admin token"
           value={pw} onChange={(e) => setPw(e.target.value)}
-          style={{ fontFamily: mono, fontSize: 14, padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border-2)", background: "var(--surface-0)", color: "var(--text-1)" }}
+          style={{ fontFamily: sans, fontSize: 14, padding: "10px 12px", borderRadius: 8, border: "1px solid var(--border-2)", background: "var(--surface-0)", color: "var(--text-1)" }}
         />
-        {err && <span style={{ fontFamily: mono, fontSize: 12, color: "var(--danger)" }}>{err}</span>}
+        {err && <span style={{ fontFamily: sans, fontSize: 12, color: "var(--danger)" }}>{err}</span>}
         <button
           type="submit" disabled={busy || !pw.trim()}
-          style={{ fontFamily: mono, fontSize: 13, fontWeight: 700, padding: "10px 14px", borderRadius: 8, cursor: "pointer", border: "1px solid var(--signal)", background: "var(--signal)", color: "var(--surface-0)", opacity: busy || !pw.trim() ? 0.6 : 1 }}
+          style={{ fontFamily: sans, fontSize: 13, fontWeight: 700, padding: "10px 14px", borderRadius: 8, cursor: "pointer", border: "1px solid var(--signal)", background: "var(--signal)", color: "var(--surface-0)", opacity: busy || !pw.trim() ? 0.6 : 1 }}
         >
           {busy ? "Memeriksa..." : "Masuk"}
         </button>
       </form>
-      <p style={{ fontFamily: mono, fontSize: 11, color: "var(--text-4)", lineHeight: 1.6, marginTop: 16 }}>
+      <p style={{ fontFamily: sans, fontSize: 11, color: "var(--text-4)", lineHeight: 1.6, marginTop: 16 }}>
         Token = nilai <code>ADMIN_TOKEN</code> di file <code>.env</code> server.
       </p>
     </div>
@@ -100,6 +102,7 @@ export default function AdminConfigPage() {
   });
 
   const [msg, setMsg] = useState("");
+  const [stockbitTokenInput, setStockbitTokenInput] = useState("");
 
   const setConfig = useMutation({
     mutationFn: async (body: { key: string; value: unknown }) => {
@@ -151,23 +154,23 @@ export default function AdminConfigPage() {
     <div style={{ padding: "48px 32px", maxWidth: 760, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
         <SlidersVertical size={20} style={{ color: "var(--signal)" }} />
-        <h1 style={{ fontFamily: mono, fontSize: 22, fontWeight: 700, color: "var(--text-1)", margin: 0 }}>Admin</h1>
+        <h1 style={{ fontFamily: sans, fontSize: 22, fontWeight: 700, color: "var(--text-1)", margin: 0 }}>Admin</h1>
         {auth?.authRequired && (
           <button
             onClick={logout}
             title="Keluar"
-            style={{ marginLeft: "auto", fontFamily: mono, fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--border-2)", background: "transparent", color: "var(--text-3)", display: "inline-flex", alignItems: "center", gap: 5 }}
+            style={{ marginLeft: "auto", fontFamily: sans, fontSize: 11, padding: "5px 10px", borderRadius: 6, cursor: "pointer", border: "1px solid var(--border-2)", background: "transparent", color: "var(--text-3)", display: "inline-flex", alignItems: "center", gap: 5 }}
           >
             <LogOut size={12} /> Keluar
           </button>
         )}
       </div>
-      <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", marginBottom: 24 }}>
+      <p style={{ fontFamily: sans, fontSize: 12, color: "var(--text-3)", marginBottom: 24 }}>
         Kontrol runtime — berlaku tanpa redeploy (propagasi ~15 detik).
       </p>
 
       {msg && (
-        <div style={{ fontFamily: mono, fontSize: 12, color: "var(--signal)", marginBottom: 16 }}>{msg}</div>
+        <div style={{ fontFamily: sans, fontSize: 12, color: "var(--signal)", marginBottom: 16 }}>{msg}</div>
       )}
 
       {isLoading && <div style={{ height: 120, background: "var(--surface-1)", borderRadius: 10 }} className="animate-pulse" />}
@@ -176,11 +179,11 @@ export default function AdminConfigPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Effective regime + spend */}
           <Panel title="STATUS EFEKTIF">
-            <p style={{ fontFamily: mono, fontSize: 13, color: "var(--text-1)", margin: 0 }}>
+            <p style={{ fontFamily: sans, fontSize: 13, color: "var(--text-1)", margin: 0 }}>
               Rezim: <strong>{data.effectiveRegime.regime}</strong> · ×{data.effectiveRegime.multiplier}
             </p>
-            <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", marginTop: 4 }}>{data.effectiveRegime.note}</p>
-            <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", marginTop: 8 }}>
+            <p style={{ fontFamily: sans, fontSize: 12, color: "var(--text-3)", marginTop: 4 }}>{data.effectiveRegime.note}</p>
+            <p style={{ fontFamily: sans, fontSize: 12, color: "var(--text-3)", marginTop: 8 }}>
               Biaya hari ini: total ${Number(data.cost.total ?? 0).toFixed(4)} / ${data.baseCaps.global} ·
               tema ${Number(data.cost.thematic ?? 0).toFixed(4)} / ${data.baseCaps.thematic}
             </p>
@@ -194,7 +197,7 @@ export default function AdminConfigPage() {
                   key={m}
                   onClick={() => setConfig.mutate({ key: "crisis_mode", value: { mode: m } })}
                   style={{
-                    fontFamily: mono, fontSize: 12, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer",
+                    fontFamily: sans, fontSize: 12, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer",
                     border: `1px solid ${crisisMode === m ? "var(--signal)" : "var(--border-2)"}`,
                     background: crisisMode === m ? "var(--signal)" : "transparent",
                     color: crisisMode === m ? "var(--surface-0)" : "var(--text-3)",
@@ -204,7 +207,7 @@ export default function AdminConfigPage() {
                 </button>
               ))}
             </div>
-            <p style={{ fontFamily: mono, fontSize: 11, color: "var(--text-4)", marginTop: 8 }}>
+            <p style={{ fontFamily: sans, fontSize: 11, color: "var(--text-4)", marginTop: 8 }}>
               FORCE_CRISIS memaksa CAPITAL_FLIGHT (skor dipotong). FORCE_NORMAL menonaktifkan supresi. AUTO = deteksi otomatis.
             </p>
           </Panel>
@@ -218,17 +221,17 @@ export default function AdminConfigPage() {
                 onChange={(e) => setConfig.mutate({ key: "suppression_override", value: { multiplier: Number(e.target.value) } })}
                 style={{ flex: 1 }}
               />
-              <span style={{ fontFamily: mono, fontSize: 13, color: "var(--text-1)", minWidth: 40 }}>
+              <span style={{ fontFamily: mono, fontVariantNumeric: "tabular-nums", fontSize: 13, color: "var(--text-1)", minWidth: 40 }}>
                 {suppression === null ? "auto" : `×${suppression.toFixed(2)}`}
               </span>
               <button
                 onClick={() => setConfig.mutate({ key: "suppression_override", value: { multiplier: null } })}
-                style={{ fontFamily: mono, fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border-2)", background: "transparent", color: "var(--text-3)", cursor: "pointer" }}
+                style={{ fontFamily: sans, fontSize: 11, padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border-2)", background: "transparent", color: "var(--text-3)", cursor: "pointer" }}
               >
                 reset
               </button>
             </div>
-            <p style={{ fontFamily: mono, fontSize: 11, color: "var(--text-4)", marginTop: 8 }}>
+            <p style={{ fontFamily: sans, fontSize: 11, color: "var(--text-4)", marginTop: 8 }}>
               Hanya berlaku pada mode AUTO. Selalu diambil yang lebih konservatif (min dari auto &amp; override).
             </p>
           </Panel>
@@ -239,7 +242,7 @@ export default function AdminConfigPage() {
               <button
                 onClick={() => setConfig.mutate({ key: "scanner_enabled", value: { enabled: !scannerOn } })}
                 style={{
-                  fontFamily: mono, fontSize: 12, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer",
+                  fontFamily: sans, fontSize: 12, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer",
                   border: `1px solid ${scannerOn ? "var(--positive)" : "var(--border-2)"}`,
                   background: scannerOn ? "var(--positive)" : "transparent",
                   color: scannerOn ? "var(--surface-0)" : "var(--text-3)",
@@ -250,7 +253,7 @@ export default function AdminConfigPage() {
               <button
                 onClick={() => { setMsg("Menjalankan scan..."); triggerScan.mutate(); }}
                 disabled={triggerScan.isPending}
-                style={{ fontFamily: mono, fontSize: 12, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer", border: "1px solid var(--signal)", background: "transparent", color: "var(--signal)", display: "inline-flex", alignItems: "center", gap: 6 }}
+                style={{ fontFamily: sans, fontSize: 12, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer", border: "1px solid var(--signal)", background: "transparent", color: "var(--signal)", display: "inline-flex", alignItems: "center", gap: 6 }}
               >
                 <Play size={12} /> Jalankan scan sekarang
               </button>
@@ -261,7 +264,7 @@ export default function AdminConfigPage() {
           <Panel title="BATAS BIAYA (USD/hari)">
             <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
               {(["thematic", "global"] as const).map((k) => (
-                <label key={k} style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", display: "flex", flexDirection: "column", gap: 4 }}>
+                <label key={k} style={{ fontFamily: sans, fontSize: 12, color: "var(--text-3)", display: "flex", flexDirection: "column", gap: 4 }}>
                   {k}
                   <input
                     type="number" step={0.5} min={0}
@@ -270,11 +273,46 @@ export default function AdminConfigPage() {
                       const v = Number(e.target.value);
                       if (isFinite(v) && v > 0) setConfig.mutate({ key: "cost_caps", value: { ...cfg?.cost_caps, [k]: v } });
                     }}
-                    style={{ fontFamily: mono, fontSize: 13, padding: "6px 8px", width: 100, borderRadius: 6, border: "1px solid var(--border-2)", background: "var(--surface-0)", color: "var(--text-1)" }}
+                    style={{ fontFamily: mono, fontVariantNumeric: "tabular-nums", fontSize: 13, padding: "6px 8px", width: 100, borderRadius: 6, border: "1px solid var(--border-2)", background: "var(--surface-0)", color: "var(--text-1)" }}
                   />
                 </label>
               ))}
             </div>
+          </Panel>
+
+          {/* Stockbit token */}
+          <Panel title="STOCKBIT TOKEN">
+            <p style={{ fontFamily: sans, fontSize: 12, color: cfg?.stockbit_token?.configured ? "var(--positive)" : "var(--text-4)", marginBottom: 10 }}>
+              {cfg?.stockbit_token?.configured
+                ? `Terkonfigurasi — berakhiran ****${cfg.stockbit_token.last4} · diperbarui ${new Date(cfg.stockbit_token.updatedAt!).toLocaleString("id-ID")}`
+                : "Belum terkonfigurasi (memakai STOCKBIT_TOKEN dari .env jika ada)."}
+            </p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                type="password"
+                placeholder="Tempel token Bearer Stockbit baru"
+                value={stockbitTokenInput}
+                onChange={(e) => setStockbitTokenInput(e.target.value)}
+                style={{ flex: 1, fontFamily: sans, fontSize: 13, padding: "8px 10px", borderRadius: 6, border: "1px solid var(--border-2)", background: "var(--surface-0)", color: "var(--text-1)" }}
+              />
+              <button
+                onClick={() => {
+                  const token = stockbitTokenInput.trim();
+                  if (!token) return;
+                  setConfig.mutate(
+                    { key: "stockbit_token", value: { token, updatedAt: new Date().toISOString() } },
+                    { onSuccess: () => setStockbitTokenInput("") },
+                  );
+                }}
+                disabled={!stockbitTokenInput.trim() || setConfig.isPending}
+                style={{ fontFamily: sans, fontSize: 12, fontWeight: 700, padding: "8px 14px", borderRadius: 8, cursor: "pointer", border: "1px solid var(--signal)", background: "var(--signal)", color: "var(--surface-0)", opacity: !stockbitTokenInput.trim() || setConfig.isPending ? 0.6 : 1 }}
+              >
+                Simpan
+              </button>
+            </div>
+            <p style={{ fontFamily: sans, fontSize: 11, color: "var(--text-4)", marginTop: 8 }}>
+              Ganti token sesi Stockbit tanpa perlu edit file .env / restart server. Nilai lama tidak pernah ditampilkan ulang.
+            </p>
           </Panel>
         </div>
       )}

@@ -42,6 +42,18 @@ export function setToken(newToken: string): void {
   token = newToken;
 }
 
+/**
+ * Admin-configurable override: reads the token from the `system_config` DB
+ * table (set via the admin dashboard) and swaps it in if present, taking
+ * precedence over the `.env`/local-file value this module boots with.
+ * No-op (keeps whatever token is already set) if nothing is configured in DB.
+ */
+export async function loadTokenFromConfig(): Promise<void> {
+  const { getConfig, CONFIG_KEYS } = await import('./systemConfig');
+  const cfg = await getConfig<{ token: string; updatedAt: string } | null>(CONFIG_KEYS.STOCKBIT_TOKEN, null);
+  if (cfg?.token) setToken(cfg.token);
+}
+
 // Serialized queue: ~1 request / 8s stays well under 40 / 5min.
 let queue: Promise<unknown> = Promise.resolve();
 const GAP_MS = Number(process.env.STOCKBIT_GAP_MS ?? 8000);

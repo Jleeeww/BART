@@ -31,7 +31,7 @@ type DrawingTool =
   | "eraser";
 
 interface OHLCVData {
-  time: string;
+  time: string | number; // 'YYYY-MM-DD' for daily; Unix seconds for intraday
   open: number;
   high: number;
   low: number;
@@ -128,7 +128,7 @@ function calcRSI(data: OHLCVData[], period = 14) {
   });
 }
 
-function calcEMAGeneric(data: { time: string; value: number }[], period: number) {
+function calcEMAGeneric(data: { time: string | number; value: number }[], period: number) {
   const k = 2 / (period + 1);
   let ema = data[0]?.value ?? 0;
   return data.map((d, i) => {
@@ -160,7 +160,23 @@ function calcStoch(data: OHLCVData[], period = 14) {
 // ─── Constants ────────────────────────────────────────────────────────────────
 const CHART_DARK  = { bg: "#0a0a0a", grid: "#161616", text: "#8b8b94", border: "#222222" };
 const CHART_LIGHT = { bg: "#ffffff", grid: "#eef2f7", text: "#475569", border: "#cbd5e1" };
-const TIMEFRAMES = ["1D", "5D", "1M", "3M", "6M", "1Y", "5Y", "All"];
+// Each tab is a real candle RESOLUTION (TradingView-style) — not a lookback
+// range with a fixed daily interval. "1M" means one candle per month, not
+// "1 month of daily candles". Each maps to {interval sent to the OHLCV API,
+// a sensible default history depth for that resolution}.
+// "4H" has no native Yahoo interval — synthesized server-side from 1H bars
+// (see server/engine/ohlcvFetcher.ts aggregateBars). Intraday intervals are
+// capped by Yahoo's actual limits (1m ≤ 8d, 15m/30m ≤ 60d, 1h ≤ 730d).
+const TIMEFRAMES = ["1m", "15m", "30m", "1H", "4H", "1D", "1M"];
+const TIMEFRAME_CONFIG: Record<string, { interval: string; rangeDays: number }> = {
+  "1m":  { interval: "1m",  rangeDays: 2 },
+  "15m": { interval: "15m", rangeDays: 10 },
+  "30m": { interval: "30m", rangeDays: 20 },
+  "1H":  { interval: "1h",  rangeDays: 90 },
+  "4H":  { interval: "4h",  rangeDays: 365 },
+  "1D":  { interval: "1d",  rangeDays: 730 },
+  "1M":  { interval: "1mo", rangeDays: 3650 },
+};
 
 const DRAWING_TOOLS: { key: DrawingTool; icon: string; label: string }[] = [
   { key: "cursor", icon: "↖", label: "Kursor" },
@@ -205,10 +221,17 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
   const [showIndPanel, setShowIndPanel] = useState(false);
   const [ohlc, setOhlc] = useState<{ o: number; h: number; l: number; c: number; chg: number; chgPct: number } | null>(null);
 
-  // Fetch live OHLCV from Yahoo when a symbol is given and no data was passed in.
+  // Fetch live OHLCV from Yahoo/IDX when a symbol is given and no data was passed in.
+  // Re-fetches whenever the active timeframe tab changes (interval + range).
   const usesRemote = !!symbol && !(data && data.length > 0);
+  const tfConfig = TIMEFRAME_CONFIG[activeTimeframe] ?? TIMEFRAME_CONFIG["1D"];
   const { data: fetched, isLoading } = useQuery<{ symbol: string; bars: OHLCVData[] }>({
-    queryKey: ["/api/stocks", symbol, "ohlcv"],
+    queryKey: ["/api/stocks", symbol, "ohlcv", tfConfig.interval, tfConfig.rangeDays],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${encodeURIComponent(symbol!)}/ohlcv?range=${tfConfig.rangeDays}&interval=${tfConfig.interval}`);
+      if (!res.ok) throw new Error("Failed to fetch OHLCV");
+      return res.json();
+    },
     enabled: usesRemote,
     staleTime: 5 * 60 * 1000,
   });
@@ -282,7 +305,7 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
 
     const volSeries = chart.addSeries(HistogramSeries, { priceFormat: { type: "volume" }, priceScaleId: "vol" });
     chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-    volSeries.setData(ohlcv.map(d => ({ time: d.time, value: d.volume, color: d.close >= d.open ? "#26a69a33" : "#ef535033" })));
+    volSeries.setData(ohlcv.map(d => ({ time: d.time, value: d.volume, color: d.close >= d.open ? "#26a69a33" : "#ef535033" })) as any);
 
     if (activeInds.has("MA20")) {
       const s = chart.addSeries(LineSeries, { color: "#f59e0b", lineWidth: 1, priceLineVisible: false, title: "MA20" });
@@ -318,7 +341,7 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
         return { time: d.time, value: Math.round(cumPV / cumVol) };
       });
       const s = chart.addSeries(LineSeries, { color: "#ec4899", lineWidth: 1, lineStyle: LineStyle.LargeDashed, priceLineVisible: false, title: "VWAP" });
-      s.setData(vwapData);
+      s.setData(vwapData as any);
     }
 
     chart.subscribeCrosshairMove(param => {
@@ -355,9 +378,9 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
     const rsiSeries = chart.addSeries(LineSeries, { color: "#a78bfa", lineWidth: 1, priceLineVisible: false });
     rsiSeries.setData(calcRSI(ohlcv) as any);
     const ob = chart.addSeries(LineSeries, { color: "#ef535055", lineWidth: 1, lineStyle: LineStyle.Dotted, priceLineVisible: false });
-    ob.setData(ohlcv.map(d => ({ time: d.time, value: 70 })));
+    ob.setData(ohlcv.map(d => ({ time: d.time, value: 70 })) as any);
     const os = chart.addSeries(LineSeries, { color: "#26a69a55", lineWidth: 1, lineStyle: LineStyle.Dotted, priceLineVisible: false });
-    os.setData(ohlcv.map(d => ({ time: d.time, value: 30 })));
+    os.setData(ohlcv.map(d => ({ time: d.time, value: 30 })) as any);
     chart.timeScale().fitContent();
     const obs = new ResizeObserver(e => { if (e[0]) chart.applyOptions({ width: e[0].contentRect.width }); });
     obs.observe(rsiRef.current);
@@ -377,7 +400,7 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
     });
     const { macdLine, signalArr, hist } = calcMACD(ohlcv);
     const histSeries = chart.addSeries(HistogramSeries, { color: "#38BDF8", priceLineVisible: false });
-    histSeries.setData(hist.map(d => ({ time: d.time, value: d.value, color: d.value >= 0 ? "#26a69a88" : "#ef535088" })));
+    histSeries.setData(hist.map(d => ({ time: d.time, value: d.value, color: d.value >= 0 ? "#26a69a88" : "#ef535088" })) as any);
     const macdS = chart.addSeries(LineSeries, { color: "#38BDF8", lineWidth: 1, priceLineVisible: false });
     macdS.setData(macdLine as any);
     const sigS = chart.addSeries(LineSeries, { color: "#f97316", lineWidth: 1, lineStyle: LineStyle.Dashed, priceLineVisible: false });
@@ -402,9 +425,9 @@ export function PriceChart({ data, symbol }: PriceChartProps) {
     const stochSeries = chart.addSeries(LineSeries, { color: "#fb923c", lineWidth: 1, priceLineVisible: false });
     stochSeries.setData(calcStoch(ohlcv) as any);
     const ob = chart.addSeries(LineSeries, { color: "#ef535055", lineWidth: 1, lineStyle: LineStyle.Dotted, priceLineVisible: false });
-    ob.setData(ohlcv.map(d => ({ time: d.time, value: 80 })));
+    ob.setData(ohlcv.map(d => ({ time: d.time, value: 80 })) as any);
     const os = chart.addSeries(LineSeries, { color: "#26a69a55", lineWidth: 1, lineStyle: LineStyle.Dotted, priceLineVisible: false });
-    os.setData(ohlcv.map(d => ({ time: d.time, value: 20 })));
+    os.setData(ohlcv.map(d => ({ time: d.time, value: 20 })) as any);
     chart.timeScale().fitContent();
     const obs = new ResizeObserver(e => { if (e[0]) chart.applyOptions({ width: e[0].contentRect.width }); });
     obs.observe(stochRef.current);

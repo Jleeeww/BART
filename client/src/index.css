@@ -170,6 +170,7 @@
 @layer utilities {
   .font-mono {
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
   }
   /* inner ring for elevation (no box-shadow) */
   .ring-elevation {

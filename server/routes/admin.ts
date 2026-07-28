@@ -29,11 +29,17 @@ export function registerAdminRoutes(app: Express): void {
   app.get('/api/admin/config', async (req, res) => {
     if (!requireAdmin(req, res)) return;
     try {
-      const { getAllConfig } = await import('../engine/systemConfig');
+      const { getAllConfig, CONFIG_KEYS } = await import('../engine/systemConfig');
       const { getCachedMacroRegime } = await import('../engine/macroRegimeDetector');
       const { getDailyCost, DAILY_CAPS } = await import('../engine/costTracker');
+      const config = await getAllConfig();
+      // Never echo the raw Stockbit token back to the client — mask it.
+      const rawStockbitToken = config[CONFIG_KEYS.STOCKBIT_TOKEN] as { token: string; updatedAt: string } | null;
+      (config as any)[CONFIG_KEYS.STOCKBIT_TOKEN] = rawStockbitToken?.token
+        ? { configured: true, last4: rawStockbitToken.token.slice(-4), updatedAt: rawStockbitToken.updatedAt }
+        : { configured: false, last4: null, updatedAt: null };
       res.status(200).json({
-        config: await getAllConfig(),
+        config,
         effectiveRegime: getCachedMacroRegime(),
         cost: getDailyCost(),
         baseCaps: DAILY_CAPS,

@@ -24,6 +24,7 @@ export interface CrisisModeConfig      { mode: CrisisMode; }
 export interface SuppressionOverride   { multiplier: number | null; }
 export interface ScannerEnabledConfig  { enabled: boolean; }
 export interface CostCapsOverride      { news?: number; thematic?: number; global?: number; management?: number; insider?: number; chat?: number; }
+export interface StockbitTokenConfig   { token: string; updatedAt: string; }
 
 // Canonical keys (documented; values are jsonb blobs)
 export const CONFIG_KEYS = {
@@ -31,6 +32,7 @@ export const CONFIG_KEYS = {
   SUPPRESSION_OVERRIDE: 'suppression_override',
   SCANNER_ENABLED:      'scanner_enabled',
   COST_CAPS:            'cost_caps',
+  STOCKBIT_TOKEN:       'stockbit_token',
 } as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS];
@@ -129,5 +131,6 @@ export async function getAllConfig(): Promise<Record<string, unknown>> {
     [CONFIG_KEYS.SUPPRESSION_OVERRIDE]: _cache.get(CONFIG_KEYS.SUPPRESSION_OVERRIDE) ?? { multiplier: null },
     [CONFIG_KEYS.SCANNER_ENABLED]:      _cache.get(CONFIG_KEYS.SCANNER_ENABLED)      ?? { enabled: true },
     [CONFIG_KEYS.COST_CAPS]:            _cache.get(CONFIG_KEYS.COST_CAPS)            ?? {},
+    [CONFIG_KEYS.STOCKBIT_TOKEN]:       _cache.get(CONFIG_KEYS.STOCKBIT_TOKEN)       ?? null,
   };
 }

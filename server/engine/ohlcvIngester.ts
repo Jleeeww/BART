@@ -53,7 +53,7 @@ export async function ingestOHLCVForSymbol(
       .insert(sessionHistory)
       .values({
         symbol: sym,
-        date: b.time,
+        date: b.time as string, // fetchOHLCV() is always daily ('1d') — time is always 'YYYY-MM-DD' here
         session: 0,
         open: b.open,
         high: b.high,

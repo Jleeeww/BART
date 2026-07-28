@@ -228,17 +228,27 @@ app.use((req, res, next) => {
       // run stockbitLogin.ts again by hand (needs OTP).
       const runStockbitRefresh = async () => {
         const { readCachedToken, refreshToken } = await import('./engine/stockbitAuth');
-        const { setToken } = await import('./engine/stockbitClient');
+        const { setToken, loadTokenFromConfig } = await import('./engine/stockbitClient');
+        const { setConfig, CONFIG_KEYS } = await import('./engine/systemConfig');
+        // Precedence before the Playwright refresh attempt: DB (admin-set) > local file cache.
         const cached = readCachedToken();
         if (cached) setToken(cached);
+        await loadTokenFromConfig();
         const fresh = await refreshToken();
         if (fresh) {
           setToken(fresh);
+          await setConfig(CONFIG_KEYS.STOCKBIT_TOKEN, { token: fresh, updatedAt: new Date().toISOString() }, 'stockbitAuth')
+            .catch((err) => log(`[stockbitAuth] failed to persist token to DB: ${err}`, 'stockbitAuth'));
           log('[stockbitAuth] token refreshed', 'stockbitAuth');
         } else {
           log('[stockbitAuth] refresh skipped/failed — saved session may need re-login (run stockbitLogin.ts)', 'stockbitAuth');
         }
       };
+      // Load the DB-configured token (if any) immediately at boot, ahead of the
+      // first scheduled refresh below, so admin-set tokens take effect right away.
+      import('./engine/stockbitClient')
+        .then(({ loadTokenFromConfig }) => loadTokenFromConfig())
+        .catch((err) => log(`[stockbitAuth] DB token load error: ${err}`, 'stockbitAuth'));
       setTimeout(() => {
         runStockbitRefresh().catch((err) => log(`[stockbitAuth] startup error: ${err}`, 'stockbitAuth'));
       }, 15000);

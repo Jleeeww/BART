@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutGrid,
@@ -10,7 +10,6 @@ import {
   Sparkles,
   SlidersVertical,
   Settings,
-  Search,
   ChevronsLeft,
   ChevronsRight,
   Sun,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { SymbolSearch } from "@/components/SymbolSearch";
 
 const mono = "'JetBrains Mono', 'IBM Plex Mono', monospace";
 
@@ -108,14 +108,6 @@ function useWibClock() {
   return time;
 }
 
-// ── Search types ──────────────────────────────────────────────────────────────
-interface SearchResult {
-  symbol: string;
-  companyName: string;
-  price: string;
-  changePercent: string;
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 interface SidebarProps {
   collapsed: boolean;
@@ -124,11 +116,6 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const [location, setLocation] = useLocation();
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [dropOpen, setDropOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
   const marketOpen = useMarketStatus();
   const wibTime = useWibClock();
   const { theme, toggleTheme } = useTheme();
@@ -143,38 +130,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   function isActive(route: string, exact?: boolean) {
     if (exact) return location === route || location.startsWith("/stock/");
     return location.startsWith(route);
-  }
-
-  // Search debounce
-  useEffect(() => {
-    if (query.length < 1) { setResults([]); setDropOpen(false); return; }
-    setIsLoading(true);
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        const data = await res.json();
-        setResults(data);
-        setDropOpen(true);
-      } catch { setResults([]); }
-      finally { setIsLoading(false); }
-    }, 200);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  // Click outside
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setDropOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  function handleResultClick(symbol: string) {
-    setQuery(""); setDropOpen(false); setResults([]);
-    setLocation(`/stock/${symbol}`);
   }
 
   return (
@@ -209,83 +164,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* ── Search (hidden while account is locked) ──────────────────── */}
       {!collapsed && isUnlocked && (
-        <div
-          ref={searchRef}
-          style={{ padding: "10px 10px", borderBottom: "1px solid var(--border-1)", position: "relative" }}
-        >
-          <div style={{ position: "relative" }}>
-            <Search style={{
-              position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)",
-              width: 13, height: 13, color: "var(--text-4)", pointerEvents: "none",
-            }} />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari saham..."
-              style={{
-                fontFamily: mono, fontSize: 13,
-                width: "100%", borderRadius: 6,
-                paddingLeft: 30, paddingRight: 8, paddingTop: 7, paddingBottom: 7,
-                background: "var(--surface-1)",
-                border: "1px solid var(--border-2)",
-                color: "var(--text-1)",
-                outline: "none",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "var(--signal)";
-                e.currentTarget.style.background = "var(--surface-2)";
-                if (results.length > 0) setDropOpen(true);
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "var(--border-2)";
-                e.currentTarget.style.background = "var(--surface-1)";
-              }}
-              data-testid="input-search-stock"
-            />
-          </div>
-
-          {dropOpen && (
-            <div style={{
-              position: "absolute", left: 10, right: 10, marginTop: 4, zIndex: 50,
-              borderRadius: 6, overflow: "hidden auto",
-              background: "var(--surface-1)", border: "1px solid var(--border-2)",
-              maxHeight: 256,
-            }}>
-              {isLoading ? (
-                <p style={{ fontFamily: mono, fontSize: 12, color: "var(--signal)", textAlign: "center", padding: "14px 0" }}>
-                  Memindai...
-                </p>
-              ) : results.length === 0 ? (
-                <p style={{ fontFamily: mono, fontSize: 12, color: "var(--text-4)", textAlign: "center", padding: "14px 0" }}>
-                  Saham tidak ditemukan
-                </p>
-              ) : results.map((r, i) => (
-                <div
-                  key={r.symbol}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "9px 12px", cursor: "pointer",
-                    borderBottom: i < results.length - 1 ? "1px solid var(--border-1)" : "none",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "var(--signal-dim)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                  onMouseDown={() => handleResultClick(r.symbol)}
-                  data-testid={`search-result-${r.symbol}`}
-                >
-                  <span style={{ fontFamily: mono, fontSize: 13, fontWeight: 600, color: "var(--text-1)", flexShrink: 0, width: 48 }}>
-                    {r.symbol}
-                  </span>
-                  <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-3)", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {r.companyName}
-                  </span>
-                  <span style={{ fontFamily: mono, fontSize: 12, color: "var(--text-2)", flexShrink: 0 }}>
-                    {r.price}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+        <div style={{ padding: "10px 10px", borderBottom: "1px solid var(--border-1)" }}>
+          <SymbolSearch onSelect={(symbol) => setLocation(`/stock/${symbol}`)} />
         </div>
       )}
 
@@ -297,7 +177,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             {!collapsed && (
               <div style={{
                 padding: "6px 18px 4px",
-                fontFamily: mono, fontSize: 10,
+                fontFamily: "var(--font-sans)", fontSize: 10,
                 letterSpacing: "0.14em",
                 color: "var(--text-4)",
                 textTransform: "uppercase",
@@ -329,10 +209,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     <Icon style={{ width: 16, height: 16, flexShrink: 0 }} />
                     {!collapsed && (
                       <>
-                        <span style={{ fontFamily: mono, fontSize: 13, flex: 1 }}>{item.label}</span>
+                        <span style={{ fontFamily: "var(--font-sans)", fontSize: 13, flex: 1 }}>{item.label}</span>
                         {item.locked ? (
                           <span style={{
-                            fontFamily: mono, fontSize: 10, color: "var(--text-4)",
+                            fontFamily: "var(--font-sans)", fontSize: 10, color: "var(--text-4)",
                             background: "var(--surface-2)", borderRadius: 3,
                             padding: "1px 5px",
                           }}>
@@ -387,7 +267,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     <Icon style={{ width: 16, height: 16, flexShrink: 0 }} />
                     {!collapsed && (
                       <span style={{
-                        fontFamily: mono, fontSize: 13,
+                        fontFamily: "var(--font-sans)", fontSize: 13,
                         fontWeight: active ? 500 : 400,
                         flex: 1,
                       }}>
@@ -396,7 +276,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     )}
                     {!collapsed && item.badge && (
                       <span style={{
-                        fontFamily: mono, fontSize: 10, fontWeight: 600,
+                        fontFamily: "var(--font-sans)", fontSize: 10, fontWeight: 600,
                         color: "var(--signal)",
                         background: "var(--signal-dim)",
                         border: "1px solid var(--signal)",
@@ -427,7 +307,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               width: 26, height: 26, borderRadius: 6, flexShrink: 0,
               display: "flex", alignItems: "center", justifyContent: "center",
               background: "var(--signal-dim)",
-              fontFamily: mono, fontSize: 12, fontWeight: 700,
+              fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 700,
               color: "var(--signal)", textTransform: "uppercase",
             }}
           >
@@ -437,13 +317,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
-                  fontFamily: mono, fontSize: 12, fontWeight: 600, color: "var(--text-1)",
+                  fontFamily: "var(--font-sans)", fontSize: 12, fontWeight: 600, color: "var(--text-1)",
                   overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}>
                   {user.username}
                 </div>
                 <div style={{
-                  fontFamily: mono, fontSize: 9, letterSpacing: "0.08em",
+                  fontFamily: "var(--font-sans)", fontSize: 9, letterSpacing: "0.08em",
                   color: isUnlocked ? "var(--positive)" : "var(--warning)",
                 }}>
                   {user.role === "admin" ? "ADMIN" : isUnlocked ? "AKTIF" : "MENUNGGU"}
@@ -492,7 +372,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             ? <Sun style={{ width: 15, height: 15 }} />
             : <Moon style={{ width: 15, height: 15 }} />}
           {!collapsed && (
-            <span style={{ fontFamily: mono, fontSize: 11 }}>
+            <span style={{ fontFamily: "var(--font-sans)", fontSize: 11 }}>
               {theme === "dark" ? "Terang" : "Gelap"}
             </span>
           )}
@@ -530,19 +410,19 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 boxShadow: marketOpen ? "0 0 5px var(--positive)" : "none",
               }} />
               <span style={{
-                fontFamily: mono, fontSize: 11, letterSpacing: "0.08em",
+                fontFamily: "var(--font-sans)", fontSize: 11, letterSpacing: "0.08em",
                 color: marketOpen ? "var(--positive)" : "var(--text-4)",
               }}>
                 {marketOpen ? "BUKA" : "TUTUP"}
               </span>
             </div>
             {wibTime && (
-              <span style={{ fontFamily: mono, fontSize: 11, color: "var(--text-4)", letterSpacing: "0.06em" }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontVariantNumeric: "tabular-nums", fontSize: 11, color: "var(--text-4)", letterSpacing: "0.06em" }}>
                 {wibTime} WIB
               </span>
             )}
           </div>
-          <p style={{ fontFamily: mono, fontSize: 10, color: "var(--text-4)", letterSpacing: "0.06em" }}>
+          <p style={{ fontFamily: "var(--font-sans)", fontSize: 10, color: "var(--text-4)", letterSpacing: "0.06em" }}>
             BART v3.0 · IDX
           </p>
         </div>

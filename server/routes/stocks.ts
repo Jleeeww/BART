@@ -7,7 +7,7 @@ import { UNIVERSE_STOCK_NAMES, UNIVERSE_STOCK_SECTORS } from "../config/constant
 import { db } from "../db";
 import { stocks as stocksTable } from "@shared/schema";
 import { inArray, isNull, and as andOp, eq } from "drizzle-orm";
-import { fetchOHLCV, type OHLCVBar } from "../engine/ohlcvFetcher";
+import { fetchOHLCV, fetchYahooOHLCV, aggregateBars, type OHLCVBar } from "../engine/ohlcvFetcher";
 
 export function registerStocksRoutes(app: Express): void {
   app.get(api.stocks.getBySymbol.path, async (req, res) => {
@@ -16,6 +16,29 @@ export function registerStocksRoutes(app: Express): void {
     if (!stock) {
       return res.status(404).json({ message: "Stock not found" });
     }
+
+    // Yahoo Finance is the primary source for live price/fundamentals; DB
+    // (Stockbit/IDX-ratio-derived) values are the fallback when Yahoo misses
+    // (rate-limited, non-standard ticker, etc). Bandarmology/news are untouched.
+    try {
+      const { fetchYahooQuote, fetchYahooFundamentals } = await import("../engine/yahooFinance");
+      const [quote, fundamentals] = await Promise.all([
+        fetchYahooQuote(symbol),
+        fetchYahooFundamentals(symbol),
+      ]);
+      if (quote?.price != null) stock.price = String(quote.price);
+      if (quote?.change != null) stock.change = String(quote.change);
+      if (quote?.changePercent != null) stock.changePercent = String(quote.changePercent);
+      if (quote?.marketCap != null) stock.marketCap = String(quote.marketCap);
+      if (fundamentals?.per != null) stock.peRatio = String(fundamentals.per);
+      if (fundamentals?.dividendYield != null) stock.dividendYield = String(fundamentals.dividendYield * 100);
+      if (fundamentals?.roe != null) stock.roe = String(fundamentals.roe * 100);
+      if (fundamentals?.netMargin != null) stock.netMargin = String(fundamentals.netMargin * 100);
+      if (fundamentals?.sector) stock.sector = fundamentals.sector;
+    } catch (err) {
+      console.warn(`[stocks] Yahoo override failed for ${symbol}, using DB values:`, err);
+    }
+
     res.json(stock);
   });
 
@@ -59,15 +82,34 @@ export function registerStocksRoutes(app: Express): void {
   app.get("/api/stocks/:symbol/ohlcv", async (req, res) => {
     try {
       const symbol = req.params.symbol.toUpperCase();
-      const rangeDays = Math.min(Math.max(Number(req.query.range) || 400, 5), 3650);
-      const cacheKey = `${symbol}:${rangeDays}`;
+      const rangeDays = Math.min(Math.max(Number(req.query.range) || 400, 1), 3650);
+      const rawInterval = String(req.query.interval || "1d");
+      // "4h" has no native Yahoo interval — synthesized by aggregating 1h bars (see below).
+      const interval = (["1m", "5m", "15m", "30m", "1h", "4h", "1d", "1mo"] as const).includes(rawInterval as any)
+        ? (rawInterval as "1m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1d" | "1mo")
+        : "1d";
+      const cacheKey = `${symbol}:${rangeDays}:${interval}`;
 
       const hit = ohlcvCache.get(cacheKey);
       if (hit && Date.now() - hit.at < OHLCV_TTL_MS) {
         return res.json({ symbol, bars: hit.bars, source: hit.source, cached: true });
       }
 
-      const { bars, source } = await fetchOHLCV(symbol, rangeDays);
+      // Intraday/monthly intervals have no IDX-official equivalent (EOD-only
+      // daily data) — go straight to Yahoo. Daily keeps the existing
+      // IDX-primary/Yahoo-fallback. 4H synthesized from real 1H bars.
+      let bars: OHLCVBar[];
+      let source: string;
+      if (interval === "1d") {
+        ({ bars, source } = await fetchOHLCV(symbol, rangeDays));
+      } else if (interval === "4h") {
+        const hourly = await fetchYahooOHLCV(symbol, rangeDays, "1h");
+        bars = aggregateBars(hourly, 4);
+        source = "YAHOO";
+      } else {
+        bars = await fetchYahooOHLCV(symbol, rangeDays, interval);
+        source = "YAHOO";
+      }
       if (bars.length === 0) {
         return res.status(502).json({ message: `No OHLCV data for ${symbol}` });
       }
@@ -294,10 +336,87 @@ export function registerStocksRoutes(app: Express): void {
       const results = universe
         .filter(s => s.symbol.includes(qUpper) || s.companyName.toLowerCase().includes(qLower))
         .slice(0, 8);
+
+      // Beyond the curated 45-stock universe: fall back to Yahoo Finance's
+      // cross-market ticker search (already filtered to .JK/IDX-listed
+      // results) so users can find and watchlist any IDX stock, TradingView-style.
+      if (results.length < 8 && q.length >= 2) {
+        try {
+          const { searchYahooTickers } = await import("../engine/yahooFinance");
+          const seen = new Set(results.map(r => r.symbol));
+          const extra = await searchYahooTickers(q);
+          for (const item of extra) {
+            if (seen.has(item.symbol)) continue;
+            seen.add(item.symbol);
+            results.push({ symbol: item.symbol, companyName: item.companyName, price: "0", changePercent: "0", source: "yahoo" } as any);
+            if (results.length >= 8) break;
+          }
+        } catch (err) {
+          console.warn("[search] Yahoo fallback failed:", err);
+        }
+      }
+
       res.json(results);
     } catch (error) {
       console.error("Error searching stocks:", error);
       res.status(500).json({ message: "Failed to search stocks" });
+    }
+  });
+
+  // Minimal live quote for symbols not seeded in the local DB (arbitrary
+  // IDX-listed tickers found via /api/search's Yahoo fallback). No DB write —
+  // the `stocks` table's curated content fields (AI summaries, etc.) only
+  // make sense for the seeded universe.
+  app.get("/api/quote/:symbol", async (req, res) => {
+    try {
+      const symbol = req.params.symbol.toUpperCase();
+      const { fetchYahooQuote, fetchYahooFundamentals } = await import("../engine/yahooFinance");
+      const [quote, fundamentals] = await Promise.all([
+        fetchYahooQuote(symbol),
+        fetchYahooFundamentals(symbol),
+      ]);
+      if (!quote && !fundamentals) {
+        return res.status(404).json({ message: `No Yahoo Finance data for ${symbol}` });
+      }
+      res.json({
+        symbol,
+        companyName: quote?.companyName ?? fundamentals?.sector ?? symbol,
+        price: quote?.price ?? null,
+        change: quote?.change ?? null,
+        changePercent: quote?.changePercent ?? null,
+        dayHigh: quote?.dayHigh ?? null,
+        dayLow: quote?.dayLow ?? null,
+        volume: quote?.volume ?? null,
+        marketCap: quote?.marketCap ?? fundamentals?.marketCap ?? null,
+        sector: fundamentals?.sector ?? null,
+        industry: fundamentals?.industry ?? null,
+        description: fundamentals?.description ?? null,
+        peRatio: fundamentals?.per ?? null,
+        pbv: fundamentals?.pbv ?? null,
+        dividendYield: fundamentals?.dividendYield != null ? fundamentals.dividendYield * 100 : null,
+        roe: fundamentals?.roe != null ? fundamentals.roe * 100 : null,
+      });
+    } catch (error) {
+      console.error("Error fetching quote:", error);
+      res.status(500).json({ message: "Failed to fetch quote" });
+    }
+  });
+
+  // Quarterly income-statement figures for the financial-statements panel
+  // (terminal-style Beranda + StockDashboard's "financials" tab). Yahoo
+  // Finance primary source — no Stockbit/IDX equivalent for this granularity.
+  app.get("/api/financials/:symbol", async (req, res) => {
+    try {
+      const symbol = req.params.symbol.toUpperCase();
+      const { fetchYahooFinancials } = await import("../engine/yahooFinance");
+      const financials = await fetchYahooFinancials(symbol);
+      if (!financials) {
+        return res.status(404).json({ message: `No financial statement data for ${symbol}` });
+      }
+      res.json(financials);
+    } catch (error) {
+      console.error("Error fetching financials:", error);
+      res.status(500).json({ message: "Failed to fetch financials" });
     }
   });
 }

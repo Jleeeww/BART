@@ -21,8 +21,12 @@ export function registerNewsRoutes(app: Express): void {
     }
   });
 
-  // Raw news feed with images (no AI). Optional ?symbol=&company= sorts
-  // relevant articles first. Powers the default Berita tab content.
+  // Raw news feed with images (no AI). Optional ?symbol=&company= HARD-FILTERS
+  // to articles genuinely about that stock (falls back to the unfiltered feed
+  // only if the filter finds nothing, so a tab never renders empty). When a
+  // symbol is given, official IDX per-stock announcements are merged in too —
+  // the one source that's genuinely per-ticker rather than keyword-matched.
+  // Powers the default Berita tab content.
   app.get('/api/news/feed', async (req, res) => {
     try {
       const { fetchLatestNews, screenArticle } = await import('../engine/newsFetcher');
@@ -32,16 +36,53 @@ export function registerNewsRoutes(app: Express): void {
 
       const symbol = String(req.query.symbol || '').toUpperCase();
       const company = String(req.query.company || '').toLowerCase();
-      const firstWord = company.split(/\s+/).filter((w) => w.length > 3)[0] ?? '';
-      if (symbol || firstWord) {
+      // Generic corporate words ("Bank", "PT", "Tbk", ...) are too common in
+      // Indonesian finance headlines to use as a relevance signal on their own
+      // (e.g. "Bank" from "Bank Central Asia" would match nearly every article
+      // about Bank Indonesia) — pick the first genuinely distinctive word.
+      const COMPANY_STOPWORDS = new Set([
+        'bank', 'perusahaan', 'group', 'grup', 'indonesia', 'nusantara',
+        'sejahtera', 'sentosa', 'utama', 'jaya', 'mandiri', 'persero',
+      ]);
+      const distinctiveWord = company
+        .split(/\s+/)
+        .filter((w) => w.length > 3 && !COMPANY_STOPWORDS.has(w))[0] ?? '';
+
+      let result = articles;
+      if (symbol || distinctiveWord) {
         const isRel = (a: any) => {
           const t = `${a.title} ${a.summary}`.toLowerCase();
           return (symbol.length >= 3 && t.includes(symbol.toLowerCase())) ||
-                 (firstWord && t.includes(firstWord));
+                 (distinctiveWord && t.includes(distinctiveWord));
         };
-        articles = [...articles].sort((a, b) => Number(isRel(b)) - Number(isRel(a)));
+        const filtered = articles.filter(isRel);
+        result = filtered.length > 0 ? filtered : articles;
       }
-      res.json({ articles: articles.slice(0, 30) });
+
+      if (symbol) {
+        try {
+          const { fetchIDXAnnouncements } = await import('../engine/idxData');
+          const announcements = await fetchIDXAnnouncements(symbol);
+          const idxArticles = announcements.map((a, i) => ({
+            id: `idx-ann-${symbol}-${i}-${a.date ?? ''}`,
+            title: a.title,
+            summary: `Pengumuman resmi IDX untuk ${symbol}.`,
+            content: `Pengumuman resmi IDX untuk ${symbol}.`,
+            source: 'IDX Resmi',
+            url: a.attachments[0]?.url ?? '',
+            publishedAt: a.date ?? new Date().toISOString(),
+            fetchedAt: new Date().toISOString(),
+            imageUrl: '',
+          }));
+          result = [...idxArticles, ...result].sort(
+            (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+          );
+        } catch {
+          // IDX announcements are a bonus merge — never let a failure break the feed.
+        }
+      }
+
+      res.json({ articles: result.slice(0, 30) });
     } catch (err) {
       res.status(500).json({ error: String(err) });
     }
