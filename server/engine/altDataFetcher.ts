@@ -9,21 +9,31 @@
  *              Weather anomalies for key production regions
  *              API: https://data.bmkg.go.id (free, public JSON)
  *
- *   Source 2 — KPBN/CPO Reference Price
- *              Indonesian CPO benchmark price (IDR/kg)
- *              Source: ESDM Ministry public data + scrape fallback
+ *   Source 2 — CPO (Crude Palm Oil) global benchmark price
+ *              Yahoo Finance `CPO=F` (Malaysian Crude Palm Oil futures,
+ *              CME, USD/MT) — a real, live, exchange-traded global CPO
+ *              benchmark. NOT Indonesia's official government-published
+ *              KPBN/ESDM domestic reference (that required screen-scraping
+ *              minerba.esdm.go.id, whose page structure changed and broke
+ *              the scraper — silently serving a stale hardcoded number for
+ *              months). Malaysia and Indonesia are the two dominant global
+ *              palm oil producers and their prices move in close tandem,
+ *              so this is a reasonable, honest, always-real proxy.
  *
- *   Source 3 — HBA Coal Index
- *              Indonesian coal reference price (USD/ton)
- *              Source: minerba.esdm.go.id (public monthly)
+ *   Source 3 — Coal global benchmark price
+ *              Yahoo Finance `MTF=F` (API2 CIF ARA seaborne thermal coal,
+ *              NYMEX, USD/ton) — real, live. NOT Indonesia's official HBA
+ *              (same ESDM-scrape problem as CPO above).
  *
  * DESIGN RULES:
  *   - Never throws — all fetches wrapped in try/catch
  *   - Returns stale cache on fetch failure (never null)
+ *   - NEVER fabricates a price: if both the live fetch and the cache are
+ *     empty, fields are null (rendered as "—" by the client) — no
+ *     hardcoded placeholder numbers are shown as if they were real data.
  *   - Each source has independent TTL and failure counter
  *   - Max 3 consecutive failures before source is marked degraded
  *   - All data tagged with fetchedAt timestamp
- *   - No external dependencies beyond built-in fetch
  *   - Safe to call from radarEngine.ts batch pipeline
  *
  * SHADOW MODE:
@@ -104,18 +114,26 @@ let _coalCache: SourceCache<CoalPriceData> = {
 };
 
 // ── Key production regions for IDX sectors ────────────────────
-
+//
+// BMKG retired the old `data.bmkg.go.id/DataMKG/MEWS/DigitalForecast/*.xml`
+// endpoint (it now 302-redirects to their homepage — dead). The current
+// public API is `https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=<code>`,
+// which requires a village-level (ADM4) administrative code, not a province
+// name. Each region below uses its provincial capital's ADM4 code as a
+// representative reading. Codes resolved from the BMKG-compatible
+// Kepmendagri wilayah reference (github.com/kodewilayah/permendagri-72-2019)
+// and verified live against the real API before being hardcoded here.
 const KEY_REGIONS = [
-  { regionId: '15', regionName: 'Riau',              sector: 'Consumer Staples' },
-  { regionId: '16', regionName: 'Sumatera Selatan',  sector: 'Consumer Staples' },
-  { regionId: '14', regionName: 'Kalimantan Tengah', sector: 'Consumer Staples' },
-  { regionId: '17', regionName: 'Kalimantan Timur',  sector: 'Energy'           },
-  { regionId: '18', regionName: 'Kalimantan Selatan', sector: 'Basic Materials' },
-  { regionId: '19', regionName: 'Kalimantan Barat',   sector: 'Basic Materials' },
-  { regionId: '20', regionName: 'Sulawesi Tengah',   sector: 'Basic Materials'  },
-  { regionId: '21', regionName: 'Maluku Utara',      sector: 'Basic Materials'  },
-  { regionId: '12', regionName: 'Jawa Tengah',       sector: 'Consumer Discretionary' },
-  { regionId: '11', regionName: 'Jawa Timur',        sector: 'Consumer Discretionary' },
+  { regionId: '14.71.01.1002', regionName: 'Riau',               sector: 'Consumer Staples',         city: 'Pekanbaru' },
+  { regionId: '16.71.01.1001', regionName: 'Sumatera Selatan',   sector: 'Consumer Staples',         city: 'Palembang' },
+  { regionId: '62.71.01.1001', regionName: 'Kalimantan Tengah',  sector: 'Consumer Staples',         city: 'Palangka Raya' },
+  { regionId: '64.72.01.1001', regionName: 'Kalimantan Timur',   sector: 'Energy',                   city: 'Samarinda' },
+  { regionId: '63.71.01.1001', regionName: 'Kalimantan Selatan', sector: 'Basic Materials',          city: 'Banjarmasin' },
+  { regionId: '61.71.01.1002', regionName: 'Kalimantan Barat',   sector: 'Basic Materials',          city: 'Pontianak' },
+  { regionId: '72.71.01.1004', regionName: 'Sulawesi Tengah',    sector: 'Basic Materials',          city: 'Palu' },
+  { regionId: '82.71.01.1001', regionName: 'Maluku Utara',       sector: 'Basic Materials',          city: 'Ternate' },
+  { regionId: '33.74.01.1001', regionName: 'Jawa Tengah',        sector: 'Consumer Discretionary',   city: 'Semarang' },
+  { regionId: '35.78.01.1001', regionName: 'Jawa Timur',         sector: 'Consumer Discretionary',   city: 'Surabaya' },
 ];
 
 // ── Fetch timeout wrapper ─────────────────────────────────────
@@ -142,29 +160,10 @@ async function fetchBMKGWeather(): Promise<WeatherRegion[]> {
   const results: WeatherRegion[] = [];
   const now = new Date().toISOString();
 
-  const BMKG_PROVINCE_MAP: Record<string, string> = {
-    '11': 'jawa-timur',
-    '12': 'jawa-tengah',
-    '14': 'kalimantan-tengah',
-    '15': 'riau',
-    '16': 'sumatera-selatan',
-    '17': 'kalimantan-timur',
-    '18': 'kalimantan-selatan',
-    '19': 'kalimantan-barat',
-    '20': 'sulawesi-tengah',
-    '21': 'maluku-utara',
-  };
-
   for (const region of KEY_REGIONS) {
     try {
-      const provinceName = BMKG_PROVINCE_MAP[region.regionId];
-      if (!provinceName) continue;
-
-      const url = `https://data.bmkg.go.id/DataMKG/MEWS/DigitalForecast/DigitalForecast-${
-        provinceName.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')
-      }.xml`;
-
-      const response = await fetchWithTimeout(url, 5000);
+      const url = `https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${region.regionId}`;
+      const response = await fetchWithTimeout(url, 6000);
 
       if (!response.ok) {
         results.push({
@@ -178,29 +177,16 @@ async function fetchBMKGWeather(): Promise<WeatherRegion[]> {
         continue;
       }
 
-      const text = await response.text();
-
-      const weatherMatch = text.match(/<weather>(\d+)<\/weather>/);
-      const tempMatch    = text.match(/<t>(\d+)<\/t>/);
-
-      const weatherCode = weatherMatch ? weatherMatch[1] : null;
-      const temperature = tempMatch ? parseFloat(tempMatch[1]) : null;
-
-      let rainfallMm: number | null = null;
-      if (weatherCode) {
-        const code = parseInt(weatherCode);
-        if (code >= 95) rainfallMm = 25;
-        else if (code >= 80) rainfallMm = 10;
-        else if (code >= 60) rainfallMm = 5;
-        else rainfallMm = 0;
-      }
+      const json = await response.json();
+      // Nearest upcoming 3-hour forecast slot for this location.
+      const slot = json?.data?.[0]?.cuaca?.[0]?.[0];
 
       results.push({
         ...region,
-        rainfallMm,
+        rainfallMm: typeof slot?.tp === 'number' ? slot.tp : null,
         rainfallAnomaly: null,
-        weatherCode,
-        temperature,
+        weatherCode: slot?.weather_desc ?? null,
+        temperature: typeof slot?.t === 'number' ? slot.t : null,
         fetchedAt: now,
       });
 
@@ -219,102 +205,92 @@ async function fetchBMKGWeather(): Promise<WeatherRegion[]> {
   return results;
 }
 
-// ── CPO Price Fetcher ─────────────────────────────────────────
+// ── CPO Price Fetcher (Yahoo Finance CPO=F — Malaysian CPO futures, CME) ──
 
-const CPO_FALLBACK: CPOPriceData = {
-  priceIDR: 15655,
+// No-data state: NEVER a fabricated price. `source` keeps the word
+// "FALLBACK" so the client's existing `source.includes("FALLBACK")` check
+// (STALE badge / dimmed styling) keeps working when there's genuinely
+// nothing real to show — the client already renders null prices as "—".
+const CPO_UNAVAILABLE: CPOPriceData = {
+  priceIDR: null,
   priceMYR: null,
-  priceUSD: 938.87,
+  priceUSD: null,
   changePercent30d: null,
-  trend: 'NAIK',
-  fetchedAt: '2026-03-12T00:00:00.000Z',
-  source: 'FALLBACK_HARDCODED',
+  trend: null,
+  fetchedAt: new Date(0).toISOString(),
+  source: 'FALLBACK_UNAVAILABLE',
 };
+
+function trendFromChangePercent(pct: number | null): CPOPriceData['trend'] {
+  if (pct == null || !isFinite(pct)) return null;
+  if (pct > 1) return 'NAIK';
+  if (pct < -1) return 'TURUN';
+  return 'STABIL';
+}
 
 async function fetchCPOPrice(): Promise<CPOPriceData> {
   const now = new Date().toISOString();
-
   try {
-    const response = await fetchWithTimeout(
-      'https://www.minerba.esdm.go.id/harga_acuan',
-      6000
-    );
-
-    if (!response.ok) throw new Error(`ESDM returned ${response.status}`);
-
-    const html = await response.text();
-
-    const usdMatch = html.match(/CPO[^$]*?([\d,]+\.?\d*)\s*(?:USD|US\$)/i);
-    const priceUSD = usdMatch ? parseFloat(usdMatch[1].replace(',', '')) : null;
-
-    if (!priceUSD || isNaN(priceUSD)) {
-      throw new Error('Could not parse CPO price from ESDM');
+    const { getYahooFinanceClient } = await import('./yahooFinance');
+    const yf = getYahooFinanceClient();
+    const q = await yf.quote('CPO=F');
+    const priceUSD = q?.regularMarketPrice ?? null;
+    if (priceUSD == null || !isFinite(priceUSD)) {
+      throw new Error('Yahoo CPO=F returned no price');
     }
-
+    const changePercent30d = q?.regularMarketChangePercent ?? null;
     return {
       priceIDR: null,
       priceMYR: null,
       priceUSD,
-      changePercent30d: null,
-      trend: null,
+      changePercent30d,
+      trend: trendFromChangePercent(changePercent30d),
       fetchedAt: now,
-      source: 'ESDM_MINERBA',
+      source: 'YAHOO_CPO_F',
     };
-
   } catch (err) {
-    console.warn('[altDataFetcher] CPO fetch failed, using fallback:',
+    console.warn('[altDataFetcher] CPO (Yahoo CPO=F) fetch failed:',
       err instanceof Error ? err.message : err);
-
-    return { ...CPO_FALLBACK };
+    return { ...CPO_UNAVAILABLE, fetchedAt: now };
   }
 }
 
-// ── HBA Coal Price Fetcher ────────────────────────────────────
+// ── Coal Price Fetcher (Yahoo Finance MTF=F — API2 CIF ARA seaborne coal) ──
 
-const COAL_FALLBACK: CoalPriceData = {
-  hba1USD: 102.87,
-  hba2USD: 71.74,
-  hba3USD: 47.34,
+const COAL_UNAVAILABLE: CoalPriceData = {
+  hba1USD: null,
+  hba2USD: null,
+  hba3USD: null,
   changePercent30d: null,
-  trend: 'TURUN',
-  fetchedAt: '2026-02-16T00:00:00.000Z',
-  source: 'FALLBACK_HARDCODED',
+  trend: null,
+  fetchedAt: new Date(0).toISOString(),
+  source: 'FALLBACK_UNAVAILABLE',
 };
 
 async function fetchCoalPrice(): Promise<CoalPriceData> {
   const now = new Date().toISOString();
-
   try {
-    const response = await fetchWithTimeout(
-      'https://www.minerba.esdm.go.id/harga_acuan',
-      6000
-    );
-
-    if (!response.ok) throw new Error(`ESDM returned ${response.status}`);
-
-    const html = await response.text();
-
-    const hba1Match = html.match(/HBA[^$]*?(\d{2,3}\.\d{2})/);
-    const hba1USD = hba1Match ? parseFloat(hba1Match[1]) : null;
-
-    if (!hba1USD || isNaN(hba1USD)) {
-      throw new Error('Could not parse HBA price from ESDM');
+    const { getYahooFinanceClient } = await import('./yahooFinance');
+    const yf = getYahooFinanceClient();
+    const q = await yf.quote('MTF=F');
+    const hba1USD = q?.regularMarketPrice ?? null;
+    if (hba1USD == null || !isFinite(hba1USD)) {
+      throw new Error('Yahoo MTF=F returned no price');
     }
-
+    const changePercent30d = q?.regularMarketChangePercent ?? null;
     return {
       hba1USD,
       hba2USD: null,
       hba3USD: null,
-      changePercent30d: null,
-      trend: null,
+      changePercent30d,
+      trend: trendFromChangePercent(changePercent30d),
       fetchedAt: now,
-      source: 'ESDM_MINERBA',
+      source: 'YAHOO_MTF_F',
     };
-
   } catch (err) {
-    console.warn('[altDataFetcher] Coal fetch failed, using fallback:',
+    console.warn('[altDataFetcher] Coal (Yahoo MTF=F) fetch failed:',
       err instanceof Error ? err.message : err);
-    return { ...COAL_FALLBACK };
+    return { ...COAL_UNAVAILABLE, fetchedAt: now };
   }
 }
 
@@ -373,7 +349,7 @@ export async function getCPOPrice(): Promise<CPOPriceData> {
   } catch (err) {
     markFailure(_cpoCache);
     console.error('[altDataFetcher] CPO fetch error:', err);
-    return _cpoCache.data ?? CPO_FALLBACK;
+    return _cpoCache.data ?? CPO_UNAVAILABLE;
   }
 }
 
@@ -392,7 +368,7 @@ export async function getCoalPrice(): Promise<CoalPriceData> {
   } catch (err) {
     markFailure(_coalCache);
     console.error('[altDataFetcher] Coal fetch error:', err);
-    return _coalCache.data ?? COAL_FALLBACK;
+    return _coalCache.data ?? COAL_UNAVAILABLE;
   }
 }
 
@@ -415,8 +391,8 @@ export async function getAltDataSnapshot(): Promise<AltDataSnapshot> {
 
   return {
     weather: weather.status === 'fulfilled' ? weather.value : [],
-    cpo:     cpo.status     === 'fulfilled' ? cpo.value     : CPO_FALLBACK,
-    coal:    coal.status    === 'fulfilled' ? coal.value    : COAL_FALLBACK,
+    cpo:     cpo.status     === 'fulfilled' ? cpo.value     : CPO_UNAVAILABLE,
+    coal:    coal.status    === 'fulfilled' ? coal.value    : COAL_UNAVAILABLE,
     lastFullRefresh: hasAnyData ? new Date().toISOString() : null,
     degradedSources,
   };

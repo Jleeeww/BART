@@ -16,11 +16,28 @@ export function registerValuationRoutes(app: Express): void {
       const { computeSynthesis }  = await import('../engine/synthesisEngine');
 
       const safeParse = (v: any): number | null => { const n = parseFloat(String(v)); return isFinite(n) ? n : null; };
+
+      // Prefer live Yahoo Finance fundamentals (same source as /api/stocks/:symbol)
+      // over the DB row, which is only refreshed periodically — avoids the
+      // Valuasi tab showing different PER/ROE than the rest of the page.
+      let peRatio = safeParse(stock.peRatio);
+      let dividendYield = safeParse(stock.dividendYield);
+      let roe = safeParse(stock.roe);
+      let netMargin = safeParse(stock.netMargin);
+      try {
+        const { fetchYahooFundamentals } = await import('../engine/yahooFinance');
+        const yf = await fetchYahooFundamentals(symbol);
+        if (yf?.per != null) peRatio = yf.per;
+        if (yf?.dividendYield != null) dividendYield = yf.dividendYield * 100;
+        if (yf?.roe != null) roe = yf.roe * 100;
+        if (yf?.netMargin != null) netMargin = yf.netMargin * 100;
+      } catch { /* fall back to DB values already parsed above */ }
+
       const valuationOutput = computeValuation({
-        peRatio:       safeParse(stock.peRatio),
-        dividendYield: safeParse(stock.dividendYield),
-        roe:           safeParse(stock.roe),
-        netMargin:     safeParse(stock.netMargin),
+        peRatio,
+        dividendYield,
+        roe,
+        netMargin,
         sector:        stock.sector ?? null,
       });
 

@@ -259,6 +259,10 @@ export default function StockDashboard() {
     if (!stock) return;
 
     setAiLoading(true);
+    // NOTE: net foreign/domestic buy is NOT sent here — the server derives
+    // it itself from real Stockbit bandarmology data (getBandarmology()).
+    // This used to send hardcoded placeholder IDR figures for every stock;
+    // removed rather than lying about real flow.
     const payload = {
       stock: stock.symbol,
       date: new Date().toISOString().split('T')[0],
@@ -268,12 +272,9 @@ export default function StockDashboard() {
       price_context: {
         last_price: parseFloat(stock.price.replace(/,/g, "")),
         d1_change_pct: parseFloat(stock.changePercent),
-        volume_vs_avg: 1.2,
       },
 
       flow_signals: {
-        net_foreign_buy_idr: 92800000000,
-        net_domestic_buy_idr: 130400000000,
         flow_bias: stock.flowBias,
         flow_intensity: stock.flowIntensity,
         flow_reliability: stock.flowReliability,
@@ -285,12 +286,6 @@ export default function StockDashboard() {
         roe: parseFloat(stock.roe),
         net_margin: parseFloat(stock.netMargin),
         yoy_profit_growth_pct: parseFloat(stock.growth),
-        capital_adequacy: "Strong",
-      },
-
-      event_specifics: {
-        event_type: "Market Update",
-        headline: `${stock.symbol} market activity analysis`,
       },
     };
 
@@ -940,108 +935,6 @@ export default function StockDashboard() {
                     )}
 
                     <FinancialStatementsPanel symbol={stock.symbol} />
-
-                    <Card className="p-6 border-border/50 shadow-sm bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/5">
-                      <h3 className="text-lg font-bold font-display mb-4 text-foreground">Ringkasan Kinerja Keuangan</h3>
-                      <p className="text-muted-foreground leading-relaxed mb-4">
-                        {stock.financialSummary}
-                        {aiData?.flowQualityScore < 50 && " Narasi keuangan struktural menghadapi potensi hambatan dari risiko distribusi institusional yang muncul."}
-                        {aiData?.flowQualityScore > 75 && " Kinerja keuangan yang berkelanjutan diimbangi dengan akumulasi institusi terkonsentrasi, meningkatkan sensitivitas makro."}
-                      </p>
-                      <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-md">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-2">
-                          <Activity className="w-3 h-3" />
-                          Perspektif Analis Keuangan
-                        </p>
-                        <p className="text-sm text-muted-foreground leading-relaxed italic">
-                          {stock.financialsAnalystView}
-                        </p>
-                      </div>
-                    </Card>
-
-                    <Card className="p-6 border-border/50 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Laporan Laba Rugi</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-border/50">
-                              <th className="text-left py-3 px-3 font-semibold text-foreground">Metric</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">2023</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">2024</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">2025</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Pendapatan</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.revenue2023}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.revenue2024}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.revenue2025}</td>
-                            </tr>
-                            <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Laba Bersih</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.netProfit2023}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.netProfit2024}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.netProfit2025}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </Card>
-
-                    <Card className="p-6 border-border/50 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Neraca</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-border/50">
-                              <th className="text-left py-3 px-3 font-semibold text-foreground">Metric</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">2023</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">2024</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">2025</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Total Aset</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.assets2023}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.assets2024}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.assets2025}</td>
-                            </tr>
-                            <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Total Liabilitas</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.liabilities2023}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.liabilities2024}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.liabilities2025}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </Card>
-
-                    <Card className="p-6 border-border/50 shadow-sm">
-                      <h4 className="text-base font-bold font-display mb-4 text-foreground">Arus Kas</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-border/50">
-                              <th className="text-left py-3 px-3 font-semibold text-foreground">Metric</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">2023</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">2024</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">2025</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr className="border-b border-border/30 hover:bg-muted/30">
-                              <td className="py-3 px-3 text-muted-foreground">Arus Kas Operasional</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.ocf2023}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.ocf2024}</td>
-                              <td className="text-right py-3 px-3 font-mono text-foreground">{stock.ocf2025}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </Card>
                   </TabsContent>
 
                   {/* Flow Tab */}
@@ -1351,192 +1244,6 @@ export default function StockDashboard() {
                       </Card>
                     )}
 
-                    {/* SECTION 2: Broker Summary */}
-                    <Card className="p-6 border-border/50 shadow-sm">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-base font-bold font-display text-foreground">Ringkasan Broker</h4>
-                        {aiData?.smartMoneyIntent && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="text-muted-foreground">Tujuan Institusional Dominan:</span>
-                            <span className="font-bold text-indigo-600 dark:text-indigo-400">{aiData.smartMoneyIntent.primaryIntent}</span>
-                          </div>
-                        )}
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-border/50">
-                              <th className="text-left py-3 px-3 font-semibold text-foreground">Broker Code</th>
-                              <th className="text-left py-3 px-3 font-semibold text-foreground">Broker Name</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">Avg Buy</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">Avg Sell</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">Net Buy (IDR)</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">Net Sell (IDR)</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">% of Volume</th>
-                              <th className="text-right py-3 px-3 font-semibold text-foreground">AI Role</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(() => {
-                              try {
-                                const brokers = JSON.parse(stock.brokerData);
-                                const sorted = [...brokers].sort((a: any, b: any) => {
-                                  const aVal = parseFloat(a.netBuy?.replace(/[B IDR]/g, "") || a.netSell?.replace(/[B IDR]/g, "") || "0");
-                                  const bVal = parseFloat(b.netBuy?.replace(/[B IDR]/g, "") || b.netSell?.replace(/[B IDR]/g, "") || "0");
-                                  return bVal - aVal;
-                                });
-                                return sorted.map((broker: any, index: number) => (
-                                  <tr key={index} className="border-b border-border/30 hover:bg-muted/30">
-                                    <td className="py-3 px-3 font-mono font-semibold text-foreground">{broker.code}</td>
-                                    <td className="py-3 px-3 text-muted-foreground">{broker.name}</td>
-                                    <td className="text-right py-3 px-3 font-mono text-emerald-600 dark:text-emerald-400">{broker.avgBuy || "—"}</td>
-                                    <td className="text-right py-3 px-3 font-mono text-red-600 dark:text-red-400">{broker.avgSell || "—"}</td>
-                                    <td className="text-right py-3 px-3 font-mono">
-                                      {broker.netBuy ? (
-                                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                                          {broker.netBuy}
-                                        </span>
-                                      ) : (
-                                        <span className="text-muted-foreground">—</span>
-                                      )}
-                                    </td>
-                                    <td className="text-right py-3 px-3 font-mono">
-                                      {broker.netSell ? (
-                                        <span className="text-red-600 dark:text-red-400 font-semibold">
-                                          {broker.netSell}
-                                        </span>
-                                      ) : (
-                                        <span className="text-muted-foreground">—</span>
-                                      )}
-                                    </td>
-                                    <td className="text-right py-3 px-3 font-mono text-foreground">{broker.volumePercent}</td>
-                                    <td className="py-3 px-3 text-right">
-                                      {(() => {
-                                        const insight = aiData?.brokerInsights?.find((i: any) => i.brokerCode === broker.code);
-                                        return insight ? (
-                                          <div className="inline-flex flex-col items-end">
-                                            <span className="text-[12px] font-bold px-1.5 py-0.5 rounded bg-secondary text-foreground uppercase">
-                                              {insight.inferredRole}
-                                            </span>
-                                            <span className="text-[12px] text-muted-foreground mt-0.5 whitespace-nowrap">
-                                              Conf: {insight.confidenceLevel}
-                                            </span>
-                                          </div>
-                                        ) : <span className="text-muted-foreground">—</span>;
-                                      })()}
-                                    </td>
-                                  </tr>
-                                ));
-                              } catch (e) {
-                                return (
-                                  <tr>
-                                    <td colSpan={7} className="py-3 px-3 text-muted-foreground text-center">
-                                      No broker data available
-                                    </td>
-                                  </tr>
-                                );
-                              }
-                            })()}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Average Transaction Price Section */}
-                      <div className="mt-6 pt-6 border-t border-border/30">
-                        <h5 className="text-sm font-bold font-display mb-4 text-foreground">Average Transaction Price</h5>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Buy Average Price</p>
-                            <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400 font-mono">{stock.avgBuyPrice}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Sell Average Price</p>
-                            <p className="text-lg font-semibold text-red-600 dark:text-red-400 font-mono">{stock.avgSellPrice}</p>
-                          </div>
-                        </div>
-                      <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
-                        The convergence of buy and sell average prices suggests institutional participation with minimal execution friction, indicating a high-quality liquidity environment.
-                      </p>
-                      </div>
-                    </Card>
-
-                    {/* SECTION 3: Foreign vs Domestic Activity */}
-                    <Card className="p-6 border-border/50 shadow-sm space-y-6">
-                      <div>
-                        <h4 className="text-base font-bold font-display mb-4 text-foreground">Aktivitas Asing vs Domestik</h4>
-                        {(() => {
-                          try {
-                            const data = JSON.parse(stock.foreignActivityData);
-                            return (
-                              <div className="space-y-6">
-                                {/* ... existing visual elements ... */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <div className="space-y-3">
-                                    <h5 className="text-sm font-semibold text-foreground">Investor Asing</h5>
-                                    <div className="space-y-2 text-sm">
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-muted-foreground">Buy:</span>
-                                        <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{data.foreignBuy}</span>
-                                      </div>
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-muted-foreground">Sell:</span>
-                                        <span className="font-mono font-semibold text-red-600 dark:text-red-400">{data.foreignSell}</span>
-                                      </div>
-                                      <div className="flex justify-between items-center border-t border-border/30 pt-2">
-                                        <span className="text-muted-foreground font-semibold">Net Flow:</span>
-                                        <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{data.netForeignFlow}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-3">
-                                    <h5 className="text-sm font-semibold text-foreground">Investor Domestik</h5>
-                                    <div className="space-y-2 text-sm">
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-muted-foreground">Buy:</span>
-                                        <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">{data.domesticBuy}</span>
-                                      </div>
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-muted-foreground">Sell:</span>
-                                        <span className="font-mono font-semibold text-red-600 dark:text-red-400">{data.domesticSell}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Participation Split ... */}
-                                <div className="space-y-3">
-                                  <h5 className="text-sm font-semibold text-foreground">Distribusi Partisipasi</h5>
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex-1 h-6 rounded-md overflow-hidden border border-border/30 flex">
-                                      <div className="bg-blue-500 dark:bg-blue-400 transition-all" style={{ width: `${data.domesticPercent}%` }} />
-                                      <div className="bg-amber-500 dark:bg-amber-400 transition-all" style={{ width: `${data.foreignPercent}%` }} />
-                                    </div>
-                                    <div className="flex gap-4 text-xs font-semibold whitespace-nowrap">
-                                      <span><span className="inline-block w-3 h-3 rounded-sm bg-blue-500 dark:bg-blue-400 mr-1" />{data.domesticPercent}%</span>
-                                      <span><span className="inline-block w-3 h-3 rounded-sm bg-amber-500 dark:bg-amber-400 mr-1" />{data.foreignPercent}%</span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Analyst View Section for Flow */}
-                                <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-md">
-                                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 flex items-center gap-2">
-                                    <Activity className="w-3 h-3" />
-                                    Perspektif Analis Aliran Dana
-                                  </p>
-                                  <p className="text-sm text-muted-foreground leading-relaxed italic">
-                                    {stock.flowAnalystView}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          } catch (e) {
-                            return null;
-                          }
-                        })()}
-                      </div>
-                    </Card>
                   </TabsContent>
 
                   {/* News Tab */}

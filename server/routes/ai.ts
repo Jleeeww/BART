@@ -69,7 +69,17 @@ export function registerAiRoutes(app: Express): void {
     // Look up stock to get consistent readinessScore and actionGuidance
     const stockSymbol = payload.stock as string;
     const stockData = await storage.getStockBySymbol(stockSymbol);
-  
+
+    // Real per-stock broker net flow (Stockbit-sourced, same data as the
+    // Flow Broker tab) — NEVER trust net_foreign_buy_idr/net_domestic_buy_idr
+    // from the client payload; those used to be hardcoded placeholder
+    // constants in the client (StockDashboard.tsx), silently feeding the
+    // same fake numbers into every stock's flow/control scores regardless
+    // of its real activity. Falls back to 0 (neutral) if genuinely unavailable
+    // (e.g. Stockbit token expired) rather than any fabricated number.
+    const { getBandarmology } = await import('../engine/stockbitBandarmology');
+    const realBandar = await getBandarmology(stockSymbol);
+
     // ═══════════════════════════════════════════════════════════
     // BANDARMOLOGY INTELLIGENCE ENGINE (Single Entry Point)
     // All intelligence computed via computeDetailFields()
@@ -89,8 +99,8 @@ export function registerAiRoutes(app: Express): void {
       flowBias:         flowSignals.flow_bias       || stockData?.flowBias       || "Netral",
       flowIntensity:    flowSignals.flow_intensity   || stockData?.flowIntensity  || "",
       flowReliability:  flowSignals.flow_reliability || stockData?.flowReliability || "Sedang",
-      netForeignBuyIdr: flowSignals.net_foreign_buy_idr || 0,
-      netDomesticBuyIdr: flowSignals.net_domestic_buy_idr || 0,
+      netForeignBuyIdr: realBandar?.foreignNet ?? 0,
+      netDomesticBuyIdr: realBandar?.localNet ?? 0,
       buyAvg:           flowSignals.buy_avg_price   || 0,
       sellAvg:          flowSignals.sell_avg_price  || 0,
       lastPrice:        priceContext.last_price     || 0,
@@ -100,7 +110,6 @@ export function registerAiRoutes(app: Express): void {
       growth:           parseFloat(String(stockData?.growth || "0")),
       insiderData:      stockData?.insiderData      || null,
       stockCharacter:   stockData?.stockCharacter   || null,
-      eventType:        payload.event_specifics?.event_type || ""
     };
     const intel = computeDetailFields(bandarmologyInput);
 
@@ -286,182 +295,6 @@ export function registerAiRoutes(app: Express): void {
         : aiReadiness.layers.management.score >= 40 ? 'SEDANG' : 'LEMAH')
       : null;
 
-    // ========================================
-    // SMART NEWS FILTER ENGINE
-    // Classifies news into Fundamental, Sentiment, or Noise
-    // ========================================
-    const smartNewsFilter = (() => {
-      // Sample news items to classify (in production, would come from news API)
-      const rawNews = [
-        {
-          id: "n1",
-          headline: "BBCA Catat Pertumbuhan Laba Bersih 12% YoY di Q3 2025",
-          date: "2025-12-22",
-          source: "IDX News"
-        },
-        {
-          id: "n2",
-          headline: "Bank Indonesia Pertahankan Suku Bunga Acuan di Level 5.75%",
-          date: "2025-11-15",
-          source: "Bisnis Indonesia"
-        },
-        {
-          id: "n3",
-          headline: "Aplikasi Digital BBCA Capai 30 Juta Pengguna Aktif",
-          date: "2025-12-05",
-          source: "TechDaily"
-        },
-        {
-          id: "n4",
-          headline: "Analis Goldman Sachs Pertahankan Rating Overweight untuk BBCA",
-          date: "2025-12-18",
-          source: "Bloomberg"
-        },
-        {
-          id: "n5",
-          headline: "BBCA Raih Penghargaan Bank Terbaik Versi Majalah Finance",
-          date: "2025-12-01",
-          source: "Kompas"
-        },
-        {
-          id: "n6",
-          headline: "Volume Transaksi Digital Banking Meningkat 40% di Q3",
-          date: "2025-12-10",
-          source: "Kontan"
-        },
-        {
-          id: "n7",
-          headline: "Rumor Akuisisi Fintech oleh BBCA Beredar di Pasar",
-          date: "2025-12-15",
-          source: "Media Sosial"
-        },
-        {
-          id: "n8",
-          headline: "BBCA Tetap Jadi Saham Favorit Investor Asing",
-          date: "2025-12-20",
-          source: "Investor Daily"
-        }
-      ];
-
-      // Classification function
-      const classifyNews = (headline: string): { 
-        category: "fundamental" | "sentiment" | "noise";
-        aiInterpretation: string;
-        contextTag: string;
-      } => {
-        const headlineLower = headline.toLowerCase();
-      
-        // Category A: Fundamental-Changing News
-        const fundamentalKeywords = [
-          "laba bersih", "laporan keuangan", "pendapatan", "right issue",
-          "akuisisi", "divestasi", "restrukturisasi", "regulasi baru",
-          "capex", "ekspansi", "merger", "obligasi", "utang", "kredit macet",
-          "npm", "nim", "roa", "roe", "car", "ldr"
-        ];
-      
-        if (fundamentalKeywords.some(kw => headlineLower.includes(kw))) {
-          return {
-            category: "fundamental",
-            aiInterpretation: "Berita ini berpotensi memengaruhi prospek jangka menengah hingga panjang karena berdampak langsung pada struktur keuangan atau kemampuan menghasilkan laba.",
-            contextTag: "Berpotensi memengaruhi valuasi"
-          };
-        }
-      
-        // Category B: Sentiment/Flow News
-        const sentimentKeywords = [
-          "rating", "rekomendasi", "analis", "suku bunga", "bank indonesia",
-          "makro", "sentimen", "asing", "rotasi", "sektor", "kebijakan",
-          "investor", "favorit", "volume", "transaksi"
-        ];
-      
-        if (sentimentKeywords.some(kw => headlineLower.includes(kw))) {
-          return {
-            category: "sentiment",
-            aiInterpretation: "Berita ini lebih berpengaruh terhadap sentimen dan psikologi pasar. Dampaknya cenderung bersifat sementara dan bergantung pada respons pelaku institusi.",
-            contextTag: "Dapat memengaruhi volatilitas jangka pendek"
-          };
-        }
-      
-        // Category C: Noise (filtered by default)
-        return {
-          category: "noise",
-          aiInterpretation: "Informasi ini tidak memiliki dampak struktural yang signifikan terhadap fundamental maupun perilaku institusi.",
-          contextTag: "Tidak berdampak pada struktur kampanye bandar"
-        };
-      };
-
-      // Classify all news
-      const classifiedNews = rawNews.map(news => {
-        const classification = classifyNews(news.headline);
-      
-        // Generate specific interpretation based on headline content
-        let specificInterpretation = classification.aiInterpretation;
-        let specificContextTag = classification.contextTag;
-      
-        // Customize interpretations for specific headlines
-        if (news.headline.includes("Laba Bersih")) {
-          specificInterpretation = "Pertumbuhan laba 12% YoY mengindikasikan keberlanjutan leverage operasional. Hasil ini dapat memengaruhi ekspektasi valuasi jangka menengah.";
-          specificContextTag = "Berpotensi memperkuat tesis valuasi";
-        } else if (news.headline.includes("Suku Bunga")) {
-          specificInterpretation = "Kebijakan suku bunga acuan dapat memengaruhi margin perbankan. Stabilitas suku bunga cenderung mendukung prediktabilitas pendapatan bunga bersih.";
-          specificContextTag = "Dapat memengaruhi ekspektasi NIM";
-        } else if (news.headline.includes("Analis Goldman")) {
-          specificInterpretation = "Rekomendasi analis internasional dapat memengaruhi aliran dana asing jangka pendek. Dampaknya bergantung pada respons pelaku institusi lainnya.";
-          specificContextTag = "Dapat memicu respons pelaku asing";
-        } else if (news.headline.includes("Digital Banking") || news.headline.includes("Aplikasi Digital")) {
-          specificInterpretation = "Pertumbuhan pengguna digital mencerminkan transformasi operasional, namun dampak ke profitabilitas memerlukan validasi lebih lanjut.";
-          specificContextTag = "Mendukung narasi transformasi digital";
-        } else if (news.headline.includes("Rumor")) {
-          specificInterpretation = "Informasi ini belum terkonfirmasi dan berasal dari sumber tidak resmi. Tidak direkomendasikan sebagai dasar analisis.";
-          specificContextTag = "Tidak dapat diverifikasi";
-        } else if (news.headline.includes("Penghargaan")) {
-          specificInterpretation = "Penghargaan bersifat simbolis dan tidak memiliki dampak langsung terhadap fundamental atau perilaku institusi.";
-          specificContextTag = "Tidak berdampak pada valuasi";
-        }
-      
-        // Check if news contradicts flow analysis
-        const flowContradictionNote = score < 40 && classification.category === "fundamental" 
-          ? " Respons pasar terhadap berita ini masih terbatas dan belum tercermin dalam perilaku bandar."
-          : "";
-      
-        return {
-          ...news,
-          category: classification.category,
-          categoryLabel: classification.category === "fundamental" 
-            ? "Berpengaruh ke Fundamental"
-            : classification.category === "sentiment"
-              ? "Mempengaruhi Sentimen Pasar"
-              : "Informasi Tidak Signifikan",
-          aiInterpretation: specificInterpretation + flowContradictionNote,
-          contextTag: specificContextTag
-        };
-      });
-
-      // Count by category
-      const fundamentalCount = classifiedNews.filter(n => n.category === "fundamental").length;
-      const sentimentCount = classifiedNews.filter(n => n.category === "sentiment").length;
-      const noiseCount = classifiedNews.filter(n => n.category === "noise").length;
-
-      // Summary text
-      const summaryText = `${fundamentalCount} berita fundamental • ${sentimentCount} berita sentimen • ${noiseCount} berita disaring`;
-
-      return {
-        summary: {
-          fundamentalCount,
-          sentimentCount,
-          noiseCount,
-          summaryText
-        },
-        news: classifiedNews,
-        // Architecture hooks for future features (not implemented yet)
-        _futureHooks: {
-          newsVsBandarReaction: null,
-          newsAbsorptionTracking: null,
-          newsImpactDecay: null
-        }
-      };
-    })();
-
     // ────────────────────────────────────────────────────────────
     // CLAUDE WEB SEARCH ENRICHMENT
     // Adds real-time news & macro context to the analysis.
@@ -627,21 +460,13 @@ export function registerAiRoutes(app: Express): void {
     
       // Action Guidance Mode (Decision Layer)
       actionGuidance,
-    
-      // Smart News Filter (Contextual Intelligence)
-      smartNewsFilter,
 
-      // Claude Web Search Analysis (real-time enrichment)
+      // Claude Web Search Analysis (real-time enrichment) — genuinely real,
+      // uses Claude's web_search tool. Everything else previously here
+      // (smartNewsFilter, event_analysis, risk_analysis) was hardcoded
+      // templated/fake text unused by the client UI — removed rather than
+      // presented as real analysis.
       webSearchAnalysis,
-
-      event_analysis: {
-        impact: "Sedang",
-        relevance: "Struktural",
-        thesis: `${payload.event_specifics?.event_type ?? 'Event'} (${payload.event_specifics?.headline ?? 'N/A'}) konsisten dengan tren operasional yang diamati. Meski peningkatan efisiensi struktural terlihat, sensitivitas makro tetap menjadi variabel utama untuk persistensi valuasi.`,
-        confidence: "Tinggi",
-        conditions: "Persistensi tesis mengasumsikan stabilitas permintaan kredit domestik dan tidak ada kontraksi signifikan pada Net Interest Margin (NIM) yang berlaku."
-      },
-      risk_analysis: `Risiko utama untuk ${payload.stock} berpusat pada de-rating yang didorong makro dan potensi kompresi NIM jika persaingan deposito meningkat. Kualitas aset yang ada memberikan bantalan defensif, meski premi valuasi tetap sensitif terhadap perlambatan pertumbuhan.`
     });
   });
 }

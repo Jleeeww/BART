@@ -32,7 +32,6 @@ export interface BandarmologyDetailInput {
   growth: number;
   insiderData: any;
   stockCharacter?: string | null;
-  eventType?: string;
 }
 
 // ─── Output types ─────────────────────────────────────────────────────────────
@@ -745,9 +744,6 @@ export function computeDetailFields(input: BandarmologyDetailInput): Bandarmolog
   }
   if (input.buyAvg && input.sellAvg >= input.buyAvg * 0.995) {
     distributionSignals.push("Distribution average gaining pricing power over accumulation.");
-  }
-  if (input.eventType === "Market Update") {
-    distributionSignals.push("Narrative exhaustion detected; lack of new structural catalysts.");
   }
 
   const earlyDistributionFlag = distributionSignals.length >= 3;

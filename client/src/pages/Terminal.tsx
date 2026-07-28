@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PriceChart } from "@/components/PriceChart";
 import { BandarmologyPanel } from "@/components/BandarmologyPanel";
+import { BrokerDistributionPanel } from "@/components/BrokerDistributionPanel";
 import { FinancialStatementsPanel } from "@/components/FinancialStatementsPanel";
 import { SymbolSearch } from "@/components/SymbolSearch";
 import { Card } from "@/components/ui/card";
@@ -193,6 +194,8 @@ export default function Terminal() {
             <Card className="p-4">
               <PriceChart symbol={symbol} />
             </Card>
+
+            <BrokerDistributionPanel symbol={symbol} />
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <FinancialStatementsPanel symbol={symbol} />
